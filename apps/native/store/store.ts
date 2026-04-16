@@ -1,15 +1,19 @@
 import { create } from 'zustand';
 
-export interface BearState {
-  bears: number;
-  increasePopulation: () => void;
-  removeAllBears: () => void;
-  updateBears: (newBears: number) => void;
+interface AuthState {
+  token: string | null;
+  isAuthenticated: boolean;
+  onboardingComplete: boolean;
+  setToken: (token: string | null) => void;
+  setOnboardingComplete: (complete: boolean) => void;
+  logout: () => void;
 }
 
-export const useStore = create<BearState>((set) => ({
-  bears: 0,
-  increasePopulation: () => set((state) => ({ bears: state.bears + 1 })),
-  removeAllBears: () => set({ bears: 0 }),
-  updateBears: (newBears) => set({ bears: newBears }),
+export const useAuthStore = create<AuthState>((set) => ({
+  token: null,
+  isAuthenticated: false,
+  onboardingComplete: false,
+  setToken: (token) => set({ token, isAuthenticated: !!token }),
+  setOnboardingComplete: (complete) => set({ onboardingComplete: complete }),
+  logout: () => set({ token: null, isAuthenticated: false, onboardingComplete: false }),
 }));
