@@ -1,159 +1,48 @@
-# Turborepo starter
+Using this design as the base, create a design system, then write it as an instructions skill for github opilot (or a set of skills), that doesn't make the AI copy 1 pecific design but gives the AI a set of design PRINCIPLES in terms fo layout, responsiveness, (on web, and even  obile on tablet devices spacing), typography, brand colors, color [sychology, color meaning...basically everything to be used in all frontend aspects of the app. i gave you 1 design, but these principles should ebexpande dina way that allows the AI to create mutlkple pages, which si why we dont' want toc oppy the deisng, but the prionciples behind ti instead, ibcluding the clean code and all tht. For native and web icons, use hugeicons, for the web, sue shadcn, for native, sue recatnativereusables component,s referencing them where possible int eh design. And thencome up with skills for code qualoty, code cleanliness, code reusability, using primitives such as hooks, functions, turborepo packageas, the middleware -router - controler archictecture, then write the design systen and this soec as a github copilot skill as doen here:
+GitHub Copilot Agent Skills are specialized, reusable units of knowledge and logic that enhance the capabilities of Copilot. Unlike general custom instructions that set global coding standards, Skills are on-demand modules containing instructions, scripts, and resources for specific tasks. 
+GitHub Docs
+GitHub Docs
+ +3
+Key Characteristics
+Modular & On-Demand: Skills are loaded only when relevant to your prompt, preventing "context rot" from unnecessary data.
+Resource Bundling: A skill folder can include not just markdown instructions (SKILL.md), but also helper scripts (Python, Node.js), templates, and reference data.
+Open Standard: They follow the Agent Skills specification, making them portable across tools like GitHub Copilot Chat in VS Code, Copilot CLI, and the Copilot cloud agent.
+Automatic Discovery: Copilot uses the skill's name and description to automatically trigger it when you ask a related question. 
+GitHub Docs
+GitHub Docs
+ +5
+Common Use Cases
+DevOps & SRE: Creating incident triage playbooks, Kubernetes rollback scripts, or Terraform review standards.
+Standardizing Workflows: Turning internal "tribal knowledge" into a repeatable runbook for tasks like PR summaries or bug triage.
+Advanced Refactoring: Defining multi-step processes for extracting logic into domain services or migrating legacy code.
+Specialized Domain Knowledge: Teaching Copilot about proprietary SDKs, internal design systems, or specific framework quirks. 
+GitHub Docs
+GitHub Docs
+ +5
+How to Create and Use Skills
+Storage Locations:
+Project-specific: Place them in .github/skills/ within your repository.
+Personal/Global: Store them in ~/.copilot/skills/ to use them across all your projects.
+Structure: Each skill must be its own subfolder containing a SKILL.md file. This file uses frontmatter for metadata (name and description) and contains the core instructions.
+Activation:
+Manual: Use a slash command in VS Code Chat (e.g., /my-custom-skill).
+Automatic: Simply prompt Copilot with keywords that match the skill's description.
+Community Resources: You can find and contribute skills through community collections like github/awesome-copilot or microsoft/skills. 
 
-This Turborepo starter is maintained by the Turborepo core team.
 
-## Using this example
 
-Run the following command:
 
-```sh
-npx create-turbo@latest
-```
 
-## What's inside?
 
-This Turborepo includes the following packages/apps:
 
-### Apps and Packages
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+Plan out what needs to be done for lernard to come to fruition feature by feature, starting with the first feature to the last one, taking into consid what neds to be done on the frontend, backend, clean code pracitces, how the code should eb structure, we're usong as turborpeo setup witb an apps and packages foldeR
 
-### Utilities
 
-This Turborepo has some additional tools already setup for you:
 
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
+Explain what eneds to be made a package fur reusability, what enedd to be made its own seperate function (not specific, write out specific guidelines for maintaining code quality)
 
-### Build
 
-To build all apps and packages, run the following command:
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
-```
-
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo build --filter=docs
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo dev
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
-```
-
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
-```
-
-### Remote Caching
-
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
-```
-
-Without global `turbo`, use your package manager:
-
-```sh
-cd my-turborepo
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
-
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+And then write it out as a prompt file for github copilot
