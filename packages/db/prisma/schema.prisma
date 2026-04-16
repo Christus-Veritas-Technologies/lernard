@@ -1,0 +1,356 @@
+// Lernard — PostgreSQL schema via Prisma
+// All entities from MAIN.md §12–14
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Role {
+  GUEST
+  STUDENT
+  GUARDIAN
+  TEACHER
+  SCHOOL_ADMIN
+}
+
+enum Plan {
+  EXPLORER
+  SCHOLAR
+  HOUSEHOLD
+  CAMPUS
+}
+
+enum LearningMode {
+  GUIDE
+  COMPANION
+}
+
+enum AgeGroup {
+  PRIMARY
+  SECONDARY
+  UNIVERSITY
+  PROFESSIONAL
+}
+
+enum StrengthLevel {
+  STRONG
+  DEVELOPING
+  NEEDS_WORK
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  FILL_IN_THE_BLANK
+  SHORT_ANSWER
+  ORDERING
+}
+
+enum SessionType {
+  LESSON
+  QUIZ
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  passwordHash String?  // null for social-only accounts
+  role         Role     @default(STUDENT)
+  plan         Plan     @default(EXPLORER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+
+  // Profile
+  ageGroup       AgeGroup?
+  grade          String?
+  timezone       String    @default("UTC")
+  learningMode   LearningMode @default(GUIDE)
+  preferredDepth String    @default("standard") // quick | standard | deep
+  sessionLength  Int       @default(20) // minutes
+  dailyGoal      Int       @default(1)  // sessions per day
+
+  // Onboarding
+  onboardingComplete Boolean @default(false)
+  firstLookComplete  Boolean @default(false)
+  sessionCount       Int     @default(0)
+  streakDays         Int     @default(0)
+  lastActiveAt       DateTime?
+
+  // Billing
+  billingAnchorDay        Int?    // day of month (1–28)
+  stripePriceId           String?
+  stripeSubscriptionId    String?
+  invalidatePermissionsAt DateTime?
+
+  // Guardian control
+  controlledByGuardianId String?
+  controlledBy           Guardian? @relation("GuardianStudents", fields: [controlledByGuardianId], references: [id])
+  lockedSettings         String[]  @default([]) // field names locked by guardian
+
+  // Relations
+  subjects          UserSubject[]
+  lessons           Lesson[]
+  quizzes           Quiz[]
+  conversations     Conversation[]
+  sessions          SessionRecord[]
+  refreshTokens     RefreshToken[]
+  settingsAudit     SettingsAudit[]
+  subjectProgress   SubjectProgress[]
+
+  @@index([email])
+  @@index([role])
+  @@index([deletedAt])
+}
+
+// ─── Guardian ─────────────────────────────────────────────────────────────────
+
+model Guardian {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  passwordHash String   // required for all guardians
+  createdAt    DateTime @default(now())
+
+  children     User[]          @relation("GuardianStudents")
+  invites      ChildInvite[]
+  settingsAudit SettingsAudit[]
+
+  @@index([userId])
+}
+
+// ─── Companion Controls (per child, set by guardian) ─────────────────────────
+
+model CompanionControls {
+  id              String @id @default(cuid())
+  studentId       String @unique
+  answerReveal    String @default("after_quiz") // immediate | after_quiz
+  quizRequired    Boolean @default(true)
+
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Settings Audit ───────────────────────────────────────────────────────────
+
+model SettingsAudit {
+  id          String   @id @default(cuid())
+  guardianId  String
+  studentId   String
+  setting     String
+  oldValue    String
+  newValue    String
+  ip          String
+  userAgent   String
+  createdAt   DateTime @default(now())
+
+  guardian Guardian @relation(fields: [guardianId], references: [id])
+  student  User     @relation(fields: [studentId], references: [id])
+
+  @@index([guardianId])
+  @@index([studentId])
+}
+
+// ─── Child Invite ─────────────────────────────────────────────────────────────
+
+model ChildInvite {
+  id         String   @id @default(cuid())
+  guardianId String
+  code       String   @unique // 6-digit
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  guardian Guardian @relation(fields: [guardianId], references: [id])
+
+  @@index([code])
+  @@index([expiresAt])
+}
+
+// ─── Refresh Token ────────────────────────────────────────────────────────────
+
+model RefreshToken {
+  id              String    @id @default(cuid())
+  userId          String
+  tokenHash       String    @unique
+  revoked         Boolean   @default(false)
+  replacedByHash  String?
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([expiresAt])
+}
+
+// ─── Subject ──────────────────────────────────────────────────────────────────
+
+model Subject {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+
+  userSubjects    UserSubject[]
+  subjectProgress SubjectProgress[]
+  lessons         Lesson[]
+  quizzes         Quiz[]
+}
+
+model UserSubject {
+  id            String   @id @default(cuid())
+  userId        String
+  subjectId     String
+  priorityIndex Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([userId, subjectId])
+  @@index([userId])
+}
+
+// ─── Subject Progress ─────────────────────────────────────────────────────────
+
+model SubjectProgress {
+  id            String        @id @default(cuid())
+  userId        String
+  subjectId     String
+  strengthLevel StrengthLevel @default(DEVELOPING)
+  topicScores   Json          @default("{}") // { [topic]: score 0-1 }
+  updatedAt     DateTime      @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id])
+
+  @@unique([userId, subjectId])
+  @@index([userId])
+}
+
+// ─── Lesson ───────────────────────────────────────────────────────────────────
+
+model Lesson {
+  id              String   @id @default(cuid())
+  userId          String
+  subjectId       String?
+  topic           String
+  depth           String   @default("standard") // quick | standard | deep
+  idempotencyKey  String   @unique
+  content         Json     // { hook, sections[], examples[], recap[] }
+  estimatedReadMs Int      @default(300000)
+  completed       Boolean  @default(false)
+  confidenceRating Int?    // 1-5 self-rating
+  createdAt       DateTime @default(now())
+  completedAt     DateTime?
+  deletedAt       DateTime?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject? @relation(fields: [subjectId], references: [id])
+  sessions SessionRecord[]
+
+  @@index([userId])
+  @@index([userId, subjectId])
+  @@index([deletedAt])
+}
+
+// ─── Quiz ─────────────────────────────────────────────────────────────────────
+
+model Quiz {
+  id             String   @id @default(cuid())
+  userId         String
+  subjectId      String?
+  topic          String
+  length         Int      @default(10)
+  idempotencyKey String   @unique
+  questions      Json     // QuizQuestion[]
+  answers        Json     @default("{}") // { [questionIndex]: userAnswer }
+  score          Int?     // out of questions.length
+  completed      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  completedAt    DateTime?
+  deletedAt      DateTime?
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject? @relation(fields: [subjectId], references: [id])
+  sessions SessionRecord[]
+
+  @@index([userId])
+  @@index([deletedAt])
+}
+
+// ─── Conversation ─────────────────────────────────────────────────────────────
+
+model Conversation {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?  // Haiku-generated 4–6 word title
+  summary   String?  // Haiku-compressed summary
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId])
+  @@index([userId, updatedAt])
+  @@index([deletedAt])
+}
+
+model ChatMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String   // user | assistant
+  content        Json     // plain text or structured slot blocks
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+}
+
+// ─── Session Record ───────────────────────────────────────────────────────────
+
+model SessionRecord {
+  id          String      @id @default(cuid())
+  userId      String
+  type        SessionType
+  lessonId    String?
+  quizId      String?
+  subjectName String
+  topic       String
+  durationMs  Int
+  createdAt   DateTime    @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson? @relation(fields: [lessonId], references: [id])
+  quiz   Quiz?   @relation(fields: [quizId], references: [id])
+
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([userId, type])
+}
+
+// ─── Idempotency Cache ────────────────────────────────────────────────────────
+
+model IdempotencyRecord {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  response  Json
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([key])
+  @@index([expiresAt])
+}
