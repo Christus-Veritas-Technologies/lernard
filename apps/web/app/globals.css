@@ -1,3 +1,66 @@
+@import "tailwindcss";
+
+@theme {
+  /* Primary — Periwinkle / Lavender Blue */
+  --color-primary-50: #F0F2FA;
+  --color-primary-100: #E0E4F4;
+  --color-primary-200: #C1C9E9;
+  --color-primary-300: #A8B5E0;
+  --color-primary-400: #7B8EC8;
+  --color-primary-500: #6478B8;
+  --color-primary-600: #4F62A3;
+  --color-primary-700: #3D4E8A;
+  --color-primary-800: #2C3A6E;
+  --color-primary-900: #1E2A54;
+
+  /* Surface & Background */
+  --color-surface: #FFFFFF;
+  --color-surface-elevated: #FFFFFF;
+  --color-background: #F0F2F8;
+  --color-background-subtle: #E8ECF4;
+
+  /* Accent Warm — Coral / Peach */
+  --color-accent-warm-100: #FFF0EC;
+  --color-accent-warm-200: #FFD6CC;
+  --color-accent-warm-300: #FFB7A5;
+  --color-accent-warm-400: #F4A896;
+  --color-accent-warm-500: #E8937F;
+
+  /* Accent Cool — Mint / Sage */
+  --color-accent-cool-100: #EDF7F1;
+  --color-accent-cool-200: #C8E6D0;
+  --color-accent-cool-300: #A8D8B9;
+  --color-accent-cool-400: #8DC5A3;
+  --color-accent-cool-500: #72B08C;
+
+  /* Category Pastels */
+  --color-category-purple: #C4B5E0;
+  --color-category-green: #B5E0C4;
+  --color-category-yellow: #E0D8B5;
+  --color-category-blue: #B5D0E0;
+  --color-category-pink: #E0B5D0;
+  --color-category-orange: #E0C8B5;
+
+  /* Text */
+  --color-text-primary: #1A1A2E;
+  --color-text-secondary: #6B7280;
+  --color-text-tertiary: #9CA3AF;
+  --color-text-inverse: #FFFFFF;
+  --color-text-link: #7B8EC8;
+
+  /* Semantic */
+  --color-success: #4CAF7D;
+  --color-success-bg: #EDF7F1;
+  --color-warning: #E5A84B;
+  --color-warning-bg: #FFF8EC;
+  --color-error: #E07B7B;
+  --color-error-bg: #FFF0F0;
+
+  /* Border & Divider */
+  --color-border: #E5E7EB;
+  --color-border-strong: #D1D5DB;
+  --color-divider: #F3F4F6;
+}
 :root {
   --background: #ffffff;
   --foreground: #171717;
