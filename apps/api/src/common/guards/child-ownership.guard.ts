@@ -19,8 +19,13 @@ export class ChildOwnershipGuard implements CanActivate {
       return true;
     }
 
+    const guardian = await this.prisma.guardian.findUnique({
+      where: { userId: user.id },
+      select: { id: true },
+    });
     const child = await this.prisma.user.findUnique({ where: { id: childId } });
-    if (!child || child.controlledByGuardianId !== user.id) {
+
+    if (!guardian || !child || child.controlledByGuardianId !== guardian.id) {
       throw new ForbiddenException('You do not have access to this child account');
     }
 

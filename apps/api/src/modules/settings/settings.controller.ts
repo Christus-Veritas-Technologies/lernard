@@ -1,4 +1,5 @@
 import { Controller, Get, Patch, Body } from '@nestjs/common';
+import type { PagePayload, SettingsContent } from '@lernard/shared-types';
 import { SettingsService } from './settings.service';
 import {
   UpdateModeDto,
@@ -15,18 +16,24 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @ProtectedRoute()
+  @Get('payload')
+  async getPayload(@CurrentUser() user: User): Promise<PagePayload<SettingsContent>> {
+    return this.settingsService.getPayload(user.id);
+  }
+
+  @ProtectedRoute()
   @Get()
   async get(@CurrentUser() user: User) {
     return this.settingsService.get(user.id);
   }
 
-  @ProtectedRoute()
+  @ProtectedRoute({ settingsLock: true })
   @Patch('mode')
   async updateMode(@CurrentUser() user: User, @Body() dto: UpdateModeDto) {
     return this.settingsService.updateMode(user.id, dto.mode);
   }
 
-  @ProtectedRoute()
+  @ProtectedRoute({ settingsLock: true })
   @Patch('companion-controls')
   async updateCompanionControls(
     @CurrentUser() user: User,
@@ -35,13 +42,13 @@ export class SettingsController {
     return this.settingsService.updateCompanionControls(user.id, dto);
   }
 
-  @ProtectedRoute()
+  @ProtectedRoute({ settingsLock: true })
   @Patch('appearance')
   async updateAppearance(@CurrentUser() user: User, @Body() dto: UpdateAppearanceDto) {
     return this.settingsService.updateAppearance(user.id, dto.appearance);
   }
 
-  @ProtectedRoute()
+  @ProtectedRoute({ settingsLock: true })
   @Patch('daily-goal')
   async updateDailyGoal(@CurrentUser() user: User, @Body() dto: UpdateDailyGoalDto) {
     return this.settingsService.updateDailyGoal(user.id, dto.dailyTarget);

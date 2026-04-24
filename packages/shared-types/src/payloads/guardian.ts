@@ -17,7 +17,8 @@ export interface GuardianSummary {
 
 export interface PendingInvite {
   id: string
-  childEmail: string
+  childEmail: string | null
+  code: string
   sentAt: string
   status: string
 }

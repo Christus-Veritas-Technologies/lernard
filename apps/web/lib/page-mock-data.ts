@@ -216,6 +216,7 @@ export const guardianDashboardContent: GuardianDashboardContent = {
         {
             id: "invite-1",
             childEmail: "new-family-member@example.com",
+            code: "483219",
             sentAt: "2026-04-23T13:10:00.000Z",
             status: "Awaiting acceptance",
         },

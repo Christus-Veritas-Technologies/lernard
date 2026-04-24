@@ -1,8 +1,10 @@
 import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Role } from '@lernard/shared-types';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { GuardianVerifyPasswordDto } from './dto/guardian-verify-password.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
 import type { User } from '@prisma/client';
@@ -61,9 +63,12 @@ export class AuthController {
     return { message: 'Not implemented' };
   }
 
+  @ProtectedRoute({ roles: [Role.GUARDIAN] })
   @Post('guardian/verify-password')
-  async guardianVerifyPassword() {
-    // TODO: Implement guardian password verification
-    return { message: 'Not implemented' };
+  async guardianVerifyPassword(
+    @CurrentUser() user: User,
+    @Body() dto: GuardianVerifyPasswordDto,
+  ) {
+    return this.authService.guardianVerifyPassword(user.id, dto.password);
   }
 }

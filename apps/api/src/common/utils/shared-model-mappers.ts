@@ -1,5 +1,7 @@
 import { StrengthLevel as PrismaStrengthLevel } from '@prisma/client';
 import {
+  Appearance,
+  LearningMode,
   SessionDepth,
   StrengthLevel,
 } from '@lernard/shared-types';
@@ -27,5 +29,33 @@ export function toSharedSessionDepth(value: string | null | undefined): SessionD
     case SessionDepth.STANDARD:
     default:
       return SessionDepth.STANDARD;
+  }
+}
+
+export function toSharedLearningMode(value: string | null | undefined): LearningMode {
+  switch (value?.toLowerCase()) {
+    case LearningMode.COMPANION:
+      return LearningMode.COMPANION;
+    case LearningMode.GUIDE:
+    default:
+      return LearningMode.GUIDE;
+  }
+}
+
+export function toPrismaLearningMode(
+  value: LearningMode | 'guide' | 'companion',
+): 'GUIDE' | 'COMPANION' {
+  return value === LearningMode.COMPANION ? 'COMPANION' : 'GUIDE';
+}
+
+export function toSharedAppearance(value: string | null | undefined): Appearance {
+  switch (value?.toLowerCase()) {
+    case Appearance.DARK:
+      return Appearance.DARK;
+    case Appearance.LIGHT:
+      return Appearance.LIGHT;
+    case Appearance.SYSTEM:
+    default:
+      return Appearance.SYSTEM;
   }
 }

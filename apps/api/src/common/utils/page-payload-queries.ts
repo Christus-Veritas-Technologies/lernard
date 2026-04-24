@@ -21,6 +21,7 @@ export interface GrowthAreaSnapshot {
 
 export interface PendingInviteSnapshot {
   id: string;
+  childEmail: string | null;
   code: string;
   createdAt: string;
   expiresAt: string;
@@ -109,6 +110,7 @@ export async function listPendingInviteSnapshots(
 
   return invites.map((invite) => ({
     id: invite.id,
+    childEmail: invite.childEmail ?? null,
     code: invite.code,
     createdAt: invite.createdAt.toISOString(),
     expiresAt: invite.expiresAt.toISOString(),

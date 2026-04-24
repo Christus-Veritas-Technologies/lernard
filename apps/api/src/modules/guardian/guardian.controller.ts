@@ -19,11 +19,25 @@ import {
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
 import type { User } from '@prisma/client';
+import type {
+  ChildCompanionContent,
+  ChildProfileContent,
+  GuardianDashboardContent,
+  PagePayload,
+} from '@lernard/shared-types';
 import { Role } from '@lernard/shared-types';
 
 @Controller('guardian')
 export class GuardianController {
   constructor(private readonly guardianService: GuardianService) {}
+
+  @ProtectedRoute({ roles: [Role.GUARDIAN] })
+  @Get('children/payload')
+  async getChildrenPayload(
+    @CurrentUser() user: User,
+  ): Promise<PagePayload<GuardianDashboardContent>> {
+    return this.guardianService.getChildrenPayload(user.id);
+  }
 
   @ProtectedRoute({ roles: [Role.GUARDIAN] })
   @Get('children')
@@ -53,6 +67,15 @@ export class GuardianController {
   @Delete('children/invite/:token')
   async cancelInvite(@CurrentUser() user: User, @Param('token') token: string) {
     return this.guardianService.cancelInvite(user.id, token);
+  }
+
+  @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
+  @Get('children/:childId/payload')
+  async getChildPayload(
+    @CurrentUser() user: User,
+    @Param('childId') childId: string,
+  ): Promise<PagePayload<ChildProfileContent>> {
+    return this.guardianService.getChildPayload(user.id, childId);
   }
 
   @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
@@ -93,6 +116,15 @@ export class GuardianController {
       cursor,
       Math.min(limit!, 50),
     );
+  }
+
+  @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
+  @Get('children/:childId/companion-controls/payload')
+  async getChildCompanionPayload(
+    @CurrentUser() user: User,
+    @Param('childId') childId: string,
+  ): Promise<PagePayload<ChildCompanionContent>> {
+    return this.guardianService.getChildCompanionPayload(user.id, childId);
   }
 
   @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })

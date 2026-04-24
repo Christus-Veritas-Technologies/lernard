@@ -101,6 +101,23 @@ export class AuthService {
     });
   }
 
+  async guardianVerifyPassword(userId: string, password: string) {
+    const guardian = await this.prisma.guardian.findUnique({
+      where: { userId },
+    });
+
+    if (!guardian) {
+      throw new UnauthorizedException('Guardian account not found');
+    }
+
+    const valid = await bcrypt.compare(password, guardian.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Incorrect guardian password');
+    }
+
+    return { verified: true };
+  }
+
   getMe(user: User) {
     return {
       id: user.id,

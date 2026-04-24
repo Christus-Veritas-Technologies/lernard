@@ -76,9 +76,11 @@ model User {
   grade          String?
   timezone       String    @default("UTC")
   learningMode   LearningMode @default(GUIDE)
+  appearance      String    @default("system")
   preferredDepth String    @default("standard") // quick | standard | deep
   sessionLength  Int       @default(20) // minutes
   dailyGoal      Int       @default(1)  // sessions per day
+  notificationsEnabled Boolean @default(true)
 
   // Onboarding
   onboardingComplete Boolean @default(false)
@@ -166,6 +168,7 @@ model SettingsAudit {
 model ChildInvite {
   id         String   @id @default(cuid())
   guardianId String
+  childEmail String?
   code       String   @unique // 6-digit
   expiresAt  DateTime
   usedAt     DateTime?
