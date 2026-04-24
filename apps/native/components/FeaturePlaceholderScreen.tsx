@@ -4,88 +4,88 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 
 interface FeaturePlaceholderItem {
-  title: string;
-  description: string;
-  detail: string;
-  tone?: 'primary' | 'cool' | 'warm';
+    title: string;
+    description: string;
+    detail: string;
+    tone?: 'primary' | 'cool' | 'warm';
 }
 
 interface FeaturePlaceholderScreenProps {
-  badge: string;
-  eyebrow: string;
-  title: string;
-  description: string;
-  noteTitle: string;
-  noteDescription: string;
-  items: FeaturePlaceholderItem[];
-  actionTitle?: string;
-  onActionPress?: () => void;
+    badge: string;
+    eyebrow: string;
+    title: string;
+    description: string;
+    noteTitle: string;
+    noteDescription: string;
+    items: FeaturePlaceholderItem[];
+    actionTitle?: string;
+    onActionPress?: () => void;
 }
 
 export function FeaturePlaceholderScreen({
-  badge,
-  eyebrow,
-  title,
-  description,
-  noteTitle,
-  noteDescription,
-  items,
-  actionTitle,
-  onActionPress,
+    badge,
+    eyebrow,
+    title,
+    description,
+    noteTitle,
+    noteDescription,
+    items,
+    actionTitle,
+    onActionPress,
 }: FeaturePlaceholderScreenProps) {
-  return (
-    <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
-        <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
-          <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">{eyebrow}</Text>
-          <Text className="mt-3 text-3xl font-semibold text-slate-900">{title}</Text>
-          <Text className="mt-3 text-base leading-7 text-slate-600">{description}</Text>
-          <View className="mt-5 self-start rounded-full bg-indigo-100 px-3 py-1">
-            <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">{badge}</Text>
-          </View>
-          {actionTitle && onActionPress ? (
-            <Button className="mt-6 self-start" onPress={onActionPress} title={actionTitle} variant="secondary" />
-          ) : null}
-        </View>
+    return (
+        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+            <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
+                <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
+                    <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">{eyebrow}</Text>
+                    <Text className="mt-3 text-3xl font-semibold text-slate-900">{title}</Text>
+                    <Text className="mt-3 text-base leading-7 text-slate-600">{description}</Text>
+                    <View className="mt-5 self-start rounded-full bg-indigo-100 px-3 py-1">
+                        <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">{badge}</Text>
+                    </View>
+                    {actionTitle && onActionPress ? (
+                        <Button className="mt-6 self-start" onPress={onActionPress} title={actionTitle} variant="secondary" />
+                    ) : null}
+                </View>
 
-        <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-          <Text className="text-2xl font-semibold text-slate-900">What&apos;s happening here</Text>
-          <Text className="mt-3 text-base leading-7 text-slate-600">{noteDescription}</Text>
-          <View className="mt-5 self-start rounded-full bg-amber-100 px-3 py-1">
-            <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{noteTitle}</Text>
-          </View>
-        </View>
+                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                    <Text className="text-2xl font-semibold text-slate-900">What&apos;s happening here</Text>
+                    <Text className="mt-3 text-base leading-7 text-slate-600">{noteDescription}</Text>
+                    <View className="mt-5 self-start rounded-full bg-amber-100 px-3 py-1">
+                        <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">{noteTitle}</Text>
+                    </View>
+                </View>
 
-        <View className="gap-4">
-          {items.map((item) => (
-            <View className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm" key={item.title}>
-              <View className={joinClasses('self-start rounded-full px-3 py-1', itemBadgeVariants[item.tone ?? 'primary'])}>
-                <Text className={joinClasses('text-xs font-semibold uppercase tracking-[0.16em]', itemTextVariants[item.tone ?? 'primary'])}>
-                  {item.title}
-                </Text>
-              </View>
-              <Text className="mt-4 text-xl font-semibold text-slate-900">{item.description}</Text>
-              <Text className="mt-3 text-base leading-7 text-slate-600">{item.detail}</Text>
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+                <View className="gap-4">
+                    {items.map((item) => (
+                        <View className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm" key={item.title}>
+                            <View className={joinClasses('self-start rounded-full px-3 py-1', itemBadgeVariants[item.tone ?? 'primary'])}>
+                                <Text className={joinClasses('text-xs font-semibold uppercase tracking-[0.16em]', itemTextVariants[item.tone ?? 'primary'])}>
+                                    {item.title}
+                                </Text>
+                            </View>
+                            <Text className="mt-4 text-xl font-semibold text-slate-900">{item.description}</Text>
+                            <Text className="mt-3 text-base leading-7 text-slate-600">{item.detail}</Text>
+                        </View>
+                    ))}
+                </View>
+            </ScrollView>
+        </SafeAreaView>
+    );
 }
 
 const itemBadgeVariants = {
-  primary: 'bg-indigo-100',
-  cool: 'bg-sky-100',
-  warm: 'bg-amber-100',
+    primary: 'bg-indigo-100',
+    cool: 'bg-sky-100',
+    warm: 'bg-amber-100',
 } as const;
 
 const itemTextVariants = {
-  primary: 'text-indigo-700',
-  cool: 'text-sky-700',
-  warm: 'text-amber-800',
+    primary: 'text-indigo-700',
+    cool: 'text-sky-700',
+    warm: 'text-amber-800',
 } as const;
 
 function joinClasses(...classes: Array<string | undefined>) {
-  return classes.filter(Boolean).join(' ');
+    return classes.filter(Boolean).join(' ');
 }

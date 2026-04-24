@@ -11,12 +11,14 @@ import { LearnModule } from './modules/learn/learn.module';
 import { ProgressModule } from './modules/progress/progress.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { GuardianModule } from './modules/guardian/guardian.module';
+import { MastraModule } from './modules/mastra/mastra.module';
 import { PrismaModule } from './prisma/prisma.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    MastraModule,
     AuthModule,
     OnboardingModule,
     SubjectsModule,
