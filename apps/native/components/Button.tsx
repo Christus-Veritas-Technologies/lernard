@@ -3,15 +3,18 @@ import { Text, TouchableOpacity, TouchableOpacityProps, View } from 'react-nativ
 
 interface ButtonProps extends TouchableOpacityProps {
   title: string;
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  textClassName?: string;
 }
 
-export const Button = forwardRef<View, ButtonProps>(({ title, ...touchableProps }, ref) => {
+export const Button = forwardRef<View, ButtonProps>(({ title, variant = 'primary', textClassName, disabled, ...touchableProps }, ref) => {
   return (
     <TouchableOpacity
       ref={ref}
       {...touchableProps}
-      className={`${styles.button} ${touchableProps.className}`}>
-      <Text className={styles.buttonText}>{title}</Text>
+      disabled={disabled}
+      className={joinClasses(styles.button, buttonVariants[variant], disabled ? 'opacity-60' : undefined, touchableProps.className)}>
+      <Text className={joinClasses(buttonTextVariants[variant], textClassName)}>{title}</Text>
     </TouchableOpacity>
   );
 });
@@ -19,6 +22,23 @@ export const Button = forwardRef<View, ButtonProps>(({ title, ...touchableProps 
 Button.displayName = 'Button';
 
 const styles = {
-  button: 'items-center bg-indigo-500 rounded-[28px] shadow-md p-4',
-  buttonText: 'text-white text-lg font-semibold text-center',
+  button: 'items-center justify-center rounded-[28px] px-4 py-3.5 shadow-sm',
 };
+
+const buttonVariants = {
+  primary: 'bg-indigo-500',
+  secondary: 'border border-slate-200 bg-white',
+  danger: 'bg-rose-500',
+  ghost: 'border border-slate-200 bg-transparent',
+} as const;
+
+const buttonTextVariants = {
+  primary: 'text-center text-base font-semibold text-white',
+  secondary: 'text-center text-base font-semibold text-slate-900',
+  danger: 'text-center text-base font-semibold text-white',
+  ghost: 'text-center text-base font-semibold text-slate-700',
+} as const;
+
+function joinClasses(...classes: Array<string | undefined>) {
+  return classes.filter(Boolean).join(' ');
+}
