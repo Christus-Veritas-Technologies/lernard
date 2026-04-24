@@ -110,6 +110,8 @@
       "name": "@lernard/web",
       "version": "0.0.0",
       "dependencies": {
+        "@lernard/auth-core": "*",
+        "@lernard/routes": "*",
         "@lernard/shared-types": "*",
         "@lernard/ui": "*",
         "@tailwindcss/postcss": "^4.0.0",

@@ -11,6 +11,8 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@lernard/auth-core": "*",
+    "@lernard/routes": "*",
     "@lernard/shared-types": "*",
     "@lernard/ui": "*",
     "next": "16.2.0",

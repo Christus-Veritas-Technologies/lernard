@@ -1,52 +1,161 @@
 "use client";
 
-import { useState } from "react";
+import { ROUTES } from "@lernard/routes";
+import type { ChildCompanionContent, CompanionControls } from "@lernard/shared-types";
+import { useEffect, useState } from "react";
 
 import { PageHero } from "../../../../../components/dashboard/PageHero";
 import { StatCard } from "../../../../../components/dashboard/StatCard";
 import { Badge } from "../../../../../components/ui/Badge";
 import { Button } from "../../../../../components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../components/ui/Card";
+import { usePagePayload } from "../../../../../hooks/usePagePayload";
+import { browserApiFetch } from "../../../../../lib/browser-api";
 import { formatRelativeDate } from "../../../../../lib/formatters";
-import { companionControlState } from "../../../../../lib/page-mock-data";
 import { ToggleCard } from "../../../../../components/guardian/ToggleCard";
 
 interface ChildCompanionClientProps {
     childId: string;
-    childName: string;
 }
 
-export function ChildCompanionClient({ childId, childName }: ChildCompanionClientProps) {
-    const [controls, setControls] = useState(companionControlState);
-    const [statusMessage, setStatusMessage] = useState(
-        "Changes have not been saved yet.",
+export function ChildCompanionClient({ childId }: ChildCompanionClientProps) {
+    const { data, error, isAuthenticated, loading, refetch } = usePagePayload<ChildCompanionContent>(
+        ROUTES.GUARDIAN.CHILD_COMPANION_PAYLOAD(childId),
     );
+    const [controls, setControls] = useState<CompanionControls | null>(null);
+    const [savedControls, setSavedControls] = useState<CompanionControls | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
+    const [statusMessage, setStatusMessage] = useState("Changes have not been saved yet.");
+
+    useEffect(() => {
+        if (!data?.content.controls) {
+            return;
+        }
+
+        setControls(data.content.controls);
+        setSavedControls(data.content.controls);
+        setStatusMessage("Live companion controls loaded.");
+    }, [data]);
 
     function updateControl(key: "showCorrectAnswers" | "allowHints" | "allowSkip", value: boolean) {
-        setControls((current) => ({
-            ...current,
-            [key]: value,
-        }));
+        setControls((current) => {
+            const nextControls = ensureControls(current);
+
+            return {
+                ...nextControls,
+                [key]: value,
+            };
+        });
         setStatusMessage("Changes staged locally. Save when you're ready.");
     }
 
-    function saveChanges() {
-        setControls((current) => ({
-            ...current,
-            lastChangedAt: new Date().toISOString(),
-        }));
-        setStatusMessage("Companion controls updated for this child.");
+    async function saveChanges() {
+        if (!controls) {
+            return;
+        }
+
+        setIsSaving(true);
+        setStatusMessage("Saving live changes to Lernard...");
+
+        try {
+            const updatedControls = await browserApiFetch<CompanionControls>(
+                ROUTES.GUARDIAN.CHILD_COMPANION_CONTROLS(childId),
+                {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                        showCorrectAnswers: controls.showCorrectAnswers,
+                        allowHints: controls.allowHints,
+                        allowSkip: controls.allowSkip,
+                    }),
+                },
+            );
+
+            setControls(updatedControls);
+            setSavedControls(updatedControls);
+            setStatusMessage("Companion controls updated for this child.");
+        } catch (saveError) {
+            setStatusMessage(
+                saveError instanceof Error
+                    ? saveError.message
+                    : "Something interrupted the save.",
+            );
+        } finally {
+            setIsSaving(false);
+        }
     }
 
     function resetDefaults() {
         setControls({
-            ...companionControlState,
+            ...ensureControls(controls),
             showCorrectAnswers: true,
             allowHints: true,
             allowSkip: false,
         });
         setStatusMessage("Controls reset to the recommended default mix.");
     }
+
+    if (!isAuthenticated) {
+        return (
+            <Card>
+                <CardHeader>
+                    <Badge className="w-fit" tone="warm">
+                        Sign in required
+                    </Badge>
+                    <CardTitle>Companion controls need your guardian session</CardTitle>
+                    <CardDescription>
+                        Lernard can only load and save live companion settings once the guardian session is active.
+                    </CardDescription>
+                </CardHeader>
+            </Card>
+        );
+    }
+
+    if (error) {
+        return (
+            <Card>
+                <CardHeader>
+                    <Badge className="w-fit" tone="warning">
+                        Live payload failed
+                    </Badge>
+                    <CardTitle>Companion controls could not load right now</CardTitle>
+                    <CardDescription>{error.message}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button onClick={refetch}>Try again</Button>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (loading || !controls || !data) {
+        return (
+            <div className="grid gap-6">
+                <Card className="overflow-hidden bg-[linear-gradient(135deg,#f9fbff_0%,#ffffff_55%,#fff7f2_100%)]">
+                    <CardContent className="mt-0 grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.9fr)] lg:items-start">
+                        <div className="space-y-4">
+                            <div className="h-4 w-28 rounded-full bg-background-subtle" />
+                            <div className="h-10 w-2/3 rounded-2xl bg-background-subtle" />
+                            <div className="h-24 w-full rounded-3xl bg-background-subtle" />
+                        </div>
+                        <div className="grid gap-4">
+                            <div className="h-36 rounded-3xl bg-background-subtle" />
+                            <div className="h-36 rounded-3xl bg-background-subtle" />
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    const childName = data.content.child.name;
+    const hasUnsavedChanges = Boolean(
+        savedControls
+        && (
+            savedControls.showCorrectAnswers !== controls.showCorrectAnswers
+            || savedControls.allowHints !== controls.allowHints
+            || savedControls.allowSkip !== controls.allowSkip
+        ),
+    );
 
     return (
         <div className="flex flex-col gap-6">
@@ -75,7 +184,9 @@ export function ChildCompanionClient({ childId, childName }: ChildCompanionClien
             >
                 <Badge tone="primary">Child ID: {childId}</Badge>
                 <Badge tone="warm">Last changed by {controls.lastChangedBy}</Badge>
-                <Button onClick={saveChanges}>Save changes</Button>
+                <Button disabled={!hasUnsavedChanges || isSaving} onClick={saveChanges}>
+                    {isSaving ? "Saving..." : "Save changes"}
+                </Button>
                 <Button onClick={resetDefaults} variant="secondary">
                     Reset defaults
                 </Button>
@@ -128,13 +239,15 @@ export function ChildCompanionClient({ childId, childName }: ChildCompanionClien
                         <CardHeader>
                             <CardTitle>Update status</CardTitle>
                             <CardDescription>
-                                Final verification can be added later through the guardian password check flow.
+                                This panel now saves directly to the live guardian companion-controls endpoint.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <p className="text-sm leading-6 text-text-secondary">{statusMessage}</p>
                             <div className="flex flex-wrap gap-2">
-                                <Button onClick={saveChanges}>Save now</Button>
+                                <Button disabled={!hasUnsavedChanges || isSaving} onClick={saveChanges}>
+                                    {isSaving ? "Saving..." : "Save now"}
+                                </Button>
                                 <Button onClick={resetDefaults} variant="secondary">
                                     Restore defaults
                                 </Button>
@@ -145,4 +258,15 @@ export function ChildCompanionClient({ childId, childName }: ChildCompanionClien
             </section>
         </div>
     );
+}
+
+function ensureControls(controls: CompanionControls | null) {
+    return controls ?? {
+        showCorrectAnswers: true,
+        allowHints: true,
+        allowSkip: false,
+        lockedByGuardian: true,
+        lastChangedAt: new Date().toISOString(),
+        lastChangedBy: "Guardian",
+    };
 }
