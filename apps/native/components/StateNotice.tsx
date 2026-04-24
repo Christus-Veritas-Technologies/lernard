@@ -1,6 +1,10 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import { Card, CardContent, CardHeader, CardTitle } from '@rnr/card';
+import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { cn } from '@/lib/cn';
 
 interface StateNoticeProps {
     badge: string;
@@ -20,23 +24,27 @@ export function StateNotice({
     onActionPress,
 }: StateNoticeProps) {
     return (
-        <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-            <View className={joinClasses('self-start rounded-full px-3 py-1', badgeVariants[tone])}>
-                <Text className={joinClasses('text-xs font-semibold uppercase tracking-[0.18em]', badgeTextVariants[tone])}>
-                    {badge}
-                </Text>
-            </View>
-            <Text className="mt-4 text-2xl font-semibold text-slate-900">{title}</Text>
-            <Text className="mt-3 text-base leading-7 text-slate-600">{description}</Text>
-            {actionTitle && onActionPress ? (
-                <Button
-                    className="mt-5 self-start"
-                    onPress={onActionPress}
-                    title={actionTitle}
-                    variant="secondary"
-                />
-            ) : null}
-        </View>
+        <Card className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+            <CardHeader className="gap-0">
+                <View className={cn('self-start rounded-full px-3 py-1', badgeVariants[tone])}>
+                    <Text className={cn('text-xs font-semibold uppercase tracking-[0.18em]', badgeTextVariants[tone])}>
+                        {badge}
+                    </Text>
+                </View>
+                <CardTitle className="mt-4 text-2xl">{title}</CardTitle>
+            </CardHeader>
+            <CardContent className="mt-3 gap-0">
+                <Text className="text-base leading-7 text-slate-600">{description}</Text>
+                {actionTitle && onActionPress ? (
+                    <Button
+                        className="mt-5 self-start"
+                        onPress={onActionPress}
+                        title={actionTitle}
+                        variant="secondary"
+                    />
+                ) : null}
+            </CardContent>
+        </Card>
     );
 }
 
@@ -51,7 +59,3 @@ const badgeTextVariants = {
     warm: 'text-amber-800',
     warning: 'text-rose-700',
 } as const;
-
-function joinClasses(...classes: Array<string | undefined>) {
-    return classes.filter(Boolean).join(' ');
-}

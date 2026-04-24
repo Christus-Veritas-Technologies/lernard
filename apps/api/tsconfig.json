@@ -22,8 +22,7 @@
     "paths": {
       "@lernard/shared-types": ["../../packages/shared-types/src/index.ts"],
       "@lernard/routes": ["../../packages/routes/src/index.ts"],
-      "@lernard/validation": ["../../packages/validation/src/index.ts"],
-      "@lernard/db": ["../../packages/db/src/index.ts"]
+      "@lernard/validation": ["../../packages/validation/src/index.ts"]
     }
   },
   "include": ["src/**/*"],

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
-import { Badge } from "../ui/Badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/Card";
-import { ProgressBar } from "../ui/ProgressBar";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
 
 interface StatCardProps {
     label: string;
@@ -37,7 +37,7 @@ export function StatCard({
             </CardHeader>
             {typeof progress === "number" || footer ? (
                 <CardContent className="space-y-4">
-                    {typeof progress === "number" ? <ProgressBar value={progress} /> : null}
+                    {typeof progress === "number" ? <Progress value={progress} /> : null}
                     {footer}
                 </CardContent>
             ) : null}

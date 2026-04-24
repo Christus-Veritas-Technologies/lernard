@@ -1,15 +1,27 @@
-# Lernard Claude/Mastra Integration
+# Lernard Mastra Service
 
 ## Overview
 
-Lernard uses Anthropic's Claude API for AI-powered content generation:
+Lernard's NestJS backend exposes a dedicated Mastra service layer in `src/mastra/` for AI-powered content generation:
 - **Claude Sonnet 4.6** (`claude-sonnet-4-5-20250929`) - Lesson and quiz generation
 - **Claude Haiku 4.5** (`claude-haiku-4-5-20251001`) - Validation and slot content
+
+Current structure:
+
+```text
+src/
+  mastra/
+    mastra.module.ts
+    mastra.service.ts
+  common/utils/
+    complete-with-retry.ts
+    validate-generated-content.ts
+```
 
 ## Setup
 
 ### 1. Install Dependencies
-Anthropic SDK is included in `apps/api/package.json`:
+The Claude client dependency is included in `apps/api/package.json`:
 ```bash
 bun install
 ```
@@ -24,11 +36,10 @@ Get your API key from [console.anthropic.com](https://console.anthropic.com)
 
 ### 3. Usage
 
-The `MastraService` is available in any NestJS controller/service:
+The `MastraService` is available to any NestJS service through dependency injection:
 
 ```typescript
-// Inject the service
-constructor(private mastraService: MastraService) {}
+constructor(private readonly mastraService: MastraService) {}
 
 // Generate a lesson
 const lesson = await this.mastraService.generateLesson({
@@ -44,11 +55,8 @@ const quiz = await this.mastraService.generateQuiz({
   questionCount: 5
 });
 
-// Validate content
-const { valid, reason } = await this.mastraService.validateContent(
-  lessonContent,
-  'lesson'
-);
+// Validate generated content before storage
+await validateGeneratedContent(lesson, this.mastraService);
 
 // Generate UI slot content
 const slotContent = await this.mastraService.generateSlotContent({
@@ -59,17 +67,13 @@ const slotContent = await this.mastraService.generateSlotContent({
 
 ## Important Rules
 
-1. **Always use `completeWithRetry()`** - Wrap Claude calls in the retry wrapper:
-   ```typescript
-   const content = await completeWithRetry(() =>
-     this.mastraService.generateLesson({ ... })
-   );
-   ```
+1. **All Claude calls already route through `completeWithRetry()`** inside `MastraService`.
+  Never call the Claude client directly from feature services or controllers.
 
 2. **Validate generated content** before storing:
    ```typescript
-   const { valid, reason } = await this.mastraService.validateContent(content, 'lesson');
-   if (!valid) throw new Error(`Validation failed: ${reason}`);
+  const content = await this.mastraService.generateLesson({ ... });
+  await validateGeneratedContent(content, this.mastraService);
    ```
 
 3. **Use the right model**:
@@ -94,7 +98,7 @@ const slotContent = await this.mastraService.generateSlotContent({
 
 Watch for:
 - `ANTHROPIC_API_KEY` missing warnings in logs
-- Rate limit errors (429) - `completeWithRetry()` handles exponential backoff
+- Rate limit errors (429) - `completeWithRetry()` applies exponential backoff
 - Token limit errors - use shorter prompts or lower `max_tokens`
 
 ## Testing
@@ -106,9 +110,7 @@ ANTHROPIC_API_KEY=test-key npm test
 
 (Actual requests won't be made without a valid API key, but the service will initialize)
 
-## Future Enhancements
+## Notes
 
-- [ ] Implement Mastra full framework for memory/agent orchestration
-- [ ] Add prompt caching for repeated content types
-- [ ] Add batch processing for bulk generation
-- [ ] Add custom prompt templates per content type
+- `validateGeneratedContent()` now delegates to `MastraService.validate()` and throws when Haiku marks content unsafe.
+- Feature services such as lessons, quizzes, and chat should stay thin at the controller layer and delegate AI work into service methods that depend on `MastraService`.

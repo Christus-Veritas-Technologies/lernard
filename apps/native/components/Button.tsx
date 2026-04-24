@@ -1,25 +1,24 @@
-import { forwardRef } from 'react';
-import { Text, TouchableOpacity, TouchableOpacityProps, View } from 'react-native';
+import { Button as PrimitiveButton, type ButtonProps as PrimitiveButtonProps } from '@rnr/button';
+import { Text } from '@rnr/text';
 
-interface ButtonProps extends TouchableOpacityProps {
+import { cn } from '@/lib/cn';
+
+interface ButtonProps extends PrimitiveButtonProps {
   title: string;
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   textClassName?: string;
 }
 
-export const Button = forwardRef<View, ButtonProps>(({ title, variant = 'primary', textClassName, disabled, ...touchableProps }, ref) => {
+export function Button({ title, variant = 'primary', textClassName, disabled, ...buttonProps }: ButtonProps) {
   return (
-    <TouchableOpacity
-      ref={ref}
-      {...touchableProps}
+    <PrimitiveButton
+      {...buttonProps}
       disabled={disabled}
-      className={joinClasses(styles.button, buttonVariants[variant], disabled ? 'opacity-60' : undefined, touchableProps.className)}>
-      <Text className={joinClasses(buttonTextVariants[variant], textClassName)}>{title}</Text>
-    </TouchableOpacity>
+      className={cn(styles.button, buttonVariants[variant], disabled ? 'opacity-60' : undefined, buttonProps.className)}>
+      <Text className={cn(buttonTextVariants[variant], textClassName)}>{title}</Text>
+    </PrimitiveButton>
   );
-});
-
-Button.displayName = 'Button';
+}
 
 const styles = {
   button: 'items-center justify-center rounded-[28px] px-4 py-3.5 shadow-sm',
@@ -38,7 +37,3 @@ const buttonTextVariants = {
   danger: 'text-center text-base font-semibold text-white',
   ghost: 'text-center text-base font-semibold text-slate-700',
 } as const;
-
-function joinClasses(...classes: Array<string | undefined>) {
-  return classes.filter(Boolean).join(' ');
-}

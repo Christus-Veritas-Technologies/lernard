@@ -4,15 +4,15 @@ import { ROUTES } from "@lernard/routes";
 import type { ChildCompanionContent, CompanionControls } from "@lernard/shared-types";
 import { useEffect, useState } from "react";
 
-import { PageHero } from "../../../../../components/dashboard/PageHero";
-import { StatCard } from "../../../../../components/dashboard/StatCard";
-import { Badge } from "../../../../../components/ui/Badge";
-import { Button } from "../../../../../components/ui/Button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../../components/ui/Card";
-import { usePagePayload } from "../../../../../hooks/usePagePayload";
-import { browserApiFetch } from "../../../../../lib/browser-api";
-import { formatRelativeDate } from "../../../../../lib/formatters";
-import { ToggleCard } from "../../../../../components/guardian/ToggleCard";
+import { PageHero } from "@/components/dashboard/PageHero";
+import { ToggleCard } from "@/components/guardian/ToggleCard";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePagePayload } from "@/hooks/usePagePayload";
+import { browserApiFetch } from "@/lib/browser-api";
+import { formatRelativeDate } from "@/lib/formatters";
 
 interface ChildCompanionClientProps {
     childId: string;

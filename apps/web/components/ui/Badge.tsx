@@ -1,6 +1,6 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
-import { cn } from "../../lib/cn";
+import { cn } from "@/lib/cn";
 
 type BadgeTone = "primary" | "warm" | "cool" | "success" | "warning" | "muted";
 

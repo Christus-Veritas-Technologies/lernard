@@ -1,4 +1,4 @@
-import { Badge } from "../ui/Badge";
+import { Badge } from "@/components/ui/badge";
 
 interface TimelineListItem {
     id: string;

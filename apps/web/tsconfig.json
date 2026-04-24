@@ -1,6 +1,10 @@
 {
-  "extends": "@lernard/typescript-config/nextjs.json",
+  "extends": "../../packages/config/typescript/nextjs.json",
   "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
     "plugins": [
       {
         "name": "next"

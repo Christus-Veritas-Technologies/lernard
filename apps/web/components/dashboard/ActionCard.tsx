@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
-import { Badge } from "../ui/Badge";
-import { Button } from "../ui/Button";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
     Card,
     CardContent,
@@ -9,7 +9,7 @@ import {
     CardFooter,
     CardHeader,
     CardTitle,
-} from "../ui/Card";
+} from "@/components/ui/card";
 
 interface ActionCardProps {
     title: string;

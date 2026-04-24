@@ -1,10 +1,12 @@
 import { useLocalSearchParams } from 'expo-router';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
 import type { ChildCompanionContent, CompanionControls } from '@lernard/shared-types';
 import { useEffect, useState } from 'react';
+
+import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
 import { StateNotice } from '@/components/StateNotice';

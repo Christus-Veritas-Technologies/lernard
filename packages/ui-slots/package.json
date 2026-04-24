@@ -15,7 +15,7 @@
     "@lernard/shared-types": "*"
   },
   "devDependencies": {
-    "@lernard/typescript-config": "*",
+    "@lernard/config": "*",
     "typescript": "5.9.2"
   }
 }

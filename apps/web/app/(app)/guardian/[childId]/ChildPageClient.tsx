@@ -5,15 +5,15 @@ import { ROUTES } from "@lernard/routes";
 import type { ChildProfileContent } from "@lernard/shared-types";
 import { useRouter } from "next/navigation";
 
-import { PageHero } from "../../../../components/dashboard/PageHero";
-import { PerformanceList } from "../../../../components/dashboard/PerformanceList";
-import { StatCard } from "../../../../components/dashboard/StatCard";
-import { TimelineList } from "../../../../components/dashboard/TimelineList";
-import { Badge } from "../../../../components/ui/Badge";
-import { Button } from "../../../../components/ui/Button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../../components/ui/Card";
-import { usePagePayload } from "../../../../hooks/usePagePayload";
-import { formatMinutes, formatPercent, formatRelativeDate } from "../../../../lib/formatters";
+import { PageHero } from "@/components/dashboard/PageHero";
+import { PerformanceList } from "@/components/dashboard/PerformanceList";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { TimelineList } from "@/components/dashboard/TimelineList";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePagePayload } from "@/hooks/usePagePayload";
+import { formatMinutes, formatPercent, formatRelativeDate } from "@/lib/formatters";
 
 interface ChildPageClientProps {
     childId: string;

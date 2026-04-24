@@ -1,5 +1,16 @@
+import type { Metadata } from "next";
+
 interface LessonCompleteProps {
     params: Promise<{ lessonId: string }>;
+}
+
+export async function generateMetadata({ params }: LessonCompleteProps): Promise<Metadata> {
+    const { lessonId } = await params;
+
+    return {
+        title: `Lesson Complete ${lessonId} — Lernard`,
+        description: "See the completion state for a finished lesson and stay ready for the next guided step.",
+    };
 }
 
 export default async function LessonCompletePage({ params }: LessonCompleteProps) {

@@ -12,7 +12,7 @@
     "check-types": "tsc --noEmit"
   },
   "devDependencies": {
-    "@lernard/typescript-config": "*",
+    "@lernard/config": "*",
     "typescript": "5.9.2"
   }
 }

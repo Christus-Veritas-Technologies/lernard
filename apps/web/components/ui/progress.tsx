@@ -1,6 +1,6 @@
-import { cn } from "../../lib/cn";
+import { cn } from "@/lib/cn";
 
-interface ProgressBarProps {
+interface ProgressProps {
     value: number;
     className?: string;
     indicatorClassName?: string;
@@ -33,11 +33,7 @@ function getProgressWidthClass(value: number) {
     return "w-full";
 }
 
-export function ProgressBar({
-    value,
-    className,
-    indicatorClassName,
-}: ProgressBarProps) {
+export function Progress({ value, className, indicatorClassName }: ProgressProps) {
     const clampedValue = Math.max(0, Math.min(100, value));
 
     return (

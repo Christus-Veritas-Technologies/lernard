@@ -30,7 +30,11 @@ export class ApiError extends Error {
 }
 
 function getBaseUrl(): string {
-  return typeof process !== 'undefined' && process.env?.['API_URL']
-    ? process.env['API_URL']
-    : 'http://localhost:3001'
+  const runtime = globalThis as typeof globalThis & {
+    process?: {
+      env?: Record<string, string | undefined>
+    }
+  }
+
+  return runtime.process?.env?.['API_URL'] ?? 'http://localhost:3001'
 }

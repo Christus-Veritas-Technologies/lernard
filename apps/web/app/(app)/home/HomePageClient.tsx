@@ -4,17 +4,17 @@ import { can } from "@lernard/auth-core";
 import { ROUTES } from "@lernard/routes";
 import type { HomeContent } from "@lernard/shared-types";
 
-import { ActionCard } from "../../../components/dashboard/ActionCard";
-import { PageHero } from "../../../components/dashboard/PageHero";
-import { PerformanceList } from "../../../components/dashboard/PerformanceList";
-import { StatCard } from "../../../components/dashboard/StatCard";
-import { TimelineList } from "../../../components/dashboard/TimelineList";
-import { Badge } from "../../../components/ui/Badge";
-import { Button } from "../../../components/ui/Button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/Card";
-import { ProgressBar } from "../../../components/ui/ProgressBar";
-import { usePagePayload } from "../../../hooks/usePagePayload";
-import { formatRelativeDate, formatSessionsLabel } from "../../../lib/formatters";
+import { ActionCard } from "@/components/dashboard/ActionCard";
+import { PageHero } from "@/components/dashboard/PageHero";
+import { PerformanceList } from "@/components/dashboard/PerformanceList";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { TimelineList } from "@/components/dashboard/TimelineList";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { usePagePayload } from "@/hooks/usePagePayload";
+import { formatRelativeDate, formatSessionsLabel } from "@/lib/formatters";
 
 function getStrengthTone(strengthLevel: string) {
     if (strengthLevel === "strong") {
@@ -195,7 +195,7 @@ export function HomePageClient() {
                                             <span>Priority in your queue</span>
                                             <span>#{subject.priorityIndex + 1}</span>
                                         </div>
-                                        <ProgressBar value={Math.max(20, 100 - subject.priorityIndex * 20)} />
+                                        <Progress value={Math.max(20, 100 - subject.priorityIndex * 20)} />
                                     </div>
                                     <div className="mt-4 flex flex-wrap gap-2">
                                         <Button className="flex-1" variant="secondary">

@@ -1,4 +1,4 @@
-import { ProgressBar } from "../ui/ProgressBar";
+import { Progress } from "@/components/ui/progress";
 
 interface PerformanceListItem {
     label: string;
@@ -19,7 +19,7 @@ export function PerformanceList({ items }: PerformanceListProps) {
                         <span className="font-medium text-text-primary">{item.label}</span>
                         <span className="text-text-secondary">{item.trailing}</span>
                     </div>
-                    <ProgressBar value={item.value} />
+                    <Progress value={item.value} />
                 </div>
             ))}
         </div>

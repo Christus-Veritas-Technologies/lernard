@@ -1,12 +1,18 @@
+import { MastraService } from '../../mastra/mastra.service';
+
 export async function validateGeneratedContent(
   content: unknown,
-  _validator?: unknown,
-): Promise<boolean> {
-  // TODO: Implement Haiku-based content validation
-  // All generated lesson/quiz/chat content must pass this before MongoDB write
+  validator: MastraService,
+): Promise<void> {
   if (!content) {
     throw new Error('Generated content is empty');
   }
 
-  return true;
+  const result = await validator.validate(content);
+
+  if (!result.safe) {
+    throw new Error(
+      result.reasons[0] ?? 'Generated content failed Haiku validation.',
+    );
+  }
 }

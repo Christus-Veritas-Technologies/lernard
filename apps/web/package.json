@@ -11,10 +11,11 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@radix-ui/react-switch": "^1.2.6",
     "@lernard/auth-core": "*",
     "@lernard/routes": "*",
     "@lernard/shared-types": "*",
-    "@lernard/ui": "*",
+    "hugeicons-react": "^0.4.0",
     "next": "16.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -22,8 +23,7 @@
     "@tailwindcss/postcss": "^4.0.0"
   },
   "devDependencies": {
-    "@lernard/eslint-config": "*",
-    "@lernard/typescript-config": "*",
+    "@lernard/config": "*",
     "@types/node": "^22.15.3",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",

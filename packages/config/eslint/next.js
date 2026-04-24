@@ -1,0 +1,1 @@
+export { nextJsConfig } from "../src/eslint/next.js";

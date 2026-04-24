@@ -1,6 +1,6 @@
-import { Badge } from "../ui/Badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/Card";
-import { PageHero } from "./PageHero";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHero } from "@/components/dashboard/PageHero";
 
 interface FeaturePlaceholderItem {
     title: string;

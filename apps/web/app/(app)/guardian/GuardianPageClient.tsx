@@ -5,15 +5,15 @@ import { ROUTES } from "@lernard/routes";
 import type { GuardianDashboardContent } from "@lernard/shared-types";
 import { useRouter } from "next/navigation";
 
-import { ActionCard } from "../../../components/dashboard/ActionCard";
-import { PageHero } from "../../../components/dashboard/PageHero";
-import { PerformanceList } from "../../../components/dashboard/PerformanceList";
-import { StatCard } from "../../../components/dashboard/StatCard";
-import { Badge } from "../../../components/ui/Badge";
-import { Button } from "../../../components/ui/Button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/Card";
-import { usePagePayload } from "../../../hooks/usePagePayload";
-import { formatRelativeDate } from "../../../lib/formatters";
+import { ActionCard } from "@/components/dashboard/ActionCard";
+import { PageHero } from "@/components/dashboard/PageHero";
+import { PerformanceList } from "@/components/dashboard/PerformanceList";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePagePayload } from "@/hooks/usePagePayload";
+import { formatRelativeDate } from "@/lib/formatters";
 
 function getStrengthTone(strengthLevel: string) {
     if (strengthLevel === "strong") {

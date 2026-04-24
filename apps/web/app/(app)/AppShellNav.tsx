@@ -1,14 +1,27 @@
 "use client";
 
+import type { ComponentType } from "react";
+import {
+    BookOpen01Icon,
+    ChartBarLineIcon,
+    CheckmarkSquare01Icon,
+    Home01Icon,
+    Message01Icon,
+    Settings02Icon,
+    UserGroupIcon,
+} from "hugeicons-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { cn } from "../../lib/cn";
+import { cn } from "@/lib/cn";
+
+type NavIcon = ComponentType<{ className?: string; size?: number; strokeWidth?: number }>;
 
 interface NavItem {
     href: string;
     label: string;
     description: string;
+    icon: NavIcon;
 }
 
 const navItems: NavItem[] = [
@@ -16,36 +29,43 @@ const navItems: NavItem[] = [
         href: "/home",
         label: "Home",
         description: "Today",
+        icon: Home01Icon,
     },
     {
         href: "/learn",
         label: "Learn",
         description: "Lessons",
+        icon: BookOpen01Icon,
     },
     {
         href: "/quiz",
         label: "Quiz",
         description: "Practice",
+        icon: CheckmarkSquare01Icon,
     },
     {
         href: "/chat",
         label: "Chat",
         description: "Ask Lernard",
+        icon: Message01Icon,
     },
     {
         href: "/progress",
         label: "Progress",
         description: "Read on You",
+        icon: ChartBarLineIcon,
     },
     {
         href: "/settings",
         label: "Settings",
         description: "Your setup",
+        icon: Settings02Icon,
     },
     {
         href: "/guardian",
         label: "Household",
         description: "Guardian",
+        icon: UserGroupIcon,
     },
 ];
 
@@ -71,11 +91,12 @@ export function AppShellNav() {
                     <nav className="mt-6 flex-1 space-y-2">
                         {navItems.map((item) => {
                             const isActive = matchesPath(pathname, item.href);
+                            const Icon = item.icon;
 
                             return (
                                 <Link
                                     className={cn(
-                                        "flex items-center justify-between rounded-2xl px-4 py-3 transition",
+                                        "flex items-center justify-between rounded-2xl px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                                         isActive
                                             ? "bg-primary-500 text-text-inverse shadow-[0_16px_40px_-24px_rgba(72,94,224,0.7)]"
                                             : "bg-white/70 text-text-primary hover:bg-surface",
@@ -83,16 +104,27 @@ export function AppShellNav() {
                                     href={item.href}
                                     key={item.href}
                                 >
-                                    <div>
-                                        <p className="text-sm font-semibold">{item.label}</p>
-                                        <p
+                                    <div className="flex items-center gap-3">
+                                        <span
                                             className={cn(
-                                                "text-xs",
-                                                isActive ? "text-primary-100" : "text-text-secondary",
+                                                "flex h-11 w-11 items-center justify-center rounded-2xl",
+                                                isActive ? "bg-white/16" : "bg-background text-primary-500",
                                             )}
                                         >
-                                            {item.description}
-                                        </p>
+                                            <Icon className={isActive ? "text-text-inverse" : "text-primary-500"} size={22} strokeWidth={1.9} />
+                                        </span>
+
+                                        <div>
+                                            <p className="text-sm font-semibold">{item.label}</p>
+                                            <p
+                                                className={cn(
+                                                    "text-xs",
+                                                    isActive ? "text-primary-100" : "text-text-secondary",
+                                                )}
+                                            >
+                                                {item.description}
+                                            </p>
+                                        </div>
                                     </div>
                                     <span
                                         className={cn(
@@ -119,11 +151,12 @@ export function AppShellNav() {
                 <div className="grid grid-cols-4 gap-2">
                     {navItems.slice(0, 4).map((item) => {
                         const isActive = matchesPath(pathname, item.href);
+                        const Icon = item.icon;
 
                         return (
                             <Link
                                 className={cn(
-                                    "flex min-h-14 flex-col items-center justify-center rounded-2xl px-2 text-center transition",
+                                    "flex min-h-14 flex-col items-center justify-center rounded-2xl px-2 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                                     isActive
                                         ? "bg-primary-500 text-text-inverse"
                                         : "text-text-secondary hover:bg-background-subtle",
@@ -131,6 +164,7 @@ export function AppShellNav() {
                                 href={item.href}
                                 key={item.href}
                             >
+                                <Icon className={isActive ? "text-text-inverse" : "text-primary-500"} size={20} strokeWidth={1.9} />
                                 <span className="text-xs font-semibold">{item.label}</span>
                                 <span
                                     className={cn(

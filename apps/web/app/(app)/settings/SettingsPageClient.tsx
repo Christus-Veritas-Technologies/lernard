@@ -11,14 +11,14 @@ import {
 } from "@lernard/shared-types";
 import { useEffect, useState } from "react";
 
-import { ToggleCard } from "../../../components/guardian/ToggleCard";
-import { PageHero } from "../../../components/dashboard/PageHero";
-import { StatCard } from "../../../components/dashboard/StatCard";
-import { Badge } from "../../../components/ui/Badge";
-import { Button } from "../../../components/ui/Button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/Card";
-import { usePagePayload } from "../../../hooks/usePagePayload";
-import { browserApiFetch } from "../../../lib/browser-api";
+import { PageHero } from "@/components/dashboard/PageHero";
+import { StatCard } from "@/components/dashboard/StatCard";
+import { ToggleCard } from "@/components/guardian/ToggleCard";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { usePagePayload } from "@/hooks/usePagePayload";
+import { browserApiFetch } from "@/lib/browser-api";
 
 export function SettingsPageClient() {
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<SettingsContent>(

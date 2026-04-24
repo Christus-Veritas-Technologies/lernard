@@ -1,0 +1,3 @@
+{
+  "extends": "../src/typescript/react-library.json"
+}

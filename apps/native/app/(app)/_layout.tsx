@@ -1,4 +1,11 @@
 import { Tabs } from 'expo-router';
+import {
+    BookOpen01Icon,
+    ChartBarLineIcon,
+    Home01Icon,
+    Message01Icon,
+    Settings02Icon,
+} from 'hugeicons-react-native';
 
 export default function AppLayout() {
     return (
@@ -28,13 +35,17 @@ export default function AppLayout() {
                 },
             }}
         >
-            <Tabs.Screen name="(home)" options={{ title: 'Home' }} />
-            <Tabs.Screen name="(learn)" options={{ title: 'Learn' }} />
-            <Tabs.Screen name="(chat)" options={{ title: 'Chat' }} />
-            <Tabs.Screen name="(progress)" options={{ title: 'Progress' }} />
-            <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
+            <Tabs.Screen name="(home)" options={{ title: 'Home', tabBarIcon: createTabIcon(Home01Icon) }} />
+            <Tabs.Screen name="(learn)" options={{ title: 'Learn', tabBarIcon: createTabIcon(BookOpen01Icon) }} />
+            <Tabs.Screen name="(chat)" options={{ title: 'Chat', tabBarIcon: createTabIcon(Message01Icon) }} />
+            <Tabs.Screen name="(progress)" options={{ title: 'Progress', tabBarIcon: createTabIcon(ChartBarLineIcon) }} />
+            <Tabs.Screen name="settings" options={{ title: 'Settings', tabBarIcon: createTabIcon(Settings02Icon) }} />
             <Tabs.Screen name="(quiz)" options={{ href: null }} />
             <Tabs.Screen name="guardian" options={{ href: null }} />
         </Tabs>
     );
+}
+
+function createTabIcon(Icon: typeof Home01Icon) {
+    return ({ color }: { color: string }) => <Icon color={color} size={24} strokeWidth={1.8} />;
 }

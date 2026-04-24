@@ -1,4 +1,10 @@
-import { Switch, Text, View } from 'react-native';
+import { View } from 'react-native';
+
+import { Card } from '@rnr/card';
+import { Switch } from '@rnr/switch';
+import { Text } from '@rnr/text';
+
+import { cn } from '@/lib/cn';
 
 interface ToggleRowProps {
     checked: boolean;
@@ -16,7 +22,7 @@ export function ToggleRow({
     onCheckedChange,
 }: ToggleRowProps) {
     return (
-        <View className={joinClasses('rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm', disabled ? 'opacity-70' : undefined)}>
+        <Card className={cn('rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm', disabled ? 'opacity-70' : undefined)}>
             <View className="flex-row items-start justify-between gap-4">
                 <View className="flex-1">
                     <Text className="text-lg font-semibold text-slate-900">{title}</Text>
@@ -31,10 +37,6 @@ export function ToggleRow({
                     value={checked}
                 />
             </View>
-        </View>
+        </Card>
     );
-}
-
-function joinClasses(...classes: Array<string | undefined>) {
-    return classes.filter(Boolean).join(' ');
 }

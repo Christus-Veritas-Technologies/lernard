@@ -1,6 +1,8 @@
-import { View, Text, ScrollView } from 'react-native';
+import { View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
+
+import { Text } from '@rnr/text';
 
 export default function LessonReaderScreen() {
     const { lessonId } = useLocalSearchParams();

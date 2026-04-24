@@ -1,6 +1,7 @@
 {
-  "extends": "@lernard/typescript-config/react-library.json",
+  "extends": "../config/typescript/react-library.json",
   "compilerOptions": {
+    "rootDir": "src",
     "outDir": "dist"
   },
   "include": ["src"],
