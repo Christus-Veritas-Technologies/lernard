@@ -5,8 +5,9 @@ export const updateModeSchema = z.object({
 })
 
 export const updateCompanionControlsSchema = z.object({
-  answerRevealTiming: z.enum(['immediate', 'after_quiz']),
-  guardianPassword: z.string().min(1).max(128),
+  showCorrectAnswers: z.boolean(),
+  allowHints: z.boolean(),
+  allowSkip: z.boolean(),
 })
 
 export const updateAppearanceSchema = z.object({

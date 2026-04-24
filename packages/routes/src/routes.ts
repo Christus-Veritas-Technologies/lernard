@@ -1,4 +1,12 @@
 export const ROUTES = {
+  HOME: {
+    PAYLOAD: '/v1/home/payload',
+  },
+
+  LEARN: {
+    PAYLOAD: '/v1/learn/payload',
+  },
+
   AUTH: {
     REGISTER: '/v1/auth/register',
     LOGIN: '/v1/auth/login',
@@ -66,6 +74,7 @@ export const ROUTES = {
 
   SETTINGS: {
     GET: '/v1/settings',
+    PAYLOAD: '/v1/settings/payload',
     MODE: '/v1/settings/mode',
     COMPANION_CONTROLS: '/v1/settings/companion-controls',
     APPEARANCE: '/v1/settings/appearance',
@@ -74,16 +83,19 @@ export const ROUTES = {
 
   GUARDIAN: {
     CHILDREN: '/v1/guardian/children',
+    DASHBOARD_PAYLOAD: '/v1/guardian/children/payload',
     INVITE: '/v1/guardian/children/invite',
     ACCEPT_INVITE: '/v1/guardian/children/accept-invite',
     PENDING: '/v1/guardian/children/pending',
     CANCEL_INVITE: (token: string) => `/v1/guardian/children/invite/${token}` as const,
     CHILD: (childId: string) => `/v1/guardian/children/${childId}` as const,
+    CHILD_PAYLOAD: (childId: string) => `/v1/guardian/children/${childId}/payload` as const,
     REMOVE_CHILD: (childId: string) => `/v1/guardian/children/${childId}` as const,
     CHILD_PROGRESS: (childId: string) => `/v1/guardian/children/${childId}/progress` as const,
     CHILD_SUBJECTS: (childId: string) => `/v1/guardian/children/${childId}/subjects` as const,
     CHILD_HISTORY: (childId: string) => `/v1/guardian/children/${childId}/history` as const,
     CHILD_COMPANION_CONTROLS: (childId: string) => `/v1/guardian/children/${childId}/companion-controls` as const,
+    CHILD_COMPANION_PAYLOAD: (childId: string) => `/v1/guardian/children/${childId}/companion-controls/payload` as const,
   },
 
   WEBHOOKS: {

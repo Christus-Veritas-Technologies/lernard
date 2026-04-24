@@ -15,14 +15,11 @@ export class AcceptInviteDto {
 
 export class UpdateChildCompanionControlsDto {
   @IsBoolean()
-  @IsOptional()
-  showCorrectAnswers?: boolean;
+  showCorrectAnswers: boolean;
 
   @IsBoolean()
-  @IsOptional()
-  allowHints?: boolean;
+  allowHints: boolean;
 
   @IsBoolean()
-  @IsOptional()
-  allowSkip?: boolean;
+  allowSkip: boolean;
 }

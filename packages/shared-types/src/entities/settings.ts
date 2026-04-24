@@ -11,7 +11,9 @@ export interface UserSettings {
 }
 
 export interface CompanionControls {
-  answerRevealTiming: 'immediate' | 'after_quiz'
+  showCorrectAnswers: boolean
+  allowHints: boolean
+  allowSkip: boolean
   lockedByGuardian: boolean
   lastChangedAt: string
   lastChangedBy: string

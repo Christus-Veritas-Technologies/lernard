@@ -1,10 +1,15 @@
 import type {
     ChildProfileContent,
+    CompanionControls,
     GuardianDashboardContent,
+    GuardianSummary,
     HomeContent,
+    LearnContent,
+    PendingInvite,
     SessionRecord,
     SubjectProgress,
 } from "@lernard/shared-types";
+import { SessionDepth, StrengthLevel } from "@lernard/shared-types";
 
 export interface LearnRecommendation {
     topic: string;
@@ -20,28 +25,6 @@ export interface LearnDraft {
     subject: string;
     status: string;
     nextStep: string;
-}
-
-export interface PendingInvite {
-    id: string;
-    childEmail: string;
-    sentAt: string;
-    status: string;
-}
-
-export interface GuardianSummary {
-    childrenCount: number;
-    activeThisWeek: number;
-    pendingInvites: number;
-    averageStreak: number;
-}
-
-export interface CompanionControlState {
-    showCorrectAnswers: boolean;
-    allowHints: boolean;
-    allowSkip: boolean;
-    lastChangedAt: string;
-    lastChangedBy: string;
 }
 
 export const homeContent: HomeContent = {
@@ -60,21 +43,21 @@ export const homeContent: HomeContent = {
             subjectId: "maths",
             name: "Mathematics",
             priorityIndex: 0,
-            strengthLevel: "developing",
+            strengthLevel: StrengthLevel.DEVELOPING,
             lastActiveAt: "2026-04-24T11:30:00.000Z",
         },
         {
             subjectId: "science",
             name: "Science",
             priorityIndex: 1,
-            strengthLevel: "strong",
+            strengthLevel: StrengthLevel.STRONG,
             lastActiveAt: "2026-04-23T14:00:00.000Z",
         },
         {
             subjectId: "english",
             name: "English",
             priorityIndex: 2,
-            strengthLevel: "needs_work",
+            strengthLevel: StrengthLevel.NEEDS_WORK,
             lastActiveAt: "2026-04-22T09:15:00.000Z",
         },
     ],
@@ -138,48 +121,75 @@ export const weeklyMomentum = [
     { label: "Fri", value: 72, trailing: "56 min" },
 ];
 
-export const learnRecommendations: LearnRecommendation[] = [
-    {
-        topic: "Fractions on number lines",
-        subject: "Mathematics",
-        reason: "Builds directly on your unfinished fractions lesson.",
-        depth: "Quick refresher",
-        estimatedMinutes: 12,
-    },
-    {
-        topic: "Particle movement in gases",
-        subject: "Science",
-        reason: "You answered phase-change questions correctly but paused on explanations.",
-        depth: "Worked examples",
-        estimatedMinutes: 15,
-    },
-    {
-        topic: "Inference from character dialogue",
-        subject: "English",
-        reason: "This is the clearest growth area in your last two reading sessions.",
-        depth: "Deep dive",
-        estimatedMinutes: 18,
-    },
-];
+export const learnContent: LearnContent = {
+    drafts: [
+        {
+            id: "draft-1",
+            topic: "Equivalent fractions",
+            subject: "Mathematics",
+            status: "Paused midway through section 3",
+            nextStep: "Resume lesson",
+        },
+        {
+            id: "draft-2",
+            topic: "Writing evidence-backed conclusions",
+            subject: "English",
+            status: "Saved for later review",
+            nextStep: "Review notes",
+        },
+    ],
+    focusTopic: "Inference from character dialogue",
+    preferredDepth: SessionDepth.STANDARD,
+    preferredSessionLength: 15,
+    recommendations: [
+        {
+            topic: "Fractions on number lines",
+            subject: "Mathematics",
+            reason: "Builds directly on your unfinished fractions lesson.",
+            depth: SessionDepth.QUICK,
+            estimatedMinutes: 12,
+        },
+        {
+            topic: "Particle movement in gases",
+            subject: "Science",
+            reason: "You answered phase-change questions correctly but paused on explanations.",
+            depth: SessionDepth.STANDARD,
+            estimatedMinutes: 15,
+        },
+        {
+            topic: "Inference from character dialogue",
+            subject: "English",
+            reason: "This is the clearest growth area in your last two reading sessions.",
+            depth: SessionDepth.DEEP,
+            estimatedMinutes: 18,
+        },
+    ],
+    subjects: [
+        { subjectId: "maths", name: "Mathematics" },
+        { subjectId: "science", name: "Science" },
+        { subjectId: "english", name: "English" },
+    ],
+};
 
-export const learnDrafts: LearnDraft[] = [
-    {
-        id: "draft-1",
-        topic: "Equivalent fractions",
-        subject: "Mathematics",
-        status: "Paused midway through section 3",
-        nextStep: "Resume lesson",
-    },
-    {
-        id: "draft-2",
-        topic: "Writing evidence-backed conclusions",
-        subject: "English",
-        status: "Saved for later review",
-        nextStep: "Review notes",
-    },
-];
+export const learnRecommendations: LearnRecommendation[] = learnContent.recommendations.map((recommendation) => ({
+    ...recommendation,
+    depth:
+        recommendation.depth === "quick"
+            ? "Quick refresher"
+            : recommendation.depth === "deep"
+                ? "Deep dive"
+                : "Worked examples",
+}));
+
+export const learnDrafts: LearnDraft[] = learnContent.drafts;
 
 export const guardianDashboardContent: GuardianDashboardContent = {
+    summary: {
+        childrenCount: 2,
+        activeThisWeek: 2,
+        pendingInvites: 1,
+        averageStreak: 6,
+    },
     children: [
         {
             studentId: "child-ada",
@@ -202,29 +212,25 @@ export const guardianDashboardContent: GuardianDashboardContent = {
             ],
         },
     ],
+    pendingInvites: [
+        {
+            id: "invite-1",
+            childEmail: "new-family-member@example.com",
+            sentAt: "2026-04-23T13:10:00.000Z",
+            status: "Awaiting acceptance",
+        },
+    ],
 };
 
-export const guardianSummary: GuardianSummary = {
-    childrenCount: 2,
-    activeThisWeek: 2,
-    pendingInvites: 1,
-    averageStreak: 6,
-};
+export const guardianSummary: GuardianSummary = guardianDashboardContent.summary;
 
-export const pendingInvites: PendingInvite[] = [
-    {
-        id: "invite-1",
-        childEmail: "new-family-member@example.com",
-        sentAt: "2026-04-23T13:10:00.000Z",
-        status: "Awaiting acceptance",
-    },
-];
+export const pendingInvites: PendingInvite[] = guardianDashboardContent.pendingInvites;
 
 const childProgress: SubjectProgress[] = [
     {
         subjectId: "maths",
         subjectName: "Mathematics",
-        strengthLevel: "strong",
+        strengthLevel: StrengthLevel.STRONG,
         totalLessons: 18,
         totalQuizzes: 9,
         averageScore: 84,
@@ -247,7 +253,7 @@ const childProgress: SubjectProgress[] = [
     {
         subjectId: "science",
         subjectName: "Science",
-        strengthLevel: "developing",
+        strengthLevel: StrengthLevel.DEVELOPING,
         totalLessons: 11,
         totalQuizzes: 5,
         averageScore: 73,
@@ -270,7 +276,7 @@ const childProgress: SubjectProgress[] = [
     {
         subjectId: "english",
         subjectName: "English",
-        strengthLevel: "needs_work",
+        strengthLevel: StrengthLevel.NEEDS_WORK,
         totalLessons: 7,
         totalQuizzes: 4,
         averageScore: 61,
@@ -329,15 +335,16 @@ const childSessions: SessionRecord[] = [
 ];
 
 export const childProfileContent: ChildProfileContent = {
-    child: guardianDashboardContent.children[0],
+    child: guardianDashboardContent.children[0]!,
     progress: childProgress,
     recentSessions: childSessions,
 };
 
-export const companionControlState: CompanionControlState = {
+export const companionControlState: CompanionControls = {
     showCorrectAnswers: true,
     allowHints: true,
     allowSkip: false,
+    lockedByGuardian: true,
     lastChangedAt: "2026-04-21T19:10:00.000Z",
     lastChangedBy: "Guardian",
 };
@@ -345,7 +352,7 @@ export const companionControlState: CompanionControlState = {
 export function getChildProfileContent(childId: string): ChildProfileContent {
     if (childId === "child-sam") {
         return {
-            child: guardianDashboardContent.children[1],
+            child: guardianDashboardContent.children[1]!,
             progress: childProgress.slice(1),
             recentSessions: childSessions.slice(1),
         };

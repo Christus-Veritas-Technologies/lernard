@@ -131,12 +131,14 @@ model Guardian {
 // ─── Companion Controls (per child, set by guardian) ─────────────────────────
 
 model CompanionControls {
-  id              String @id @default(cuid())
-  studentId       String @unique
-  answerReveal    String @default("after_quiz") // immediate | after_quiz
-  quizRequired    Boolean @default(true)
-
-  updatedAt DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  studentId          String   @unique
+  showCorrectAnswers Boolean  @default(true)
+  allowHints         Boolean  @default(true)
+  allowSkip          Boolean  @default(false)
+  lockedByGuardian   Boolean  @default(false)
+  lastChangedAt      DateTime @updatedAt
+  lastChangedBy      String   @default("Lernard")
 }
 
 // ─── Settings Audit ───────────────────────────────────────────────────────────

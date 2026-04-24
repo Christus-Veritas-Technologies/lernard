@@ -1,8 +1,25 @@
+import type { CompanionControls } from '../entities/settings'
 import type { GuardianChild } from '../entities/user'
 import type { SubjectProgress, SessionRecord } from '../entities/progress'
 
 export interface GuardianDashboardContent {
+  summary: GuardianSummary
   children: GuardianChildOverview[]
+  pendingInvites: PendingInvite[]
+}
+
+export interface GuardianSummary {
+  childrenCount: number
+  activeThisWeek: number
+  pendingInvites: number
+  averageStreak: number
+}
+
+export interface PendingInvite {
+  id: string
+  childEmail: string
+  sentAt: string
+  status: string
 }
 
 export interface GuardianChildOverview {
@@ -17,4 +34,9 @@ export interface ChildProfileContent {
   child: GuardianChildOverview
   progress: SubjectProgress[]
   recentSessions: SessionRecord[]
+}
+
+export interface ChildCompanionContent {
+  child: Pick<GuardianChildOverview, 'studentId' | 'name'>
+  controls: CompanionControls
 }

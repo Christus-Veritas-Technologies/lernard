@@ -1,5 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsNumber, Min, Max, ValidateNested, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsEnum, IsNumber, Min, Max, IsBoolean } from 'class-validator';
 
 export class UpdateModeDto {
   @IsEnum(['guide', 'companion'])
@@ -8,16 +7,13 @@ export class UpdateModeDto {
 
 export class CompanionControlsDto {
   @IsBoolean()
-  @IsOptional()
-  showCorrectAnswers?: boolean;
+  showCorrectAnswers: boolean;
 
   @IsBoolean()
-  @IsOptional()
-  allowHints?: boolean;
+  allowHints: boolean;
 
   @IsBoolean()
-  @IsOptional()
-  allowSkip?: boolean;
+  allowSkip: boolean;
 }
 
 export class UpdateAppearanceDto {

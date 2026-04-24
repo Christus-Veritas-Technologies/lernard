@@ -30,12 +30,20 @@ export type {
 
 // Payloads
 export type { HomeContent, RecentSession } from './payloads/home'
+export type { LearnContent, LearnRecommendation, LearnDraft } from './payloads/learn'
 export type { LessonContent, PostLessonContent } from './payloads/lesson'
 export type { QuizContent, QuizResultsContent } from './payloads/quiz'
 export type { ChatContent, ConversationContent } from './payloads/chat'
 export type { ProgressContent, SubjectDetailContent, SessionHistoryContent } from './payloads/progress'
 export type { SettingsContent } from './payloads/settings'
-export type { GuardianDashboardContent, GuardianChildOverview, ChildProfileContent } from './payloads/guardian'
+export type {
+  GuardianDashboardContent,
+  GuardianSummary,
+  PendingInvite,
+  GuardianChildOverview,
+  ChildProfileContent,
+  ChildCompanionContent,
+} from './payloads/guardian'
 export type { AuthResponse, AuthUser, RegisterPayload, LoginPayload } from './payloads/auth'
 export type {
   AccountTypePayload,

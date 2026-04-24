@@ -9,8 +9,9 @@ export const acceptInviteSchema = z.object({
 })
 
 export const updateChildCompanionControlsSchema = z.object({
-  answerRevealTiming: z.enum(['immediate', 'after_quiz']),
-  guardianPassword: z.string().min(1).max(128),
+  showCorrectAnswers: z.boolean(),
+  allowHints: z.boolean(),
+  allowSkip: z.boolean(),
 })
 
 export type InviteChildInput = z.infer<typeof inviteChildSchema>

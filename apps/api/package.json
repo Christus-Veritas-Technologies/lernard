@@ -2,6 +2,9 @@
   "name": "@lernard/api",
   "version": "0.0.0",
   "private": true,
+  "prisma": {
+    "schema": "../../packages/db/prisma/schema.prisma"
+  },
   "scripts": {
     "build": "nest build",
     "db:generate": "prisma generate --schema ../../packages/db/prisma/schema.prisma",
