@@ -1,13 +1,40 @@
-import { View, Text, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+
+import { FeaturePlaceholderScreen } from '@/components/FeaturePlaceholderScreen';
 
 export default function ProgressScreen() {
+    const router = useRouter();
+
     return (
-        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
-                <Text className="text-2xl font-bold text-foreground">Progress</Text>
-                <Text className="text-muted-foreground">Lernard's Read on You</Text>
-            </ScrollView>
-        </SafeAreaView>
+        <FeaturePlaceholderScreen
+            actionTitle="Open Home"
+            badge="Read on You"
+            description="This is where your cross-subject progress story will live once the progress service is implemented."
+            eyebrow="Progress"
+            items={[
+                {
+                    title: 'Subject trends',
+                    description: 'Compare strengths and growth areas',
+                    detail: 'The progress routes are already shaped out, but the underlying service still throws not implemented for now.',
+                    tone: 'primary',
+                },
+                {
+                    title: 'Session history',
+                    description: 'Follow your rhythm over time',
+                    detail: 'This shell page now makes space for the richer progress view so it will not feel bolted on later.',
+                    tone: 'cool',
+                },
+                {
+                    title: 'Right now',
+                    description: 'Use Home and Household snapshots',
+                    detail: 'Live Home and Household pages already surface the strongest recent signals while the full progress layer lands.',
+                    tone: 'warm',
+                },
+            ]}
+            noteDescription="The progress controller routes exist, but the service methods still return not implemented, so this remains an intentional placeholder."
+            noteTitle="Not yet live"
+            onActionPress={() => router.push('/home')}
+            title="Lernard's Read on You is getting its full home"
+        />
     );
 }

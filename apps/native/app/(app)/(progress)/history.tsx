@@ -1,13 +1,34 @@
-import { View, Text, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+
+import { FeaturePlaceholderScreen } from '@/components/FeaturePlaceholderScreen';
 
 export default function HistoryScreen() {
+    const router = useRouter();
+
     return (
-        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-4">
-                <Text className="text-2xl font-bold text-foreground">Session History</Text>
-                <Text className="text-muted-foreground">Your recent learning sessions.</Text>
-            </ScrollView>
-        </SafeAreaView>
+        <FeaturePlaceholderScreen
+            actionTitle="Back to Progress"
+            badge="History"
+            description="This route is reserved for the full session timeline once the progress history service is live."
+            eyebrow="Progress history"
+            items={[
+                {
+                    title: 'Lessons and quizzes',
+                    description: 'Recent sessions will group here',
+                    detail: 'The route already exists so the navigation shape is stable before the history service lands.',
+                    tone: 'cool',
+                },
+                {
+                    title: 'Guardian review',
+                    description: 'Parents will be able to scan recent work faster',
+                    detail: 'History and progress details will connect cleanly with the Household views once the backend is ready.',
+                    tone: 'primary',
+                },
+            ]}
+            noteDescription="The progress history endpoint is present in the route constants, but the service is still not implemented."
+            noteTitle="Waiting on backend"
+            onActionPress={() => router.push('/progress')}
+            title="Session history is waiting on the progress service"
+        />
     );
 }

@@ -6,10 +6,25 @@ export default function AppLayout() {
             screenOptions={{
                 headerShown: false,
                 tabBarActiveTintColor: '#7B8EC8',
-                tabBarInactiveTintColor: '#9CA3AF',
+                tabBarInactiveTintColor: '#64748B',
+                tabBarLabelStyle: {
+                    fontSize: 12,
+                    fontWeight: '600',
+                    paddingBottom: 4,
+                },
+                sceneStyle: {
+                    backgroundColor: '#F8FAFC',
+                },
                 tabBarStyle: {
-                    borderTopWidth: 1,
-                    borderTopColor: '#E5E7EB',
+                    height: 74,
+                    paddingTop: 8,
+                    paddingBottom: 10,
+                    borderTopWidth: 0,
+                    backgroundColor: '#FFFFFF',
+                    shadowColor: '#0F172A',
+                    shadowOpacity: 0.08,
+                    shadowRadius: 18,
+                    elevation: 10,
                 },
             }}
         >
