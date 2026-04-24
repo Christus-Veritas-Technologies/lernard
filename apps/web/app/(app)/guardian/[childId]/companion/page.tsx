@@ -2,17 +2,13 @@ interface ChildCompanionProps {
     params: Promise<{ childId: string }>;
 }
 
+import { getChildProfileContent } from "../../../../../lib/page-mock-data";
+
+import { ChildCompanionClient } from "./ChildCompanionClient";
+
 export default async function ChildCompanionPage({ params }: ChildCompanionProps) {
     const { childId } = await params;
+    const profile = getChildProfileContent(childId);
 
-    return (
-        <div className="flex flex-col gap-6">
-            <h1 className="text-2xl font-bold text-text-primary">
-                Companion controls
-            </h1>
-            <p className="text-text-secondary">
-                Manage companion settings for child: {childId}
-            </p>
-        </div>
-    );
+    return <ChildCompanionClient childId={childId} childName={profile.child.name} />;
 }
