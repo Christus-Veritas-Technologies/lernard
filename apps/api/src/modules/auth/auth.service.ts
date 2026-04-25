@@ -9,6 +9,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 import type { User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { toSharedPlan, toSharedRole } from '../../common/utils/shared-model-mappers';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -23,16 +24,35 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    const normalizedEmail = dto.email.toLowerCase();
     const existing = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+      where: { email: normalizedEmail },
     });
     if (existing) {
       throw new ConflictException('Email already registered');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-    const user = await this.prisma.user.create({
-      data: { name: dto.name, email: dto.email.toLowerCase(), passwordHash },
+    const user = await this.prisma.$transaction(async (transaction) => {
+      const createdUser = await transaction.user.create({
+        data: {
+          name: dto.name,
+          email: normalizedEmail,
+          passwordHash,
+          role: dto.accountType === 'guardian' ? 'GUARDIAN' : 'STUDENT',
+        },
+      });
+
+      if (dto.accountType === 'guardian') {
+        await transaction.guardian.create({
+          data: {
+            userId: createdUser.id,
+            passwordHash,
+          },
+        });
+      }
+
+      return createdUser;
     });
 
     return this.issueTokens(user);
@@ -119,17 +139,7 @@ export class AuthService {
   }
 
   getMe(user: User) {
-    return {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      plan: user.plan,
-      ageGroup: user.ageGroup,
-      learningMode: user.learningMode,
-      onboardingComplete: user.onboardingComplete,
-      firstLookComplete: user.firstLookComplete,
-    };
+    return this.serializeAuthUser(user);
   }
 
   private async issueTokens(user: User) {
@@ -150,7 +160,19 @@ export class AuthService {
     return {
       accessToken,
       refreshToken: refreshTokenRaw,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role, plan: user.plan },
+      user: this.serializeAuthUser(user),
+    };
+  }
+
+  private serializeAuthUser(user: User) {
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: toSharedRole(user.role),
+      plan: toSharedPlan(user.plan),
+      onboardingComplete: user.onboardingComplete,
+      firstLookComplete: user.firstLookComplete,
     };
   }
 

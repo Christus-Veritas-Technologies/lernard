@@ -1,10 +1,46 @@
-import { StrengthLevel as PrismaStrengthLevel } from '@prisma/client';
+import {
+  Plan as PrismaPlan,
+  Role as PrismaRole,
+  StrengthLevel as PrismaStrengthLevel,
+} from '@prisma/client';
 import {
   Appearance,
   LearningMode,
+  Plan,
+  Role,
   SessionDepth,
   StrengthLevel,
 } from '@lernard/shared-types';
+
+export function toSharedRole(role: PrismaRole | null | undefined): Role {
+  switch (role) {
+    case PrismaRole.GUEST:
+      return Role.GUEST;
+    case PrismaRole.GUARDIAN:
+      return Role.GUARDIAN;
+    case PrismaRole.TEACHER:
+      return Role.TEACHER;
+    case PrismaRole.SCHOOL_ADMIN:
+      return Role.SCHOOL_ADMIN;
+    case PrismaRole.STUDENT:
+    default:
+      return Role.STUDENT;
+  }
+}
+
+export function toSharedPlan(plan: PrismaPlan | null | undefined): Plan {
+  switch (plan) {
+    case PrismaPlan.SCHOLAR:
+      return Plan.SCHOLAR;
+    case PrismaPlan.HOUSEHOLD:
+      return Plan.HOUSEHOLD;
+    case PrismaPlan.CAMPUS:
+      return Plan.CAMPUS;
+    case PrismaPlan.EXPLORER:
+    default:
+      return Plan.EXPLORER;
+  }
+}
 
 export function toSharedStrengthLevel(
   strengthLevel: PrismaStrengthLevel | null | undefined,

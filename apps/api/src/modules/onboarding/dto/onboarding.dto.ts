@@ -1,7 +1,27 @@
-import { IsString, IsEnum, IsArray, IsOptional, MaxLength, IsNumber, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
+import {
+  AgeGroup,
+  LearningGoal,
+  SessionDepth,
+} from '@lernard/shared-types';
+import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+
+const ACCOUNT_TYPES = ['student', 'guardian'] as const;
 
 export class AccountTypeDto {
-  @IsEnum(['student', 'guardian'])
+  @IsEnum(ACCOUNT_TYPES)
   accountType: 'student' | 'guardian';
 }
 
@@ -10,8 +30,8 @@ export class ProfileSetupDto {
   @MaxLength(50)
   name: string;
 
-  @IsEnum(['primary', 'secondary', 'university', 'professional'])
-  ageGroup: string;
+  @IsEnum(AgeGroup)
+  ageGroup: AgeGroup;
 
   @IsString()
   @IsOptional()
@@ -19,34 +39,52 @@ export class ProfileSetupDto {
   grade?: string;
 
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(10)
   @IsString({ each: true })
+  @MaxLength(100, { each: true })
   subjects: string[];
 
-  @IsEnum(['exam_prep', 'keep_up', 'learn_something_new', 'fill_gaps'])
+  @IsEnum(LearningGoal)
   @IsOptional()
-  learningGoal?: string;
+  learningGoal?: LearningGoal;
 
-  @IsNumber()
+  @IsInt()
   @IsOptional()
   @Min(5)
-  @Max(60)
+  @Max(120)
   preferredSessionLength?: number;
 
-  @IsNumber()
+  @IsEnum(SessionDepth)
+  @IsOptional()
+  preferredDepth?: SessionDepth;
+
+  @IsInt()
   @IsOptional()
   @Min(1)
   @Max(10)
-  dailyTarget?: number;
+  dailyGoal?: number;
 
   @IsString()
   @IsOptional()
   timezone?: string;
 }
 
-export class FirstLookSubmitDto {
-  @IsString()
-  subjectId: string;
+class FirstLookAnswerDto {
+  @IsInt()
+  @Min(0)
+  index: number;
 
+  @IsString()
+  @MaxLength(500)
+  answer: string;
+}
+
+export class FirstLookSubmitDto {
   @IsArray()
-  answers: Array<{ questionId: string; answer: string }>;
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => FirstLookAnswerDto)
+  answers: FirstLookAnswerDto[];
 }

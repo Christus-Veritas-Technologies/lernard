@@ -13,6 +13,7 @@ export interface AuthUser {
   role: Role
   plan: Plan
   onboardingComplete: boolean
+  firstLookComplete: boolean
 }
 
 export interface RegisterPayload {
