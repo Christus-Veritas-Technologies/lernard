@@ -26,18 +26,18 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
     return (
         <View
             className={cn(
-                'min-h-12 flex-row items-center rounded-[24px] border bg-white px-4 shadow-sm',
+                'min-h-12 flex-row items-center gap-3 rounded-[24px] border bg-white px-4 shadow-sm',
                 hasError ? 'border-rose-300' : 'border-slate-200',
                 containerClassName,
             )}>
-            {leading ? <View className="mr-3">{leading}</View> : null}
+            {leading ? <View className="shrink-0">{leading}</View> : null}
             <TextInput
                 ref={ref}
                 className={cn('flex-1 py-3 text-base text-slate-900', className)}
                 placeholderTextColor={placeholderTextColor}
                 {...props}
             />
-            {trailing ? <View className="ml-3">{trailing}</View> : null}
+            {trailing ? <View className="shrink-0">{trailing}</View> : null}
         </View>
     );
 });
