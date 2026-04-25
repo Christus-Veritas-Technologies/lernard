@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MaxLength, IsUUID } from 'class-validator';
+import { IsString, IsOptional, MaxLength, IsUUID, IsIn, IsNumberString } from 'class-validator';
 
 export class GenerateLessonDto {
   @IsString()
@@ -18,10 +18,9 @@ export class GenerateLessonDto {
 }
 
 export class SectionCheckDto {
-  @IsString()
+  @IsNumberString()
   sectionId: string;
 
-  @IsString()
-  @MaxLength(2000)
+  @IsIn(['got_it', 'not_sure', 'confused'])
   response: string;
 }
