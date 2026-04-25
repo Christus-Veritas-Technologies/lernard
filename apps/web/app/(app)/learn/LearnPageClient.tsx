@@ -1,8 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
 import { can } from "@lernard/auth-core";
 import { ROUTES } from "@lernard/routes";
-import { SessionDepth, type LearnContent } from "@lernard/shared-types";
+import { SessionDepth, type Lesson, type LearnContent } from "@lernard/shared-types";
 
 import { ActionCard } from "@/components/dashboard/ActionCard";
 import { PageHero } from "@/components/dashboard/PageHero";
@@ -12,12 +15,43 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePagePayload } from "@/hooks/usePagePayload";
+import { browserApiFetch } from "@/lib/browser-api";
 import { formatMinutes } from "@/lib/formatters";
 
 export function LearnPageClient() {
+    const router = useRouter();
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<LearnContent>(
         ROUTES.LEARN.PAYLOAD,
     );
+
+    const [topic, setTopic] = useState("");
+    const [selectedSubjectId, setSelectedSubjectId] = useState<string | undefined>(undefined);
+    const [selectedDepth, setSelectedDepth] = useState<SessionDepth | undefined>(undefined);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [generateError, setGenerateError] = useState<string | null>(null);
+
+    async function handleGenerate(overrideTopic?: string, overrideDepth?: SessionDepth) {
+        const finalTopic = (overrideTopic ?? topic).trim();
+        if (!finalTopic) return;
+
+        setIsGenerating(true);
+        setGenerateError(null);
+        try {
+            const lesson = await browserApiFetch<Lesson>(ROUTES.LESSONS.GENERATE, {
+                method: "POST",
+                body: JSON.stringify({
+                    topic: finalTopic,
+                    subjectId: selectedSubjectId,
+                    depth: overrideDepth ?? selectedDepth ?? data?.content.preferredDepth ?? "standard",
+                    idempotencyKey: crypto.randomUUID(),
+                }),
+            });
+            router.push(`/learn/${lesson.id}`);
+        } catch (e) {
+            setGenerateError(e instanceof Error ? e.message : "Failed to generate lesson. Please try again.");
+            setIsGenerating(false);
+        }
+    }
 
     if (!isAuthenticated) {
         return (
@@ -78,6 +112,12 @@ export function LearnPageClient() {
     const { content, permissions } = data;
     const topRecommendation = content.recommendations[0] ?? null;
     const canStartLesson = can(permissions, "can_start_lesson");
+    const effectiveDepth = selectedDepth ?? content.preferredDepth;
+
+    // Initialise selectedSubjectId once subjects are loaded
+    if (selectedSubjectId === undefined && content.subjects.length > 0) {
+        setSelectedSubjectId(content.subjects[0]!.subjectId);
+    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -114,7 +154,12 @@ export function LearnPageClient() {
             >
                 {content.focusTopic ? <Badge tone="warm">Focus area: {content.focusTopic}</Badge> : null}
                 <Badge tone="cool">Preferred depth: {formatDepthLabel(content.preferredDepth)}</Badge>
-                <Button disabled={!canStartLesson}>Generate lesson</Button>
+                <Button
+                    disabled={!canStartLesson || isGenerating || !topic.trim()}
+                    onClick={() => void handleGenerate()}
+                >
+                    {isGenerating ? "Generating…" : "Generate lesson"}
+                </Button>
             </PageHero>
 
             <section className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)]">
@@ -126,22 +171,30 @@ export function LearnPageClient() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form className="grid gap-4 sm:grid-cols-2">
+                        <form
+                            className="grid gap-4 sm:grid-cols-2"
+                            onSubmit={(e) => { e.preventDefault(); void handleGenerate(); }}
+                        >
                             <label className="space-y-2 sm:col-span-2">
                                 <span className="text-sm font-medium text-text-primary">Topic</span>
                                 <input
                                     className="min-h-11 w-full rounded-2xl border border-border bg-background px-4 text-sm text-text-primary outline-none transition focus:border-primary-300"
-                                    defaultValue={content.focusTopic ?? ""}
                                     maxLength={300}
+                                    onChange={(e) => setTopic(e.target.value)}
                                     placeholder="What do you want to learn today?"
                                     type="text"
+                                    value={topic}
                                 />
                             </label>
                             <label className="space-y-2">
                                 <span className="text-sm font-medium text-text-primary">Subject</span>
                                 <select
                                     className="min-h-11 w-full rounded-2xl border border-border bg-background px-4 text-sm text-text-primary outline-none transition focus:border-primary-300"
-                                    defaultValue={content.subjects[0]?.name ?? ""}
+                                    onChange={(e) => {
+                                        const s = content.subjects.find((sub) => sub.name === e.target.value);
+                                        setSelectedSubjectId(s?.subjectId);
+                                    }}
+                                    value={content.subjects.find((s) => s.subjectId === selectedSubjectId)?.name ?? ""}
                                 >
                                     {content.subjects.length ? (
                                         content.subjects.map((subject) => (
@@ -167,20 +220,29 @@ export function LearnPageClient() {
                                 <span className="text-sm font-medium text-text-primary">Depth</span>
                                 <div className="flex flex-wrap gap-2">
                                     {([SessionDepth.QUICK, SessionDepth.STANDARD, SessionDepth.DEEP] as const).map((depth) => (
-                                        <Badge
+                                        <button
+                                            className="cursor-pointer"
                                             key={depth}
-                                            tone={depth === content.preferredDepth ? "primary" : "muted"}
+                                            onClick={() => setSelectedDepth(depth)}
+                                            type="button"
                                         >
-                                            {formatDepthLabel(depth)}
-                                        </Badge>
+                                            <Badge tone={depth === effectiveDepth ? "primary" : "muted"}>
+                                                {formatDepthLabel(depth)}
+                                            </Badge>
+                                        </button>
                                     ))}
                                 </div>
                             </div>
                         </form>
+                        {generateError ? <p className="mt-3 text-sm text-red-600">{generateError}</p> : null}
                     </CardContent>
                     <CardFooter>
-                        <Button disabled={!canStartLesson}>Generate lesson</Button>
-                        <Button variant="secondary">Save for later</Button>
+                        <Button
+                            disabled={!canStartLesson || isGenerating || !topic.trim()}
+                            onClick={() => void handleGenerate()}
+                        >
+                            {isGenerating ? "Generating…" : "Generate lesson"}
+                        </Button>
                     </CardFooter>
                 </Card>
 
@@ -251,6 +313,7 @@ export function LearnPageClient() {
                                         description: draft.status,
                                         meta: draft.nextStep,
                                         tone: "primary" as const,
+                                        href: `/learn/${draft.id}`,
                                     }))}
                                 />
                             ) : (
@@ -269,9 +332,18 @@ export function LearnPageClient() {
                                     detail={`${formatDepthLabel(recommendation.depth)} • ${formatMinutes(recommendation.estimatedMinutes)}`}
                                     eyebrow={recommendation.subject}
                                     key={`${recommendation.subject}-${recommendation.topic}`}
-                                    primaryAction="Start now"
-                                    secondaryAction="Queue next"
+                                    primaryAction={isGenerating ? "Generating…" : "Start now"}
                                     title={recommendation.topic}
+                                    footer={
+                                        <Button
+                                            className="w-full"
+                                            disabled={!canStartLesson || isGenerating}
+                                            onClick={() => void handleGenerate(recommendation.topic, recommendation.depth as SessionDepth)}
+                                            size="sm"
+                                        >
+                                            {isGenerating ? "Generating…" : "Start now"}
+                                        </Button>
+                                    }
                                 />
                             ))
                         ) : (
