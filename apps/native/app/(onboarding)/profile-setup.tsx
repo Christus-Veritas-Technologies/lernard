@@ -131,7 +131,7 @@ export default function ProfileSetupScreen() {
                                 className={`rounded-xl border px-4 py-2.5 ${ageGroup === value
                                     ? 'border-primary-400 bg-primary-100'
                                     : 'border-slate-200 bg-slate-50'
-                                }`}
+                                    }`}
                             >
                                 <Text className={`text-sm font-medium ${ageGroup === value ? 'text-primary-700' : 'text-slate-600'}`}>
                                     {label}
@@ -165,7 +165,7 @@ export default function ProfileSetupScreen() {
                                 className={`rounded-full border px-3.5 py-1.5 ${subjects.includes(subject)
                                     ? 'border-primary-400 bg-primary-100'
                                     : 'border-slate-200 bg-slate-50'
-                                }`}
+                                    }`}
                             >
                                 <Text className={`text-sm ${subjects.includes(subject) ? 'text-primary-700 font-medium' : 'text-slate-600'}`}>
                                     {subject}
@@ -192,7 +192,7 @@ export default function ProfileSetupScreen() {
                                 className={`flex-row items-center gap-3 rounded-2xl border p-4 ${learningGoal === value
                                     ? 'border-primary-400 bg-primary-50'
                                     : 'border-slate-100 bg-slate-50'
-                                }`}
+                                    }`}
                             >
                                 <View className={`h-4 w-4 rounded-full border-2 ${learningGoal === value ? 'border-primary-500 bg-primary-500' : 'border-slate-300'}`} />
                                 <View className="flex-1 gap-0.5">
@@ -221,7 +221,7 @@ export default function ProfileSetupScreen() {
                                 className={`flex-1 items-center rounded-xl border py-3 ${depth === value
                                     ? 'border-primary-400 bg-primary-100'
                                     : 'border-slate-200 bg-slate-50'
-                                }`}
+                                    }`}
                             >
                                 <Text className={`text-sm font-semibold ${depth === value ? 'text-primary-700' : 'text-slate-600'}`}>
                                     {label}
@@ -281,4 +281,4 @@ export default function ProfileSetupScreen() {
 }
 
 
-    return (
+return (

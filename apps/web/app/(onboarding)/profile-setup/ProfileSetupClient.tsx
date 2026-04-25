@@ -129,8 +129,8 @@ export function ProfileSetupClient() {
                             type="button"
                             onClick={() => setAgeGroup(value)}
                             className={`rounded-xl border py-3 text-sm font-medium transition-all ${ageGroup === value
-                                    ? "border-primary-400 bg-primary-50 text-primary-700"
-                                    : "border-border bg-surface text-text-secondary hover:border-primary-200"
+                                ? "border-primary-400 bg-primary-50 text-primary-700"
+                                : "border-border bg-surface text-text-secondary hover:border-primary-200"
                                 }`}
                         >
                             {label}
@@ -151,8 +151,8 @@ export function ProfileSetupClient() {
                             type="button"
                             onClick={() => toggleSubject(subject)}
                             className={`rounded-full border px-3.5 py-1.5 text-sm transition-all ${subjects.includes(subject)
-                                    ? "border-primary-400 bg-primary-100 text-primary-700"
-                                    : "border-border bg-surface text-text-secondary hover:border-primary-200"
+                                ? "border-primary-400 bg-primary-100 text-primary-700"
+                                : "border-border bg-surface text-text-secondary hover:border-primary-200"
                                 }`}
                         >
                             {subject}
@@ -171,14 +171,14 @@ export function ProfileSetupClient() {
                             type="button"
                             onClick={() => setLearningGoal(value)}
                             className={`flex items-center gap-3 rounded-xl border p-4 text-left transition-all ${learningGoal === value
-                                    ? "border-primary-400 bg-primary-50"
-                                    : "border-border bg-surface hover:border-primary-200"
+                                ? "border-primary-400 bg-primary-50"
+                                : "border-border bg-surface hover:border-primary-200"
                                 }`}
                         >
                             <div
                                 className={`h-4 w-4 shrink-0 rounded-full border-2 transition-all ${learningGoal === value
-                                        ? "border-primary-500 bg-primary-500"
-                                        : "border-border"
+                                    ? "border-primary-500 bg-primary-500"
+                                    : "border-border"
                                     }`}
                             />
                             <div>
@@ -200,8 +200,8 @@ export function ProfileSetupClient() {
                             type="button"
                             onClick={() => setDepth(value)}
                             className={`flex flex-col gap-1 rounded-xl border p-3 text-left transition-all ${depth === value
-                                    ? "border-primary-400 bg-primary-50"
-                                    : "border-border bg-surface hover:border-primary-200"
+                                ? "border-primary-400 bg-primary-50"
+                                : "border-border bg-surface hover:border-primary-200"
                                 }`}
                         >
                             <span className="text-sm font-semibold text-text-primary">{label}</span>

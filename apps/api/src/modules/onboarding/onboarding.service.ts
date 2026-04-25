@@ -82,6 +82,8 @@ export class OnboardingService {
         where: { id: userId },
         data: {
           role: accountType === 'guardian' ? 'GUARDIAN' : 'STUDENT',
+          // Guardians skip profile-setup and First Look — they're done after this step
+          ...(accountType === 'guardian' ? { onboardingComplete: true } : {}),
         },
       });
 
@@ -114,7 +116,7 @@ export class OnboardingService {
       await transaction.user.update({
         where: { id: userId },
         data: {
-          name: dto.name,
+          ...(dto.name ? { name: dto.name } : {}),
           ageGroup: toPrismaAgeGroup(dto.ageGroup),
           grade: dto.grade ?? null,
           learningGoal: dto.learningGoal ? toPrismaLearningGoal(dto.learningGoal) : null,

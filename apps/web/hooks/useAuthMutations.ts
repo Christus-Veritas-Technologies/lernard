@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
     AccountTypePayload,
     FirstLookSubmission,
@@ -53,8 +53,12 @@ export function useAuthMeQuery(enabled = true) {
 }
 
 export function useAccountTypeMutation() {
+    const queryClient = useQueryClient();
     return useMutation({
         mutationFn: (payload: AccountTypePayload) => setAccountType(payload),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+        },
     });
 }
 

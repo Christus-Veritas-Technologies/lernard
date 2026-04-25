@@ -188,8 +188,8 @@ export default function FirstLookScreen() {
                                 onPress={() => selectAnswer(option)}
                                 activeOpacity={0.8}
                                 className={`flex-row items-center gap-3 rounded-2xl border p-4 ${isSelected
-                                        ? 'border-primary bg-primary-50'
-                                        : 'border-slate-200 bg-white'
+                                    ? 'border-primary bg-primary-50'
+                                    : 'border-slate-200 bg-white'
                                     }`}
                             >
                                 <View

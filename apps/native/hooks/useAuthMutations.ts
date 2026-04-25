@@ -101,6 +101,7 @@ export function useNativeRegister() {
 }
 
 export function useNativeAccountType() {
+    const setOnboardingComplete = useAuthStore((s) => s.setOnboardingComplete);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -116,6 +117,10 @@ export function useNativeAccountType() {
                     method: 'POST',
                     body: JSON.stringify(payload),
                 });
+                // Guardians complete onboarding at this step
+                if (payload.accountType === 'guardian') {
+                    setOnboardingComplete(true);
+                }
                 callbacks?.onSuccess?.();
             } catch (e) {
                 const msg = extractMessage(e);
@@ -125,7 +130,7 @@ export function useNativeAccountType() {
                 setIsLoading(false);
             }
         },
-        [],
+        [setOnboardingComplete],
     );
 
     return { mutate, isLoading, error, reset: () => setError(null) };
@@ -189,6 +194,7 @@ export function useNativeFirstLookStart() {
 }
 
 export function useNativeFirstLookSubmit() {
+    const setOnboardingComplete = useAuthStore((s) => s.setOnboardingComplete);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -204,6 +210,7 @@ export function useNativeFirstLookSubmit() {
                     ROUTES.ONBOARDING.FIRST_LOOK.SUBMIT,
                     { method: 'POST', body: JSON.stringify(payload) },
                 );
+                setOnboardingComplete(true);
                 callbacks?.onSuccess?.(result);
                 return result;
             } catch (e) {
@@ -214,13 +221,14 @@ export function useNativeFirstLookSubmit() {
                 setIsLoading(false);
             }
         },
-        [],
+        [setOnboardingComplete],
     );
 
     return { mutate, isLoading, error };
 }
 
 export function useNativeFirstLookSkip() {
+    const setOnboardingComplete = useAuthStore((s) => s.setOnboardingComplete);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -232,6 +240,7 @@ export function useNativeFirstLookSkip() {
                 await nativeApiFetch<FirstLookSkipResponse>(ROUTES.ONBOARDING.FIRST_LOOK.SKIP, {
                     method: 'POST',
                 });
+                setOnboardingComplete(true);
                 callbacks?.onSuccess?.();
             } catch (e) {
                 const msg = extractMessage(e);
@@ -241,7 +250,7 @@ export function useNativeFirstLookSkip() {
                 setIsLoading(false);
             }
         },
-        [],
+        [setOnboardingComplete],
     );
 
     return { mutate, isLoading, error };

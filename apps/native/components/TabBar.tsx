@@ -13,11 +13,11 @@ import {
 import { Text } from '@rnr/text';
 
 const TABS = [
-    { name: '(home)',      label: 'Home',     Icon: Home01Icon },
-    { name: '(learn)',     label: 'Learn',    Icon: BookOpen01Icon },
-    { name: '(chat)',      label: 'Chat',     Icon: Message01Icon },
-    { name: '(progress)',  label: 'Progress', Icon: ChartBarLineIcon },
-    { name: 'settings',   label: 'Settings', Icon: Settings02Icon },
+    { name: '(home)', label: 'Home', Icon: Home01Icon },
+    { name: '(learn)', label: 'Learn', Icon: BookOpen01Icon },
+    { name: '(chat)', label: 'Chat', Icon: Message01Icon },
+    { name: '(progress)', label: 'Progress', Icon: ChartBarLineIcon },
+    { name: 'settings', label: 'Settings', Icon: Settings02Icon },
 ] as const;
 
 export function TabBar({ state, navigation }: BottomTabBarProps) {

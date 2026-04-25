@@ -13,9 +13,9 @@ import {
 import { Text } from '@rnr/text';
 
 const CAPABILITIES = [
-    { Icon: ChartBarLineIcon,   text: 'Monitor your child\'s progress and growth areas' },
+    { Icon: ChartBarLineIcon, text: 'Monitor your child\'s progress and growth areas' },
     { Icon: UserMultiple02Icon, text: 'Manage learning preferences for each child' },
-    { Icon: Settings02Icon,     text: 'Set daily lesson goals and review quiz scores' },
+    { Icon: Settings02Icon, text: 'Set daily lesson goals and review quiz scores' },
     { Icon: CheckmarkCircle02Icon, text: 'Approve topics and control what they learn' },
 ];
 
