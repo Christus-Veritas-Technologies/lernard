@@ -132,35 +132,45 @@ export function FirstLookClient() {
 
     return (
         <div className="flex flex-col gap-6">
-            <div className="flex items-start justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-text-primary">First Look</h1>
-                    <p className="mt-0.5 text-sm text-text-secondary">
-                        A quick check so Lernard knows where to start.
-                    </p>
-                </div>
-                <div className="flex items-center gap-1.5 rounded-full bg-primary-50 px-3 py-1.5">
-                    <BookOpen01Icon size={14} className="text-primary-500" />
-                    <span className="text-xs font-semibold text-primary-600">
-                        {currentIndex + 1}/{questions.length}
+            {/* Step indicator */}
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-6 rounded-full bg-primary-200" />
+                    <div className="h-px flex-1 bg-primary-200" />
+                    <span className="rounded-full bg-primary-500 px-3 py-1 text-xs font-bold text-white">
+                        Step 2 of 2
                     </span>
+                </div>
+                <div className="flex items-end justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold text-text-primary">First Look</h1>
+                        <p className="mt-0.5 text-sm text-text-secondary">
+                            A quick quiz to set your baseline.
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 rounded-full bg-primary-50 px-3 py-1.5">
+                        <BookOpen01Icon size={14} className="text-primary-500" />
+                        <span className="text-xs font-semibold text-primary-600">
+                            {currentIndex + 1}/{questions.length}
+                        </span>
+                    </div>
                 </div>
             </div>
 
             {/* Progress bar */}
-            <div className="h-1.5 w-full rounded-full bg-primary-100">
+            <div className="h-2 w-full overflow-hidden rounded-full bg-primary-100">
                 <div
-                    className="h-1.5 rounded-full bg-primary-500 transition-all duration-300"
+                    className="h-2 rounded-full bg-primary-500 transition-all duration-300"
                     style={{ width: `${progressPercent}%` }}
                 />
             </div>
 
-            {/* Question */}
-            <div className="rounded-2xl bg-primary-50 px-5 py-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary-400">
+            {/* Question card */}
+            <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-primary-100">
+                <span className="inline-block rounded-full bg-primary-100 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary-600">
                     {current.subject}
-                </p>
-                <p className="mt-2 text-base font-semibold leading-snug text-text-primary">
+                </span>
+                <p className="mt-3 text-lg font-semibold leading-snug text-text-primary">
                     {current.question}
                 </p>
             </div>

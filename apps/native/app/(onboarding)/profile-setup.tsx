@@ -1,7 +1,15 @@
-import { useRouter } from 'expo-router';
+﻿import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import {
+    BookOpen01Icon,
+    BulbIcon,
+    SchoolIcon,
+    Target02Icon,
+    TimeScheduleIcon,
+} from 'hugeicons-react-native';
 
 import { Text } from '@rnr/text';
 
@@ -82,12 +90,20 @@ export default function ProfileSetupScreen() {
         <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'bottom']}>
             <ScrollView
                 className="flex-1"
-                contentContainerClassName="px-5 pb-8 pt-6 gap-8"
+                contentContainerClassName="px-5 pb-8 pt-6 gap-5"
                 keyboardShouldPersistTaps="handled"
             >
-                <View className="gap-1">
-                    <Text className="text-3xl font-bold text-slate-900">Let&apos;s get to know you</Text>
-                    <Text className="text-base leading-7 text-slate-500">
+                {/* Step header */}
+                <View className="gap-2">
+                    <View className="flex-row items-center gap-2">
+                        <View className="rounded-full bg-primary-100 px-3 py-1">
+                            <Text className="text-xs font-bold text-primary-700">Step 1 of 2</Text>
+                        </View>
+                        <View className="h-px flex-1 bg-primary-200" />
+                        <View className="h-1.5 w-6 rounded-full bg-slate-200" />
+                    </View>
+                    <Text className="text-3xl font-bold text-slate-900">Tell us about you</Text>
+                    <Text className="text-sm leading-6 text-slate-500">
                         Lernard uses this to personalise every lesson and quiz.
                     </Text>
                 </View>
@@ -98,9 +114,14 @@ export default function ProfileSetupScreen() {
                     </View>
                 ) : null}
 
-                {/* Age group */}
-                <View className="gap-3">
-                    <Text className="text-sm font-semibold text-slate-900">What stage are you at?</Text>
+                {/* Section: Stage */}
+                <View className="overflow-hidden rounded-[24px] bg-white p-5 shadow-sm">
+                    <View className="mb-3 flex-row items-center gap-2.5">
+                        <View className="rounded-xl bg-primary-100 p-2">
+                            <SchoolIcon size={16} color="#4F62A3" />
+                        </View>
+                        <Text className="text-sm font-semibold text-slate-900">What stage are you at?</Text>
+                    </View>
                     <View className="flex-row flex-wrap gap-2">
                         {AGE_GROUPS.map(({ value, label }) => (
                             <TouchableOpacity
@@ -108,14 +129,11 @@ export default function ProfileSetupScreen() {
                                 onPress={() => setAgeGroup(value)}
                                 activeOpacity={0.8}
                                 className={`rounded-xl border px-4 py-2.5 ${ageGroup === value
-                                    ? 'border-primary bg-primary-100'
-                                    : 'border-slate-200 bg-white'
-                                    }`}
+                                    ? 'border-primary-400 bg-primary-100'
+                                    : 'border-slate-200 bg-slate-50'
+                                }`}
                             >
-                                <Text
-                                    className={`text-sm font-medium ${ageGroup === value ? 'text-primary' : 'text-slate-600'
-                                        }`}
-                                >
+                                <Text className={`text-sm font-medium ${ageGroup === value ? 'text-primary-700' : 'text-slate-600'}`}>
                                     {label}
                                 </Text>
                             </TouchableOpacity>
@@ -123,12 +141,21 @@ export default function ProfileSetupScreen() {
                     </View>
                 </View>
 
-                {/* Subjects */}
-                <View className="gap-3">
-                    <Text className="text-sm font-semibold text-slate-900">
-                        Which subjects?{' '}
-                        <Text className="font-normal text-slate-400">(pick any)</Text>
-                    </Text>
+                {/* Section: Subjects */}
+                <View className="overflow-hidden rounded-[24px] bg-white p-5 shadow-sm">
+                    <View className="mb-3 flex-row items-center gap-2.5">
+                        <View className="rounded-xl bg-primary-100 p-2">
+                            <BookOpen01Icon size={16} color="#4F62A3" />
+                        </View>
+                        <View className="flex-1 flex-row items-center justify-between">
+                            <Text className="text-sm font-semibold text-slate-900">Which subjects?</Text>
+                            {subjects.length > 0 && (
+                                <View className="rounded-full bg-primary-500 px-2.5 py-0.5">
+                                    <Text className="text-xs font-bold text-white">{subjects.length} selected</Text>
+                                </View>
+                            )}
+                        </View>
+                    </View>
                     <View className="flex-row flex-wrap gap-2">
                         {COMMON_SUBJECTS.map((subject) => (
                             <TouchableOpacity
@@ -136,14 +163,11 @@ export default function ProfileSetupScreen() {
                                 onPress={() => toggleSubject(subject)}
                                 activeOpacity={0.8}
                                 className={`rounded-full border px-3.5 py-1.5 ${subjects.includes(subject)
-                                    ? 'border-primary bg-primary-100'
-                                    : 'border-slate-200 bg-white'
-                                    }`}
+                                    ? 'border-primary-400 bg-primary-100'
+                                    : 'border-slate-200 bg-slate-50'
+                                }`}
                             >
-                                <Text
-                                    className={`text-sm ${subjects.includes(subject) ? 'text-primary font-medium' : 'text-slate-600'
-                                        }`}
-                                >
+                                <Text className={`text-sm ${subjects.includes(subject) ? 'text-primary-700 font-medium' : 'text-slate-600'}`}>
                                     {subject}
                                 </Text>
                             </TouchableOpacity>
@@ -151,9 +175,14 @@ export default function ProfileSetupScreen() {
                     </View>
                 </View>
 
-                {/* Learning goal */}
-                <View className="gap-3">
-                    <Text className="text-sm font-semibold text-slate-900">What&apos;s your main goal?</Text>
+                {/* Section: Learning goal */}
+                <View className="overflow-hidden rounded-[24px] bg-white p-5 shadow-sm">
+                    <View className="mb-3 flex-row items-center gap-2.5">
+                        <View className="rounded-xl bg-primary-100 p-2">
+                            <Target02Icon size={16} color="#4F62A3" />
+                        </View>
+                        <Text className="text-sm font-semibold text-slate-900">What&apos;s your main goal?</Text>
+                    </View>
                     <View className="gap-2">
                         {LEARNING_GOALS.map(({ value, label, description }) => (
                             <TouchableOpacity
@@ -161,14 +190,11 @@ export default function ProfileSetupScreen() {
                                 onPress={() => setLearningGoal(value)}
                                 activeOpacity={0.8}
                                 className={`flex-row items-center gap-3 rounded-2xl border p-4 ${learningGoal === value
-                                    ? 'border-primary bg-primary-50'
-                                    : 'border-slate-200 bg-white'
-                                    }`}
+                                    ? 'border-primary-400 bg-primary-50'
+                                    : 'border-slate-100 bg-slate-50'
+                                }`}
                             >
-                                <View
-                                    className={`h-4 w-4 rounded-full border-2 ${learningGoal === value ? 'border-primary bg-primary' : 'border-slate-300'
-                                        }`}
-                                />
+                                <View className={`h-4 w-4 rounded-full border-2 ${learningGoal === value ? 'border-primary-500 bg-primary-500' : 'border-slate-300'}`} />
                                 <View className="flex-1 gap-0.5">
                                     <Text className="text-sm font-semibold text-slate-900">{label}</Text>
                                     <Text className="text-xs text-slate-500">{description}</Text>
@@ -178,9 +204,14 @@ export default function ProfileSetupScreen() {
                     </View>
                 </View>
 
-                {/* Session depth */}
-                <View className="gap-3">
-                    <Text className="text-sm font-semibold text-slate-900">How do you like to learn?</Text>
+                {/* Section: Study style */}
+                <View className="overflow-hidden rounded-[24px] bg-white p-5 shadow-sm">
+                    <View className="mb-3 flex-row items-center gap-2.5">
+                        <View className="rounded-xl bg-primary-100 p-2">
+                            <BulbIcon size={16} color="#4F62A3" />
+                        </View>
+                        <Text className="text-sm font-semibold text-slate-900">How do you like to learn?</Text>
+                    </View>
                     <View className="flex-row gap-2">
                         {DEPTHS.map(({ value, label }) => (
                             <TouchableOpacity
@@ -188,14 +219,11 @@ export default function ProfileSetupScreen() {
                                 onPress={() => setDepth(value)}
                                 activeOpacity={0.8}
                                 className={`flex-1 items-center rounded-xl border py-3 ${depth === value
-                                    ? 'border-primary bg-primary-100'
-                                    : 'border-slate-200 bg-white'
-                                    }`}
+                                    ? 'border-primary-400 bg-primary-100'
+                                    : 'border-slate-200 bg-slate-50'
+                                }`}
                             >
-                                <Text
-                                    className={`text-sm font-semibold ${depth === value ? 'text-primary' : 'text-slate-600'
-                                        }`}
-                                >
+                                <Text className={`text-sm font-semibold ${depth === value ? 'text-primary-700' : 'text-slate-600'}`}>
                                     {label}
                                 </Text>
                             </TouchableOpacity>
@@ -203,26 +231,31 @@ export default function ProfileSetupScreen() {
                     </View>
                 </View>
 
-                {/* Daily goal */}
-                <View className="gap-2">
-                    <Text className="text-sm font-semibold text-slate-900">
-                        Daily lessons goal:{' '}
-                        <Text className="text-primary">{dailyGoal} lesson{dailyGoal !== 1 ? 's' : ''}</Text>
-                    </Text>
+                {/* Section: Daily goal */}
+                <View className="overflow-hidden rounded-[24px] bg-white p-5 shadow-sm">
+                    <View className="mb-3 flex-row items-center gap-2.5">
+                        <View className="rounded-xl bg-primary-100 p-2">
+                            <TimeScheduleIcon size={16} color="#4F62A3" />
+                        </View>
+                        <Text className="text-sm font-semibold text-slate-900">
+                            Daily target:{' '}
+                            <Text className="text-primary-600">{dailyGoal} lesson{dailyGoal !== 1 ? 's' : ''}</Text>
+                        </Text>
+                    </View>
                     <View className="flex-row items-center gap-4">
                         <TouchableOpacity
                             onPress={() => setDailyGoal((g) => Math.max(1, g - 1))}
-                            className="h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
+                            className="h-11 w-11 items-center justify-center rounded-full border-2 border-slate-200 bg-slate-50"
                             activeOpacity={0.7}
                         >
-                            <Text className="text-lg font-bold text-slate-700">-</Text>
+                            <Text className="text-lg font-bold text-slate-700">−</Text>
                         </TouchableOpacity>
                         <View className="flex-1 items-center">
-                            <Text className="text-2xl font-bold text-primary">{dailyGoal}</Text>
+                            <Text className="text-3xl font-bold text-primary-600">{dailyGoal}</Text>
                         </View>
                         <TouchableOpacity
                             onPress={() => setDailyGoal((g) => Math.min(10, g + 1))}
-                            className="h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
+                            className="h-11 w-11 items-center justify-center rounded-full border-2 border-slate-200 bg-slate-50"
                             activeOpacity={0.7}
                         >
                             <Text className="text-lg font-bold text-slate-700">+</Text>
@@ -230,18 +263,22 @@ export default function ProfileSetupScreen() {
                     </View>
                 </View>
 
+                {/* Submit */}
                 <TouchableOpacity
                     onPress={handleSubmit}
                     disabled={isLoading}
-                    className="h-14 items-center justify-center rounded-[24px] bg-primary"
+                    className="h-14 items-center justify-center rounded-[24px] bg-primary-500"
                     style={{ opacity: isLoading ? 0.6 : 1 }}
                     activeOpacity={0.8}
                 >
                     <Text className="text-base font-bold text-white">
-                        {isLoading ? 'Saving…' : 'Continue'}
+                        {isLoading ? 'Saving…' : 'Continue to First Look →'}
                     </Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
     );
 }
+
+
+    return (

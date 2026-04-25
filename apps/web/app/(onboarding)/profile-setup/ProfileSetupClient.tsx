@@ -98,9 +98,17 @@ export function ProfileSetupClient() {
 
     return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-8">
-            <div>
-                <h1 className="text-3xl font-bold text-text-primary">Let&apos;s get to know you</h1>
-                <p className="mt-1 text-text-secondary">
+            {/* Step indicator */}
+            <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-primary-100 px-3 py-1 text-xs font-bold text-primary-700">
+                        Step 1 of 2
+                    </span>
+                    <div className="h-px flex-1 bg-primary-200" />
+                    <div className="h-1.5 w-6 rounded-full bg-border" />
+                </div>
+                <h1 className="text-3xl font-bold text-text-primary">Tell us about you</h1>
+                <p className="text-sm text-text-secondary">
                     Lernard uses this to personalise every lesson and quiz.
                 </p>
             </div>
@@ -228,7 +236,7 @@ export function ProfileSetupClient() {
                 disabled={isPending}
                 className="flex h-12 items-center justify-center rounded-2xl bg-primary-500 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-600 disabled:opacity-60"
             >
-                {isPending ? "Saving…" : "Continue"}
+                {isPending ? "Saving…" : "Continue to First Look →"}
             </button>
         </form>
     );

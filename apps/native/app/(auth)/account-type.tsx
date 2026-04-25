@@ -36,7 +36,7 @@ export default function AccountTypeScreen() {
             {
                 onSuccess: () => {
                     if (selected === 'guardian') {
-                        router.replace('/(app)/(home)');
+                        router.replace('/(onboarding)/guardian-welcome');
                     } else {
                         router.replace('/(onboarding)/profile-setup');
                     }

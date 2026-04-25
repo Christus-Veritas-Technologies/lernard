@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -85,11 +85,11 @@ export default function FirstLookScreen() {
                     <TouchableOpacity
                         onPress={handleSkip}
                         disabled={skipHook.isLoading}
-                        className="h-14 w-full items-center justify-center rounded-[24px] bg-primary"
+                        className="h-14 w-full items-center justify-center rounded-[24px] bg-primary-500"
                         activeOpacity={0.8}
                     >
                         <Text className="text-base font-bold text-white">
-                            {skipHook.isLoading ? 'Skipping…' : 'Skip and go to Lernard'}
+                            {skipHook.isLoading ? 'Skippingâ€¦' : 'Skip and go to Lernard'}
                         </Text>
                     </TouchableOpacity>
                 </View>
@@ -115,7 +115,7 @@ export default function FirstLookScreen() {
                     </View>
                     <TouchableOpacity
                         onPress={() => router.replace('/(app)/(home)')}
-                        className="h-14 w-full items-center justify-center rounded-[24px] bg-primary"
+                        className="h-14 w-full items-center justify-center rounded-[24px] bg-primary-500"
                         activeOpacity={0.8}
                     >
                         <Text className="text-base font-bold text-white">Go to Lernard</Text>
@@ -134,35 +134,46 @@ export default function FirstLookScreen() {
                 contentContainerClassName="px-5 pb-8 pt-6 gap-6"
                 keyboardShouldPersistTaps="handled"
             >
-                {/* Header */}
-                <View className="flex-row items-start justify-between">
-                    <View className="gap-0.5">
-                        <Text className="text-2xl font-bold text-slate-900">First Look</Text>
-                        <Text className="text-sm text-slate-500">A quick check to set your baseline.</Text>
+                {/* Step header */}
+                <View className="gap-2">
+                    <View className="flex-row items-center gap-2">
+                        <View className="h-1.5 w-6 rounded-full bg-primary-200" />
+                        <View className="h-px flex-1 bg-primary-200" />
+                        <View className="rounded-full bg-primary-500 px-3 py-1">
+                            <Text className="text-xs font-bold text-white">Step 2 of 2</Text>
+                        </View>
                     </View>
-                    <View className="flex-row items-center gap-1.5 rounded-full bg-primary-100 px-3 py-1.5">
-                        <BookOpen01Icon size={14} color="#4F62A3" />
-                        <Text className="text-xs font-semibold text-primary">
-                            {currentIndex + 1}/{questions.length}
-                        </Text>
+                    <View className="flex-row items-end justify-between">
+                        <View className="gap-0.5">
+                            <Text className="text-3xl font-bold text-slate-900">First Look</Text>
+                            <Text className="text-sm text-slate-500">A quick quiz to set your baseline.</Text>
+                        </View>
+                        <View className="flex-row items-center gap-1.5 rounded-full bg-primary-100 px-3 py-1.5">
+                            <BookOpen01Icon size={14} color="#4F62A3" />
+                            <Text className="text-xs font-semibold text-primary-700">
+                                {currentIndex + 1}/{questions.length}
+                            </Text>
+                        </View>
                     </View>
                 </View>
 
                 {/* Progress bar */}
-                <View className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                <View className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
                     <View
-                        className="h-full rounded-full bg-primary"
+                        className="h-full rounded-full bg-primary-500"
                         // eslint-disable-next-line react-native/no-inline-styles
                         style={{ width: `${progressPercent}%` }}
                     />
                 </View>
 
-                {/* Question */}
-                <View className="gap-2 rounded-[24px] bg-primary-50 px-5 py-4">
-                    <Text className="text-xs font-semibold uppercase tracking-wider text-primary">
-                        {current.subject}
-                    </Text>
-                    <Text className="text-base font-semibold leading-7 text-slate-900">
+                {/* Question card */}
+                <View className="gap-3 overflow-hidden rounded-[24px] bg-white p-5 shadow-sm">
+                    <View className="self-start rounded-full bg-primary-100 px-3 py-1">
+                        <Text className="text-xs font-bold uppercase tracking-wider text-primary-700">
+                            {current.subject}
+                        </Text>
+                    </View>
+                    <Text className="text-lg font-semibold leading-7 text-slate-900">
                         {current.question}
                     </Text>
                 </View>
@@ -211,19 +222,19 @@ export default function FirstLookScreen() {
                         <TouchableOpacity
                             onPress={handleSubmit}
                             disabled={!allAnswered || submitHook.isLoading}
-                            className="h-14 flex-1 items-center justify-center rounded-[24px] bg-primary"
+                            className="h-14 flex-1 items-center justify-center rounded-[24px] bg-primary-500"
                             style={{ opacity: !allAnswered || submitHook.isLoading ? 0.5 : 1 }}
                             activeOpacity={0.8}
                         >
                             <Text className="text-sm font-bold text-white">
-                                {submitHook.isLoading ? 'Submitting…' : 'Submit answers'}
+                                {submitHook.isLoading ? 'Submittingâ€¦' : 'Submit answers'}
                             </Text>
                         </TouchableOpacity>
                     ) : (
                         <TouchableOpacity
                             onPress={() => setCurrentIndex((i) => i + 1)}
                             disabled={!answers[currentIndex]}
-                            className="h-14 flex-1 items-center justify-center rounded-[24px] bg-primary"
+                            className="h-14 flex-1 items-center justify-center rounded-[24px] bg-primary-500"
                             style={{ opacity: !answers[currentIndex] ? 0.5 : 1 }}
                             activeOpacity={0.8}
                         >
@@ -234,7 +245,7 @@ export default function FirstLookScreen() {
 
                 <TouchableOpacity onPress={handleSkip} disabled={skipHook.isLoading}>
                     <Text className="text-center text-sm text-slate-400">
-                        {skipHook.isLoading ? 'Skipping…' : 'Skip First Look'}
+                        {skipHook.isLoading ? 'Skippingâ€¦' : 'Skip First Look'}
                     </Text>
                 </TouchableOpacity>
 
