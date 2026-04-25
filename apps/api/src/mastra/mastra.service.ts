@@ -109,18 +109,50 @@ export class MastraService {
   private buildLessonPrompt(input: GenerateLessonInput): string {
     return `You are Lernard's lesson generator.
 
-Generate an engaging lesson on: ${input.topic}
+Generate a lesson on: ${input.topic}
 Difficulty level: ${input.depth}
 ${input.studentLevel ? `Student proficiency: ${input.studentLevel}/100` : ''}
 
-Format requirements:
-- Clear learning objectives (2-3 goals)
-- Concise explanation (150-300 words)
-- Key concepts highlighted with **bold**
-- 2-3 practical, relevant examples
-- Summary with main takeaways
+Return ONLY valid JSON (no markdown, no commentary) with this exact structure:
+{
+  "sections": [
+    {
+      "index": 0,
+      "type": "hook",
+      "title": "Why this matters",
+      "content": "Engaging opening that connects the topic to real life (80-120 words)"
+    },
+    {
+      "index": 1,
+      "type": "concept",
+      "title": "The core idea",
+      "content": "Clear, precise explanation of the main concept (120-200 words)"
+    },
+    {
+      "index": 2,
+      "type": "example",
+      "title": "Seeing it in action",
+      "content": "One concrete, worked example with step-by-step reasoning (100-160 words)"
+    },
+    {
+      "index": 3,
+      "type": "recap",
+      "title": "What to remember",
+      "content": "Brief reinforcement and connection to related ideas (60-100 words)"
+    }
+  ],
+  "recap": [
+    "Key takeaway 1 — one sentence",
+    "Key takeaway 2 — one sentence",
+    "Key takeaway 3 — one sentence"
+  ]
+}
 
-Keep the tone warm, precise, and encouraging.`;
+Rules:
+- section types must be exactly: "hook", "concept", "example", "recap"
+- recap array must have exactly 3 items
+- content must be plain text — no markdown headers, bullets, or code blocks
+- tone: warm, precise, encouraging`;
   }
 
   private buildQuizPrompt(input: GenerateQuizInput): string {
