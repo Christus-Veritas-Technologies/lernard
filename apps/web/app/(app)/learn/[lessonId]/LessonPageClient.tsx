@@ -195,9 +195,6 @@ export function LessonPageClient({ lessonId }: { lessonId: string }) {
     );
 }
 
-    const router = useRouter();
-    const { lesson } = payload.content;
-
     const [sectionChecks, setSectionChecks] = useState<SectionCheckState>({});
     const [checkingSection, setCheckingSection] = useState<number | null>(null);
     const [isCompleting, setIsCompleting] = useState(false);
