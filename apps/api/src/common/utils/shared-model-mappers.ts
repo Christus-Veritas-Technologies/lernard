@@ -1,10 +1,14 @@
 import {
+  AgeGroup as PrismaAgeGroup,
+  LearningGoal as PrismaLearningGoal,
   Plan as PrismaPlan,
   Role as PrismaRole,
   StrengthLevel as PrismaStrengthLevel,
 } from '@prisma/client';
 import {
+  AgeGroup,
   Appearance,
+  LearningGoal,
   LearningMode,
   Plan,
   Role,
@@ -53,6 +57,46 @@ export function toSharedStrengthLevel(
     case PrismaStrengthLevel.DEVELOPING:
     default:
       return StrengthLevel.DEVELOPING;
+  }
+}
+
+export function toPrismaStrengthLevel(value: StrengthLevel): PrismaStrengthLevel {
+  switch (value) {
+    case StrengthLevel.STRONG:
+      return PrismaStrengthLevel.STRONG;
+    case StrengthLevel.NEEDS_WORK:
+      return PrismaStrengthLevel.NEEDS_WORK;
+    case StrengthLevel.DEVELOPING:
+    default:
+      return PrismaStrengthLevel.DEVELOPING;
+  }
+}
+
+export function toPrismaAgeGroup(value: AgeGroup): PrismaAgeGroup {
+  switch (value) {
+    case AgeGroup.PRIMARY:
+      return PrismaAgeGroup.PRIMARY;
+    case AgeGroup.UNIVERSITY:
+      return PrismaAgeGroup.UNIVERSITY;
+    case AgeGroup.PROFESSIONAL:
+      return PrismaAgeGroup.PROFESSIONAL;
+    case AgeGroup.SECONDARY:
+    default:
+      return PrismaAgeGroup.SECONDARY;
+  }
+}
+
+export function toPrismaLearningGoal(value: LearningGoal): PrismaLearningGoal {
+  switch (value) {
+    case LearningGoal.EXAM_PREP:
+      return PrismaLearningGoal.EXAM_PREP;
+    case LearningGoal.KEEP_UP:
+      return PrismaLearningGoal.KEEP_UP;
+    case LearningGoal.FILL_GAPS:
+      return PrismaLearningGoal.FILL_GAPS;
+    case LearningGoal.LEARN_NEW:
+    default:
+      return PrismaLearningGoal.LEARN_NEW;
   }
 }
 

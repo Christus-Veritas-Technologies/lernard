@@ -39,6 +39,13 @@ enum AgeGroup {
   PROFESSIONAL
 }
 
+enum LearningGoal {
+  EXAM_PREP
+  KEEP_UP
+  LEARN_NEW
+  FILL_GAPS
+}
+
 enum StrengthLevel {
   STRONG
   DEVELOPING
@@ -74,6 +81,7 @@ model User {
   // Profile
   ageGroup       AgeGroup?
   grade          String?
+  learningGoal   LearningGoal?
   timezone       String    @default("UTC")
   learningMode   LearningMode @default(GUIDE)
   appearance      String    @default("system")
