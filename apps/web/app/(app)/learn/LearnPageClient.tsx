@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 import { can } from "@lernard/auth-core";
 import { ROUTES } from "@lernard/routes";
@@ -17,6 +18,26 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { usePagePayload } from "@/hooks/usePagePayload";
 import { browserApiFetch } from "@/lib/browser-api";
 import { formatMinutes } from "@/lib/formatters";
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.08,
+            delayChildren: 0.1,
+        },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.4, ease: "easeOut" },
+    },
+};
 
 export function LearnPageClient() {
     const router = useRouter();

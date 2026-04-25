@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { can } from "@lernard/auth-core";
 import { ROUTES } from "@lernard/routes";
 import {
@@ -19,6 +20,26 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { usePagePayload } from "@/hooks/usePagePayload";
 import { browserApiFetch } from "@/lib/browser-api";
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.08,
+            delayChildren: 0.1,
+        },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.4, ease: "easeOut" },
+    },
+};
 
 export function SettingsPageClient() {
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<SettingsContent>(

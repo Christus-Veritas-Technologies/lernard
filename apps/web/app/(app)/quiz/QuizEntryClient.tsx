@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { motion } from "framer-motion";
 
 import { ROUTES } from "@lernard/routes";
 import type { Quiz } from "@lernard/shared-types";
@@ -9,6 +10,26 @@ import type { Quiz } from "@lernard/shared-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { browserApiFetch } from "@/lib/browser-api";
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.08,
+            delayChildren: 0.1,
+        },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.4, ease: "easeOut" },
+    },
+};
 
 function QuizEntryForm() {
     const router = useRouter();

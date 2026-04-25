@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 import { ROUTES } from "@lernard/routes";
 import type { LessonContent, LessonSection, PostLessonContent } from "@lernard/shared-types";
@@ -31,6 +32,26 @@ const CHECK_OPTIONS: { value: SectionCheckResponse; label: string; emoji: string
     { value: "not_sure", label: "Not sure", emoji: "~" },
     { value: "confused", label: "Confused", emoji: "?" },
 ];
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.08,
+            delayChildren: 0.1,
+        },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.4, ease: "easeOut" },
+    },
+};
 
 export function LessonPageClient({ lessonId }: { lessonId: string }) {
     const router = useRouter();

@@ -3,6 +3,7 @@
 import { ROUTES } from "@lernard/routes";
 import type { ChildCompanionContent, CompanionControls } from "@lernard/shared-types";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 import { PageHero } from "@/components/dashboard/PageHero";
 import { ToggleCard } from "@/components/guardian/ToggleCard";
@@ -13,6 +14,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { usePagePayload } from "@/hooks/usePagePayload";
 import { browserApiFetch } from "@/lib/browser-api";
 import { formatRelativeDate } from "@/lib/formatters";
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.08,
+            delayChildren: 0.1,
+        },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.4, ease: "easeOut" },
+    },
+};
 
 interface ChildCompanionClientProps {
     childId: string;

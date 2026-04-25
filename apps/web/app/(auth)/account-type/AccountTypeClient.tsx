@@ -2,11 +2,32 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 import { GraduateFemaleIcon, UserGroupIcon } from "hugeicons-react";
 
 import { AuthApiError } from "@/lib/auth-client";
 import { useAccountTypeMutation } from "@/hooks/useAuthMutations";
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1,
+            delayChildren: 0.1,
+        },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.4, ease: "easeOut" },
+    },
+};
 
 const TYPES = [
     {
@@ -52,26 +73,33 @@ export function AccountTypeClient() {
                 : null;
 
     return (
-        <div className="flex flex-col gap-8">
-            <div>
+        <motion.div
+            className="flex flex-col gap-8"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+        >
+            <motion.div variants={itemVariants}>
                 <h1 className="text-3xl font-bold text-text-primary">Who are you?</h1>
                 <p className="mt-1 text-text-secondary">
                     Lernard will personalise everything based on your role.
                 </p>
-            </div>
+            </motion.div>
 
             {apiError && (
-                <div className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error">
+                <motion.div className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error" variants={itemVariants}>
                     {apiError}
-                </div>
+                </motion.div>
             )}
 
-            <div className="flex flex-col gap-3">
+            <motion.div className="flex flex-col gap-3" variants={itemVariants}>
                 {TYPES.map(({ value, label, description, Icon }) => (
-                    <button
+                    <motion.button
                         key={value}
                         type="button"
                         onClick={() => setSelected(value)}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
                         className={`flex items-start gap-4 rounded-2xl border-2 p-5 text-left transition-all ${selected === value
                             ? "border-primary-400 bg-primary-50 shadow-sm"
                             : "border-border bg-surface hover:border-primary-200 hover:bg-primary-50/50"
@@ -95,18 +123,21 @@ export function AccountTypeClient() {
                                 : "border-border"
                                 }`}
                         />
-                    </button>
+                    </motion.button>
                 ))}
-            </div>
+            </motion.div>
 
-            <button
+            <motion.button
                 type="button"
                 onClick={handleContinue}
                 disabled={!selected || isPending}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
                 className="flex h-12 items-center justify-center rounded-2xl bg-primary-500 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-600 disabled:opacity-50"
+                variants={itemVariants}
             >
                 {isPending ? "Saving…" : "Continue"}
-            </button>
-        </div>
+            </motion.button>
+        </motion.div>
     );
 }

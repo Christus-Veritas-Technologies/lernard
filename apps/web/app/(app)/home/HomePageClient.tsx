@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { can } from "@lernard/auth-core";
 import { ROUTES } from "@lernard/routes";
 import type { HomeContent } from "@lernard/shared-types";
@@ -15,6 +16,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { usePagePayload } from "@/hooks/usePagePayload";
 import { formatRelativeDate, formatSessionsLabel } from "@/lib/formatters";
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.08,
+            delayChildren: 0.1,
+        },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.4, ease: "easeOut" },
+    },
+};
 
 function getStrengthTone(strengthLevel: string) {
     if (strengthLevel === "strong") {

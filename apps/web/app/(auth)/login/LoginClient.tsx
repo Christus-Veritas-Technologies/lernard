@@ -3,11 +3,32 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 import { Mail01Icon, LockPasswordIcon } from "hugeicons-react";
 
 import { AuthApiError } from "@/lib/auth-client";
 import { useLoginMutation } from "@/hooks/useAuthMutations";
+
+const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.08,
+            delayChildren: 0.1,
+        },
+    },
+};
+
+const itemVariants = {
+    hidden: { opacity: 0, y: 12 },
+    visible: {
+        opacity: 1,
+        y: 0,
+        transition: { duration: 0.4, ease: "easeOut" },
+    },
+};
 
 export function LoginClient() {
     const router = useRouter();
@@ -56,13 +77,18 @@ export function LoginClient() {
                 : null;
 
     return (
-        <div className="flex flex-col gap-8">
-            <div>
+        <motion.div
+            className="flex flex-col gap-8"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+        >
+            <motion.div variants={itemVariants}>
                 <h1 className="text-3xl font-bold text-text-primary">Welcome back</h1>
                 <p className="mt-1 text-text-secondary">Log in to continue with Lernard.</p>
-            </div>
+            </motion.div>
 
-            <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+            <motion.form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4" variants={itemVariants}>
                 {apiError && (
                     <div className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error">
                         {apiError}
@@ -117,21 +143,27 @@ export function LoginClient() {
                     )}
                 </div>
 
-                <button
+                <motion.button
                     type="submit"
                     disabled={isPending}
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
                     className="mt-2 flex h-12 items-center justify-center rounded-2xl bg-primary-500 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-600 disabled:opacity-60"
                 >
                     {isPending ? "Logging in…" : "Log in"}
-                </button>
-            </form>
+                </motion.button>
+            </motion.form>
 
-            <p className="text-center text-sm text-text-secondary">
-                Don&apos;t have an account?{" "}
-                <Link href="/register" className="font-semibold text-primary-500 hover:underline">
-                    Sign up
-                </Link>
-            </p>
-        </div>
+            <motion.div className="flex flex-col gap-2.5" variants={itemVariants}>
+                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                    <Link
+                        href="/register"
+                        className="flex h-12 items-center justify-center rounded-2xl border border-border bg-surface text-sm font-semibold text-text-primary transition-colors hover:bg-background"
+                    >
+                        Don&apos;t have an account? Sign up
+                    </Link>
+                </motion.div>
+            </motion.div>
+        </motion.div>
     );
 }

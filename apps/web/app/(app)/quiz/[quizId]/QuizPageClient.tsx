@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { motion } from "framer-motion";
 
 import { ROUTES } from "@lernard/routes";
 import type { QuizContent, QuizResultsContent } from "@lernard/shared-types";
