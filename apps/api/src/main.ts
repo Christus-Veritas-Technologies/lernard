@@ -39,7 +39,7 @@ async function bootstrap() {
 
   app.enableCors({
     origin: [
-      'http://localhost:3000',
+      'http://localhost:4000',
       'http://localhost:8081',
       process.env.WEB_URL,
     ].filter(Boolean) as string[],
@@ -53,7 +53,7 @@ async function bootstrap() {
     ],
   });
 
-  const port = process.env.PORT ?? 3001;
+  const port = 4001;
   await app.listen(port);
 }
 bootstrap();
