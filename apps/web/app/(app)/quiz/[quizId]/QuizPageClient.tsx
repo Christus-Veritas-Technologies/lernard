@@ -136,8 +136,8 @@ export function QuizPageClient({ quizId }: { quizId: string }) {
                                     ${currentAnswer?.submitted && isSelected && currentAnswer.isCorrect
                                         ? "border-green-400 bg-green-50 text-green-900"
                                         : currentAnswer?.submitted && isSelected && !currentAnswer.isCorrect
-                                        ? "border-red-300 bg-red-50 text-red-900"
-                                        : "border-border bg-surface hover:bg-background-subtle"}`}
+                                            ? "border-red-300 bg-red-50 text-red-900"
+                                            : "border-border bg-surface hover:bg-background-subtle"}`}
                                 disabled={!!currentAnswer?.submitted || isSubmitting}
                                 key={idx}
                                 onClick={() => void handleAnswer(option, i)}
