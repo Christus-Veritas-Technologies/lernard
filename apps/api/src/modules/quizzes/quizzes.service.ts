@@ -7,10 +7,12 @@ import type {
   PagePayload,
   Quiz,
   QuizContent,
+  QuizQuestion,
   QuizResultsContent,
   QuizScore,
   ScopedPermission,
 } from '@lernard/shared-types';
+import { QuestionType } from '@lernard/shared-types';
 import { buildNullSlots, buildPagePayload } from '../../common/utils/build-page-payload';
 import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
 import { MastraService } from '../../mastra/mastra.service';
@@ -46,30 +48,34 @@ function parseStoredQuestions(raw: unknown): StoredQuestion[] {
 }
 
 function parseStoredAnswers(raw: unknown): StoredAnswers {
-  if (!raw || typeof raw === 'string') {
+  if (typeof raw === 'string' && raw) {
     try {
-      return raw ? JSON.parse(raw) : {};
+      return JSON.parse(raw);
     } catch {
       return {};
     }
   }
+  if (!raw) {
+    return {};
+  }
   return raw as StoredAnswers;
 }
 
-function sanitizeQuestions(questions: StoredQuestion[], answers: StoredAnswers) {
+function sanitizeQuestions(questions: StoredQuestion[], answers: StoredAnswers): QuizQuestion[] {
   return questions.map((q) => {
     const studentAnswer = answers[String(q.index)] ?? null;
     const isCorrect = studentAnswer !== null ? String(q.correctAnswer) === studentAnswer : null;
+    const type = (q.type === 'multiple-choice' ? 'multiple_choice' : q.type) as QuestionType;
     return {
       index: q.index,
-      type: q.type === 'multiple-choice' ? 'multiple_choice' : q.type,
+      type,
       question: q.question,
       options: q.options,
       correctAnswer: undefined,
       studentAnswer,
       isCorrect,
       feedback: null as string | null,
-    };
+    } as QuizQuestion;
   });
 }
 
