@@ -13,6 +13,16 @@
   --color-primary-800: #2C3A6E;
   --color-primary-900: #1E2A54;
 
+  /* Secondary — Mint / Sage */
+  --color-secondary-50: #F6FBF8;
+  --color-secondary-100: #EDF7F1;
+  --color-secondary-200: #C8E6D0;
+  --color-secondary-300: #A8D8B9;
+  --color-secondary-400: #8DC5A3;
+  --color-secondary-500: #72B08C;
+  --color-secondary-600: #5E9978;
+  --color-secondary-700: #4C7E63;
+
   /* Surface & Background */
   --color-surface: #FFFFFF;
   --color-surface-elevated: #FFFFFF;
@@ -82,6 +92,13 @@ body {
 body {
   color: var(--foreground);
   background: var(--background);
+}
+
+.auth-orb-background {
+  background:
+    radial-gradient(circle at top left, color-mix(in srgb, var(--color-primary-200) 65%, transparent) 0%, transparent 38%),
+    radial-gradient(circle at bottom right, color-mix(in srgb, var(--color-secondary-200) 65%, transparent) 0%, transparent 42%),
+    linear-gradient(180deg, #fbfcff 0%, var(--color-background) 50%, #f8fbfd 100%);
 }
 
 * {
