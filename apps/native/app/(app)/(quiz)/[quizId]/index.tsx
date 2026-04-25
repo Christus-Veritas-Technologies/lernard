@@ -140,13 +140,12 @@ export default function QuizScreen() {
                             const isSelected = currentAnswer?.selectedOption === option;
                             return (
                                 <Pressable
-                                    className={`rounded-2xl border px-4 py-3 ${
-                                        currentAnswer?.submitted && isSelected && currentAnswer.isCorrect
+                                    className={`rounded-2xl border px-4 py-3 ${currentAnswer?.submitted && isSelected && currentAnswer.isCorrect
                                             ? 'border-green-400 bg-green-50'
                                             : currentAnswer?.submitted && isSelected && !currentAnswer.isCorrect
-                                            ? 'border-red-300 bg-red-50'
-                                            : 'border-slate-200 bg-slate-50'
-                                    }`}
+                                                ? 'border-red-300 bg-red-50'
+                                                : 'border-slate-200 bg-slate-50'
+                                        }`}
                                     disabled={!!currentAnswer?.submitted || isSubmitting}
                                     key={String(i)}
                                     onPress={() => void handleAnswer(option, i)}
