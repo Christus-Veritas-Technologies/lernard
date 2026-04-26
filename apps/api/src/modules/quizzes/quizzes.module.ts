@@ -7,5 +7,6 @@ import { QuizzesService } from './quizzes.service';
   imports: [MastraModule],
   controllers: [QuizzesController],
   providers: [QuizzesService],
+  exports: [QuizzesService],
 })
 export class QuizzesModule {}

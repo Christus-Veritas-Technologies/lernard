@@ -26,6 +26,15 @@ interface GenerateSlotContentInput {
   studentId?: string;
 }
 
+interface GenerateChatReplyInput {
+  message: string;
+  history: Array<{
+    role: 'user' | 'assistant';
+    content: string;
+  }>;
+  studentId?: string;
+}
+
 interface ValidationResult {
   safe: boolean;
   reasons: string[];
@@ -56,6 +65,10 @@ export class MastraService {
 
   async generateSlotContent(input: GenerateSlotContentInput): Promise<string> {
     return completeWithRetry(() => this.callHaiku(this.buildSlotPrompt(input)));
+  }
+
+  async generateChatReply(input: GenerateChatReplyInput): Promise<string> {
+    return completeWithRetry(() => this.callSonnet(this.buildChatPrompt(input)));
   }
 
   async validate(content: unknown): Promise<ValidationResult> {
@@ -207,5 +220,29 @@ Keep it:
 - Under 100 characters
 - Specific and actionable
 - Encouraging without hype`;
+  }
+
+  private buildChatPrompt(input: GenerateChatReplyInput): string {
+    const history = input.history
+      .slice(-8)
+      .map((entry) => `${entry.role.toUpperCase()}: ${entry.content}`)
+      .join('\n');
+
+    return `You are Lernard, a warm and precise learning guide.
+
+Conversation so far:
+${history || '(no prior messages)'}
+
+Latest student message:
+${input.message}
+
+Write the next assistant reply.
+
+Rules:
+- Keep it plain text only (no markdown)
+- 60-160 words
+- Be practical, supportive, and educational
+- If the student asks for explanation, break it into short clear steps
+- End with one focused follow-up question when useful`;
   }
 }

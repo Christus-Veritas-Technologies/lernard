@@ -7,5 +7,6 @@ import { LessonsService } from './lessons.service';
   imports: [MastraModule],
   controllers: [LessonsController],
   providers: [LessonsService],
+  exports: [LessonsService],
 })
 export class LessonsModule {}
