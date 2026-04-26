@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-import { BookOpen01Icon, ArrowRight01Icon } from "hugeicons-react";
+import { BookOpen01Icon, ArrowRight01Icon, CheckmarkCircle02Icon } from "hugeicons-react";
 import { Button } from "@/components/ui/button";
 
 const containerVariants = {
@@ -29,55 +29,74 @@ const itemVariants = {
 export function WelcomeClient() {
     return (
         <motion.div
-            className="flex flex-col gap-8"
+            className="flex flex-col gap-12"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
         >
-            {/* Hero Card */}
-            <motion.div
-                className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-400 via-primary-500 to-primary-700 px-8 py-12 text-white md:px-10 md:py-14 lg:px-12 lg:py-16"
-                variants={itemVariants}
-            >
-                {/* Subtle top accent */}
-                <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-white/5 blur-3xl" />
-                
-                {/* Main content */}
-                <div className="relative space-y-6">
-                    {/* Badge */}
-                    <motion.div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 backdrop-blur-sm" variants={itemVariants}>
-                        <BookOpen01Icon size={16} />
-                        <span className="text-xs font-semibold uppercase tracking-widest">AI-Powered Tutoring</span>
-                    </motion.div>
+            {/* Hero Section - Minimal, clean split design */}
+            <div className="grid gap-8 lg:grid-cols-2 lg:items-center lg:gap-12">
+                {/* Left: Content */}
+                <motion.div className="space-y-8" variants={itemVariants}>
+                    {/* Overline */}
+                    <motion.span className="inline-block text-xs font-semibold uppercase tracking-widest text-primary-600" variants={itemVariants}>
+                        The future of learning
+                    </motion.span>
 
-                    {/* Heading */}
-                    <motion.div className="space-y-3" variants={itemVariants}>
-                        <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight">
-                            Lernard
+                    {/* Main heading */}
+                    <motion.div className="space-y-4" variants={itemVariants}>
+                        <h1 className="text-6xl lg:text-7xl font-bold tracking-tight text-text-primary">
+                            Learn with an AI that knows you.
                         </h1>
-                        <p className="text-lg md:text-xl leading-relaxed text-primary-100 max-w-2xl">
-                            Your personal AI tutor that adapts to your pace, remembers your progress, and makes learning feel like a conversation with a friend.
+                        <p className="text-xl text-text-secondary leading-relaxed max-w-xl">
+                            Lernard remembers every lesson, adapts to your pace, and builds a personalized learning journey just for you.
                         </p>
                     </motion.div>
 
-                    {/* Key benefit */}
-                    <motion.div className="flex items-start gap-3 rounded-2xl bg-white/10 px-4 py-3 backdrop-blur-sm w-fit" variants={itemVariants}>
-                        <BookOpen01Icon size={18} className="shrink-0 mt-0.5" />
-                        <p className="text-sm font-medium text-primary-50">
-                            Every lesson is generated fresh, tailored just for you
-                        </p>
-                    </motion.div>
-                </div>
-            </motion.div>
+                    {/* Key benefits as list */}
+                    <motion.ul className="space-y-3" variants={itemVariants}>
+                        {["Personalized lessons generated in real-time", "AI remembers your progress across sessions", "Adapts difficulty to match your level"].map((benefit, i) => (
+                            <motion.li key={i} className="flex items-start gap-3" variants={itemVariants}>
+                                <CheckmarkCircle02Icon size={20} className="shrink-0 text-secondary-500 mt-0.5" />
+                                <span className="text-text-primary">{benefit}</span>
+                            </motion.li>
+                        ))}
+                    </motion.ul>
+                </motion.div>
+
+                {/* Right: Visual showcase card */}
+                <motion.div
+                    className="relative hidden lg:block"
+                    variants={itemVariants}
+                >
+                    <div className="absolute inset-0 bg-gradient-to-br from-primary-500/20 to-secondary-500/20 rounded-3xl blur-3xl" />
+                    <div className="relative rounded-3xl bg-gradient-to-br from-primary-50 to-secondary-50 border border-primary-200 p-8 space-y-6">
+                        <div className="space-y-2">
+                            <p className="text-sm font-semibold text-primary-600 uppercase tracking-wide">Sample Lesson</p>
+                            <h3 className="text-2xl font-bold text-text-primary">Quantum Mechanics</h3>
+                        </div>
+                        <div className="space-y-3">
+                            <div className="h-3 w-3/4 rounded-full bg-primary-200" />
+                            <div className="h-3 w-5/6 rounded-full bg-primary-100" />
+                            <div className="h-3 w-2/3 rounded-full bg-primary-100" />
+                        </div>
+                        <div className="flex items-center justify-between pt-4 border-t border-primary-200">
+                            <span className="text-sm text-text-secondary">Your level: Advanced</span>
+                            <span className="text-sm font-semibold text-primary-600">85% complete</span>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
 
             {/* CTA Buttons */}
-            <motion.div className="flex flex-col gap-3" variants={itemVariants}>
+            <motion.div className="flex flex-col sm:flex-row gap-3" variants={itemVariants}>
                 <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
+                    className="flex-1"
                 >
-                    <Button className="w-full h-12 text-base font-semibold bg-primary-500 hover:bg-primary-600 active:bg-primary-700 transition-colors">
-                        <Link href="/register" className="flex items-center justify-center w-full gap-2">
+                    <Button asChild className="w-full h-12 text-base font-semibold">
+                        <Link href="/register" className="flex items-center justify-center gap-2">
                             Get started — it&apos;s free
                             <ArrowRight01Icon size={18} />
                         </Link>
@@ -86,9 +105,10 @@ export function WelcomeClient() {
                 <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
+                    className="flex-1 sm:flex-none sm:min-w-max"
                 >
-                    <Button variant="secondary" className="w-full h-12 text-base font-semibold transition-colors">
-                        <Link href="/login" className="flex items-center justify-center w-full">
+                    <Button asChild variant="secondary" className="w-full h-12 text-base font-semibold">
+                        <Link href="/login">
                             I already have an account
                         </Link>
                     </Button>
