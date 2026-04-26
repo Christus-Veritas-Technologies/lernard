@@ -1,40 +1,250 @@
 import { useRouter } from 'expo-router';
+import { ScrollView, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { FeaturePlaceholderScreen } from '@/components/FeaturePlaceholderScreen';
+import { ROUTES } from '@lernard/routes';
+import type { ProgressContent } from '@lernard/shared-types';
+
+import { Text } from '@rnr/text';
+
+import { Button } from '@/components/Button';
+import { StateNotice } from '@/components/StateNotice';
+import { usePagePayload } from '@/hooks/usePagePayload';
+import { formatMinutes, formatPercent, formatRelativeDate } from '@/lib/formatters';
 
 export default function ProgressScreen() {
     const router = useRouter();
+    const { data, error, isAuthenticated, loading, refetch } = usePagePayload<ProgressContent>(
+        ROUTES.PROGRESS.OVERVIEW,
+    );
+
+    if (!isAuthenticated) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        badge="Sign in required"
+                        description="Lernard can only load your live progress snapshot after your session is active."
+                        title="Progress needs your session"
+                        tone="warm"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (loading) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        badge="Loading"
+                        description="Pulling your streak, level, subject trends, and session rhythm from live backend data."
+                        title="Building your Read on You"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (error || !data) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        actionTitle="Try again"
+                        badge="Live payload failed"
+                        description={error?.message ?? 'Something interrupted the progress request.'}
+                        onActionPress={refetch}
+                        title="Progress could not load right now"
+                        tone="warning"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    const { content } = data;
 
     return (
-        <FeaturePlaceholderScreen
-            actionTitle="Open Home"
-            badge="Read on You"
-            description="This is where your cross-subject progress story will live once the progress service is implemented."
-            eyebrow="Progress"
-            items={[
-                {
-                    title: 'Subject trends',
-                    description: 'Compare strengths and growth areas',
-                    detail: 'The progress routes are already shaped out, but the underlying service still throws not implemented for now.',
-                    tone: 'primary',
-                },
-                {
-                    title: 'Session history',
-                    description: 'Follow your rhythm over time',
-                    detail: 'This shell page now makes space for the richer progress view so it will not feel bolted on later.',
-                    tone: 'cool',
-                },
-                {
-                    title: 'Right now',
-                    description: 'Use Home and Household snapshots',
-                    detail: 'Live Home and Household pages already surface the strongest recent signals while the full progress layer lands.',
-                    tone: 'warm',
-                },
-            ]}
-            noteDescription="The progress controller routes exist, but the service methods still return not implemented, so this remains an intentional placeholder."
-            noteTitle="Not yet live"
-            onActionPress={() => router.push('/home')}
-            title="Lernard's Read on You is getting its full home"
-        />
+        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+            <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
+                <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
+                    <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Read on You</Text>
+                    <Text className="mt-3 text-3xl font-semibold text-slate-900">Your growth map is live</Text>
+                    <Text className="mt-3 text-base leading-7 text-slate-600">
+                        Track streak, level, and subject confidence so your next lesson or quiz targets the right growth area.
+                    </Text>
+                    <View className="mt-5 flex-row flex-wrap gap-2">
+                        <Badge label={`${content.streak}-day streak`} tone="indigo" />
+                        <Badge label={`Level ${content.xpLevel}`} tone="sky" />
+                        <Badge label={`${content.totalLessons} lessons`} tone="emerald" />
+                        <Badge label={`${content.totalQuizzes} quizzes`} tone="amber" />
+                    </View>
+                    <View className="mt-6 flex-row flex-wrap gap-3">
+                        <Button
+                            onPress={() => router.push('/progress/history')}
+                            title="Open session history"
+                            variant="secondary"
+                        />
+                        <Button onPress={() => router.push('/learn')} title="Start lesson" />
+                    </View>
+                </View>
+
+                <View className="flex-row flex-wrap gap-4">
+                    <MetricCard
+                        description="Average session length"
+                        title={formatMinutes(content.averageSessionLength)}
+                        tone="sky"
+                    />
+                    <MetricCard
+                        description="Active subjects"
+                        title={`${content.subjects.length}`}
+                        tone="indigo"
+                    />
+                </View>
+
+                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                    <View className="flex-row items-start justify-between gap-3">
+                        <View className="flex-1">
+                            <Text className="text-2xl font-semibold text-slate-900">Subject confidence</Text>
+                            <Text className="mt-2 text-base leading-7 text-slate-600">
+                                Native progress bars replace web charts so this view stays smooth on mobile while keeping the same insight.
+                            </Text>
+                        </View>
+                        <Button onPress={() => router.push('/progress/history')} title="History" variant="ghost" />
+                    </View>
+
+                    <View className="mt-5 gap-4">
+                        {content.subjects.length ? content.subjects.map((subject) => {
+                            const score = subject.averageScore ?? averageTopicScore(subject.topics);
+                            return (
+                                <View className="rounded-[28px] bg-slate-50 p-4" key={subject.subjectId}>
+                                    <View className="flex-row items-start justify-between gap-3">
+                                        <View className="flex-1">
+                                            <Text className="text-lg font-semibold text-slate-900">{subject.subjectName}</Text>
+                                            <Text className="mt-1 text-sm leading-6 text-slate-600">
+                                                {subject.totalLessons} lessons • {subject.totalQuizzes} quizzes • Last active {formatRelativeDate(subject.lastActiveAt)}
+                                            </Text>
+                                        </View>
+                                        <View className={strengthBadge(subject.strengthLevel)}>
+                                            <Text className={strengthText(subject.strengthLevel)}>{subject.strengthLevel.replace('_', ' ')}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View className="mt-4">
+                                        <View className="flex-row items-center justify-between">
+                                            <Text className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-600">Confidence trend</Text>
+                                            <Text className="text-sm font-semibold text-slate-900">{formatPercent(score)}</Text>
+                                        </View>
+                                        <View className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-200">
+                                            <View
+                                                className="h-full rounded-full bg-indigo-500"
+                                                style={{ width: `${clampPercent(score)}%` }}
+                                            />
+                                        </View>
+                                    </View>
+
+                                    <View className="mt-4 flex-row flex-wrap gap-2">
+                                        <Button
+                                            onPress={() => router.push(`/progress/${subject.subjectId}`)}
+                                            title="Open subject"
+                                            variant="secondary"
+                                        />
+                                        <Button onPress={() => router.push('/quiz')} title="Practice now" />
+                                    </View>
+                                </View>
+                            );
+                        }) : (
+                            <Text className="text-base leading-7 text-slate-600">
+                                Subject progress will appear after your first completed lesson or quiz.
+                            </Text>
+                        )}
+                    </View>
+                </View>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
+
+function Badge({ label, tone }: { label: string; tone: 'indigo' | 'sky' | 'emerald' | 'amber' }) {
+    return (
+        <View className={badgeTone[tone]}>
+            <Text className={badgeToneText[tone]}>{label}</Text>
+        </View>
+    );
+}
+
+function MetricCard({
+    title,
+    description,
+    tone,
+}: {
+    title: string;
+    description: string;
+    tone: 'indigo' | 'sky';
+}) {
+    return (
+        <View className="min-w-[160px] flex-1 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+            <Text className={tone === 'indigo' ? 'text-sm font-semibold uppercase tracking-[0.16em] text-indigo-500' : 'text-sm font-semibold uppercase tracking-[0.16em] text-sky-600'}>
+                Snapshot
+            </Text>
+            <Text className="mt-3 text-3xl font-semibold text-slate-900">{title}</Text>
+            <Text className="mt-2 text-sm leading-6 text-slate-600">{description}</Text>
+        </View>
+    );
+}
+
+function averageTopicScore(topics: Array<{ score: number }>) {
+    if (!topics.length) {
+        return null;
+    }
+
+    return Math.round(topics.reduce((sum, topic) => sum + topic.score, 0) / topics.length);
+}
+
+function clampPercent(value: number | null) {
+    if (value === null) {
+        return 0;
+    }
+
+    return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function strengthBadge(strengthLevel: string) {
+    if (strengthLevel === 'strong') {
+        return 'rounded-full bg-emerald-100 px-3 py-1';
+    }
+
+    if (strengthLevel === 'developing') {
+        return 'rounded-full bg-amber-100 px-3 py-1';
+    }
+
+    return 'rounded-full bg-rose-100 px-3 py-1';
+}
+
+function strengthText(strengthLevel: string) {
+    if (strengthLevel === 'strong') {
+        return 'text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700';
+    }
+
+    if (strengthLevel === 'developing') {
+        return 'text-xs font-semibold uppercase tracking-[0.16em] text-amber-800';
+    }
+
+    return 'text-xs font-semibold uppercase tracking-[0.16em] text-rose-700';
+}
+
+const badgeTone = {
+    indigo: 'rounded-full bg-indigo-100 px-3 py-1',
+    sky: 'rounded-full bg-sky-100 px-3 py-1',
+    emerald: 'rounded-full bg-emerald-100 px-3 py-1',
+    amber: 'rounded-full bg-amber-100 px-3 py-1',
+} as const;
+
+const badgeToneText = {
+    indigo: 'text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700',
+    sky: 'text-xs font-semibold uppercase tracking-[0.16em] text-sky-700',
+    emerald: 'text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700',
+    amber: 'text-xs font-semibold uppercase tracking-[0.16em] text-amber-800',
+} as const;
