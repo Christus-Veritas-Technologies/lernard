@@ -90,11 +90,11 @@ export class ChatService {
       where: { key },
       create: {
         key,
-        response: response as Prisma.InputJsonValue,
+        response: response as unknown as Prisma.InputJsonValue,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
       update: {
-        response: response as Prisma.InputJsonValue,
+        response: response as unknown as Prisma.InputJsonValue,
         expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
       },
     });

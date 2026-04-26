@@ -159,6 +159,21 @@ export class ProgressService {
   async getGrowthAreas(userId: string) {
     return listGrowthAreaSnapshots(this.prisma, userId, 8);
   }
+
+  private async getAverageSessionLengthMinutes(userId: string): Promise<number> {
+    const aggregate = await this.prisma.sessionRecord.aggregate({
+      where: { userId },
+      _avg: { durationMs: true },
+    });
+
+    const averageDurationMs = aggregate._avg.durationMs ?? 0;
+
+    if (averageDurationMs <= 0) {
+      return 0;
+    }
+
+    return Math.max(1, Math.round(averageDurationMs / 60000));
+  }
 }
 
 function calculateXpLevel(sessionCount: number): number {
