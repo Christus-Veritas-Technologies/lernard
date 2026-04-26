@@ -135,10 +135,10 @@ export default function SubjectDetailScreen() {
                                     </View>
                                 </View>
                             )) : (
-                                <Text className="text-base leading-7 text-slate-600">
-                                    Topic-level confidence will appear once this subject has enough scored activity.
-                                </Text>
-                            )}
+                            <Text className="text-base leading-7 text-slate-600">
+                                Topic-level confidence will appear once this subject has enough scored activity.
+                            </Text>
+                        )}
                     </View>
                 </View>
             </ScrollView>
