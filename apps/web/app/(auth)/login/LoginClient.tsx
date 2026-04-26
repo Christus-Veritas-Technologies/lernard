@@ -101,7 +101,7 @@ export function LoginClient() {
                         Email
                     </label>
                     <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary">
                             <Mail01Icon size={18} />
                         </span>
                         <input
@@ -111,7 +111,7 @@ export function LoginClient() {
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             placeholder="you@example.com"
-                            className="h-12 w-full rounded-2xl border border-border bg-surface pl-10 pr-4 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 aria-invalid:border-error aria-invalid:ring-error-bg"
+                            className="h-12 w-full rounded-2xl border border-border bg-surface pl-12 pr-4 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 aria-invalid:border-error aria-invalid:ring-error-bg"
                             aria-invalid={Boolean(fieldErrors.email)}
                         />
                     </div>
@@ -125,7 +125,7 @@ export function LoginClient() {
                         Password
                     </label>
                     <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-tertiary">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary">
                             <LockPasswordIcon size={18} />
                         </span>
                         <input
@@ -135,7 +135,7 @@ export function LoginClient() {
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="Your password"
-                            className="h-12 w-full rounded-2xl border border-border bg-surface pl-10 pr-4 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 aria-invalid:border-error aria-invalid:ring-error-bg"
+                            className="h-12 w-full rounded-2xl border border-border bg-surface pl-12 pr-4 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 aria-invalid:border-error aria-invalid:ring-error-bg"
                             aria-invalid={Boolean(fieldErrors.password)}
                         />
                     </div>
