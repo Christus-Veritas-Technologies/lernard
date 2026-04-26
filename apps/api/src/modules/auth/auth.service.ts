@@ -40,6 +40,7 @@ export class AuthService {
           email: normalizedEmail,
           passwordHash,
           role: dto.accountType === 'guardian' ? 'GUARDIAN' : 'STUDENT',
+          ...(dto.accountType === 'guardian' ? { onboardingComplete: true } : {}),
         },
       });
 

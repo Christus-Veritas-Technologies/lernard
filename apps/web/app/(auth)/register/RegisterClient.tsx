@@ -70,7 +70,11 @@ export function RegisterClient() {
             { name: name.trim(), email: email.trim().toLowerCase(), password, accountType },
             {
                 onSuccess: () => {
-                    router.push("/account-type");
+                    if (accountType === "guardian") {
+                        router.push("/home");
+                    } else {
+                        router.push("/profile-setup");
+                    }
                 },
             },
         );

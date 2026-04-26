@@ -15,6 +15,8 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/cn";
 
+import { useAuthMeQuery } from "@/hooks/useAuthMutations";
+
 type NavIcon = ComponentType<{ className?: string; size?: number; strokeWidth?: number }>;
 
 interface NavItem {
@@ -68,9 +70,31 @@ const navItems: NavItem[] = [
         icon: UserGroupIcon,
     },
 ];
+const studentNavItems: NavItem[] = [
+    { href: "/home", label: "Home", description: "Today", icon: Home01Icon },
+    { href: "/learn", label: "Learn", description: "Lessons", icon: BookOpen01Icon },
+    { href: "/quiz", label: "Quiz", description: "Practice", icon: CheckmarkSquare01Icon },
+    { href: "/chat", label: "Chat", description: "Ask Lernard", icon: Message01Icon },
+    { href: "/progress", label: "Progress", description: "Read on You", icon: ChartBarLineIcon },
+    { href: "/settings", label: "Settings", description: "Your setup", icon: Settings02Icon },
+];
+
+const guardianNavItems: NavItem[] = [
+    { href: "/guardian", label: "My Children", description: "Household", icon: UserGroupIcon },
+    { href: "/chat", label: "Ask Lernard", description: "Chat", icon: Message01Icon },
+    { href: "/settings", label: "Settings", description: "Your setup", icon: Settings02Icon },
+];
 
 export function AppShellNav() {
     const pathname = usePathname();
+    const { data: me } = useAuthMeQuery();
+    const isGuardian = me?.role === "guardian";
+    const navItems = isGuardian ? guardianNavItems : studentNavItems;
+    const mobileNavItems = isGuardian ? guardianNavItems : studentNavItems.slice(0, 4);
+    const sidebarDescription = isGuardian
+        ? "Manage your children's learning, chat with Lernard, and configure your household."
+        : "Move between lessons, practice, settings, and your Household without losing context.";
+    const mobileGridCols = isGuardian ? "grid-cols-3" : "grid-cols-4";
 
     return (
         <>
@@ -81,10 +105,10 @@ export function AppShellNav() {
                             Lernard
                         </p>
                         <h1 className="mt-3 text-2xl font-semibold text-text-primary">
-                            Your learning studio
+                            {isGuardian ? "Guardian hub" : "Your learning studio"}
                         </h1>
                         <p className="mt-2 text-sm leading-6 text-text-secondary">
-                            Move between lessons, practice, settings, and your Household without losing context.
+                            {sidebarDescription}
                         </p>
                     </div>
 
@@ -116,12 +140,7 @@ export function AppShellNav() {
 
                                         <div>
                                             <p className="text-sm font-semibold">{item.label}</p>
-                                            <p
-                                                className={cn(
-                                                    "text-xs",
-                                                    isActive ? "text-primary-100" : "text-text-secondary",
-                                                )}
-                                            >
+                                            <p className={cn("text-xs", isActive ? "text-primary-100" : "text-text-secondary")}>
                                                 {item.description}
                                             </p>
                                         </div>
@@ -140,16 +159,12 @@ export function AppShellNav() {
                             );
                         })}
                     </nav>
-
-                    <div className="rounded-3xl border border-border bg-surface/90 p-4 text-sm leading-6 text-text-secondary">
-                        Home, Learn, Guardian, and Companion controls are now live. The remaining sections below are aligned visually here while their deeper flows are still landing.
-                    </div>
                 </div>
             </aside>
 
             <nav className="fixed bottom-3 left-3 right-3 z-20 rounded-[28px] border border-border bg-surface/95 p-2 shadow-[0_18px_50px_-30px_rgba(30,42,84,0.45)] backdrop-blur lg:hidden">
-                <div className="grid grid-cols-4 gap-2">
-                    {navItems.slice(0, 4).map((item) => {
+                <div className={cn("grid gap-2", mobileGridCols)}>
+                    {mobileNavItems.map((item) => {
                         const isActive = matchesPath(pathname, item.href);
                         const Icon = item.icon;
 
@@ -166,12 +181,7 @@ export function AppShellNav() {
                             >
                                 <Icon className={isActive ? "text-text-inverse" : "text-primary-500"} size={20} strokeWidth={1.9} />
                                 <span className="text-xs font-semibold">{item.label}</span>
-                                <span
-                                    className={cn(
-                                        "mt-1 text-[11px]",
-                                        isActive ? "text-primary-100" : "text-text-tertiary",
-                                    )}
-                                >
+                                <span className={cn("mt-1 text-[11px]", isActive ? "text-primary-100" : "text-text-tertiary")}>
                                     {item.description}
                                 </span>
                             </Link>
