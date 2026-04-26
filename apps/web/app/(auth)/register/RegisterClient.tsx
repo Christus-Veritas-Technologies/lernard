@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 
 import { Mail01Icon, LockPasswordIcon, User02Icon } from "hugeicons-react";
 
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AuthApiError } from "@/lib/auth-client";
 import { useRegisterMutation } from "@/hooks/useAuthMutations";
 
@@ -94,20 +95,17 @@ export function RegisterClient() {
             </motion.div>
 
             {/* Account type toggle */}
-            <motion.div className="grid grid-cols-2 gap-2 rounded-2xl bg-background p-1" variants={itemVariants}>
-                {(["student", "guardian"] as const).map((type) => (
-                    <button
-                        key={type}
-                        type="button"
-                        onClick={() => setAccountType(type)}
-                        className={`rounded-xl py-2.5 text-sm font-semibold transition-all ${accountType === type
-                            ? "bg-surface text-primary-600 shadow-sm"
-                            : "text-text-secondary hover:text-text-primary"
-                            }`}
-                    >
-                        {type === "student" ? "Student" : "Guardian"}
-                    </button>
-                ))}
+            <motion.div variants={itemVariants}>
+                <Tabs value={accountType} onValueChange={(value) => setAccountType(value as "student" | "guardian")}>
+                    <TabsList className="w-full">
+                        <TabsTrigger value="student" className="flex-1">
+                            Student
+                        </TabsTrigger>
+                        <TabsTrigger value="guardian" className="flex-1">
+                            Guardian
+                        </TabsTrigger>
+                    </TabsList>
+                </Tabs>
             </motion.div>
 
             <motion.form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4" variants={itemVariants}>

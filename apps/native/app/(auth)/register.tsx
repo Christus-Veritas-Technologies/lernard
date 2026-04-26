@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LockPasswordIcon, Mail01Icon, UserIcon } from 'hugeicons-react-native';
 
+import { TabsList, Tabs, TabsTrigger } from '@rnr/tabs';
 import { Text } from '@rnr/text';
 
 import { AuthField } from '@/components/auth/AuthField';
@@ -81,24 +82,12 @@ export default function RegisterScreen() {
                     ) : null}
 
                     {/* Account type toggle */}
-                    <View className="flex-row rounded-2xl bg-slate-100 p-1">
-                        {(['student', 'guardian'] as const).map((type) => (
-                            <TouchableOpacity
-                                key={type}
-                                onPress={() => setAccountType(type)}
-                                className={`flex-1 items-center rounded-xl py-2.5 ${accountType === type ? 'bg-white shadow-sm' : ''
-                                    }`}
-                                activeOpacity={0.7}
-                            >
-                                <Text
-                                    className={`text-sm font-semibold ${accountType === type ? 'text-primary' : 'text-slate-500'
-                                        }`}
-                                >
-                                    {type === 'student' ? 'Student' : 'Guardian'}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
+                    <Tabs value={accountType} onValueChange={(value) => setAccountType(value as 'student' | 'guardian')}>
+                        <TabsList className="w-full">
+                            <TabsTrigger value="student">Student</TabsTrigger>
+                            <TabsTrigger value="guardian">Guardian</TabsTrigger>
+                        </TabsList>
+                    </Tabs>
 
                     <AuthField
                         label="Full name"
