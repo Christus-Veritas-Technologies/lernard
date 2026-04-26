@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 
 import { Mail01Icon, LockPasswordIcon } from "hugeicons-react";
 
+import { Button } from "@/components/ui/button";
 import { AuthApiError } from "@/lib/auth-client";
 import { useLoginMutation } from "@/hooks/useAuthMutations";
 
@@ -156,12 +157,11 @@ export function LoginClient() {
 
             <motion.div className="flex flex-col gap-2.5" variants={itemVariants}>
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Link
-                        href="/register"
-                        className="flex h-12 items-center justify-center rounded-2xl border border-border bg-surface text-sm font-semibold text-text-primary transition-colors hover:bg-background"
-                    >
-                        Don&apos;t have an account? Sign up
-                    </Link>
+                    <Button asChild variant="secondary" className="w-full h-12 text-sm font-semibold">
+                        <Link href="/register">
+                            Don&apos;t have an account? Sign up
+                        </Link>
+                    </Button>
                 </motion.div>
             </motion.div>
         </motion.div>
