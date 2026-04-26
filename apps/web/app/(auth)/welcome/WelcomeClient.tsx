@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-import { BookOpen01Icon } from "hugeicons-react";
+import { BookOpen01Icon, ArrowRight01Icon } from "hugeicons-react";
+import { Button } from "@/components/ui/button";
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -33,75 +34,81 @@ export function WelcomeClient() {
             initial="hidden"
             animate="visible"
         >
-            {/* Hero */}
+            {/* Hero Card */}
             <motion.div
-                className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-500 to-primary-700 text-white shadow-lg"
+                className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-400 via-primary-500 to-primary-700 px-8 py-12 text-white md:px-10 md:py-14 lg:px-12 lg:py-16"
                 variants={itemVariants}
             >
-                {/* Decorative circles */}
-                <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10 pointer-events-none select-none" />
-                <div className="absolute -bottom-10 left-6 h-32 w-32 rounded-full bg-primary-400/30 pointer-events-none select-none" />
-                {/* Main content with padding */}
-                <div className="relative flex flex-col gap-5 p-10 md:p-12 lg:p-14">
-                    <motion.div
-                        className="flex items-center gap-2"
-                        variants={itemVariants}
-                    >
-                        <span className="text-sm font-semibold uppercase tracking-widest text-primary-200">
-                            ✦ AI Tutor
-                        </span>
+                {/* Subtle top accent */}
+                <div className="absolute -right-20 -top-20 h-40 w-40 rounded-full bg-white/5 blur-3xl" />
+                
+                {/* Main content */}
+                <div className="relative space-y-6">
+                    {/* Badge */}
+                    <motion.div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 backdrop-blur-sm" variants={itemVariants}>
+                        <BookOpen01Icon size={16} />
+                        <span className="text-xs font-semibold uppercase tracking-widest">AI-Powered Tutoring</span>
                     </motion.div>
-                    <motion.div variants={itemVariants}>
-                        <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
+
+                    {/* Heading */}
+                    <motion.div className="space-y-3" variants={itemVariants}>
+                        <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight">
                             Lernard
                         </h1>
-                        <p className="mt-3 text-lg leading-relaxed text-primary-100">
-                            Your personal tutor. Always ready, always learning about you.
+                        <p className="text-lg md:text-xl leading-relaxed text-primary-100 max-w-2xl">
+                            Your personal AI tutor that adapts to your pace, remembers your progress, and makes learning feel like a conversation with a friend.
                         </p>
                     </motion.div>
-                    <motion.div
-                        className="flex items-center gap-3 rounded-2xl bg-white/15 px-4 py-3 backdrop-blur-sm"
-                        variants={itemVariants}
-                    >
-                        <BookOpen01Icon size={20} className="shrink-0 text-white" />
-                        <p className="text-sm text-primary-100">
-                            Every lesson and quiz is generated fresh, just for you.
+
+                    {/* Key benefit */}
+                    <motion.div className="flex items-start gap-3 rounded-2xl bg-white/10 px-4 py-3 backdrop-blur-sm w-fit" variants={itemVariants}>
+                        <BookOpen01Icon size={18} className="shrink-0 mt-0.5" />
+                        <p className="text-sm font-medium text-primary-50">
+                            Every lesson is generated fresh, tailored just for you
                         </p>
                     </motion.div>
                 </div>
             </motion.div>
 
-            {/* CTAs */}
+            {/* CTA Buttons */}
             <motion.div className="flex flex-col gap-3" variants={itemVariants}>
                 <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                 >
-                    <Link
-                        href="/register"
-                        className="flex h-12 items-center justify-center rounded-2xl bg-primary-500 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-600 active:bg-primary-700"
-                    >
-                        Get started — it&apos;s free
-                    </Link>
+                    <Button className="w-full h-12 text-base font-semibold bg-primary-500 hover:bg-primary-600 active:bg-primary-700 transition-colors">
+                        <Link href="/register" className="flex items-center justify-center w-full gap-2">
+                            Get started — it&apos;s free
+                            <ArrowRight01Icon size={18} />
+                        </Link>
+                    </Button>
                 </motion.div>
                 <motion.div
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                 >
-                    <Link
-                        href="/login"
-                        className="flex h-12 items-center justify-center rounded-2xl border border-border bg-surface text-sm font-semibold text-primary-800 transition-colors hover:bg-primary-50 focus-visible:ring-2 focus-visible:ring-primary-400"
-                    >
-                        I already have an account
-                    </Link>
+                    <Button variant="secondary" className="w-full h-12 text-base font-semibold transition-colors">
+                        <Link href="/login" className="flex items-center justify-center w-full">
+                            I already have an account
+                        </Link>
+                    </Button>
                 </motion.div>
             </motion.div>
 
+            {/* Footer text */}
             <motion.p
                 className="text-center text-xs text-text-tertiary"
                 variants={itemVariants}
             >
-                By continuing, you agree to our Terms of Service and Privacy Policy.
+                By continuing, you agree to our{" "}
+                <a href="#" className="underline hover:text-text-secondary transition-colors">
+                    Terms of Service
+                </a>{" "}
+                and{" "}
+                <a href="#" className="underline hover:text-text-secondary transition-colors">
+                    Privacy Policy
+                </a>
+                .
             </motion.p>
         </motion.div>
     );
