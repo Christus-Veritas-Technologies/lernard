@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { Mail01Icon, LockPasswordIcon, User02Icon } from "hugeicons-react";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AuthField } from "@/components/auth/AuthField";
 import { AuthApiError } from "@/lib/auth-client";
 import { useRegisterMutation } from "@/hooks/useAuthMutations";
 
@@ -119,78 +120,39 @@ export function RegisterClient() {
                     </div>
                 )}
 
-                <div className="flex flex-col gap-1.5">
-                    <label htmlFor="name" className="text-sm font-semibold text-text-primary">
-                        Full name
-                    </label>
-                    <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary">
-                            <User02Icon size={18} />
-                        </span>
-                        <input
-                            id="name"
-                            type="text"
-                            autoComplete="name"
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="Your name"
-                            maxLength={50}
-                            className="h-12 w-full rounded-2xl border border-border bg-surface pl-12 pr-4 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 aria-invalid:border-error"
-                            aria-invalid={Boolean(fieldErrors.name)}
-                        />
-                    </div>
-                    {fieldErrors.name && (
-                        <p className="text-xs text-error">{fieldErrors.name}</p>
-                    )}
-                </div>
+                <AuthField
+                    label="Full name"
+                    type="text"
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Your name"
+                    maxLength={50}
+                    error={fieldErrors.name}
+                    icon={<User02Icon size={18} />}
+                />
 
-                <div className="flex flex-col gap-1.5">
-                    <label htmlFor="email" className="text-sm font-semibold text-text-primary">
-                        Email
-                    </label>
-                    <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary">
-                            <Mail01Icon size={18} />
-                        </span>
-                        <input
-                            id="email"
-                            type="email"
-                            autoComplete="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="you@example.com"
-                            className="h-12 w-full rounded-2xl border border-border bg-surface pl-12 pr-4 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 aria-invalid:border-error"
-                            aria-invalid={Boolean(fieldErrors.email)}
-                        />
-                    </div>
-                    {fieldErrors.email && (
-                        <p className="text-xs text-error">{fieldErrors.email}</p>
-                    )}
-                </div>
+                <AuthField
+                    label="Email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    error={fieldErrors.email}
+                    icon={<Mail01Icon size={18} />}
+                />
 
-                <div className="flex flex-col gap-1.5">
-                    <label htmlFor="password" className="text-sm font-semibold text-text-primary">
-                        Password
-                    </label>
-                    <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary">
-                            <LockPasswordIcon size={18} />
-                        </span>
-                        <input
-                            id="password"
-                            type="password"
-                            autoComplete="new-password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="At least 8 characters"
-                            className="h-12 w-full rounded-2xl border border-border bg-surface pl-12 pr-4 text-sm text-text-primary outline-none placeholder:text-text-tertiary focus:border-primary-400 focus:ring-2 focus:ring-primary-100 aria-invalid:border-error"
-                            aria-invalid={Boolean(fieldErrors.password)}
-                        />
-                    </div>
-                    {fieldErrors.password && (
-                        <p className="text-xs text-error">{fieldErrors.password}</p>
-                    )}
-                </div>
+                <AuthField
+                    label="Password"
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="At least 8 characters"
+                    error={fieldErrors.password}
+                    icon={<LockPasswordIcon size={18} />}
+                />
 
                 <motion.button
                     type="submit"

@@ -1,4 +1,7 @@
 import type { InputHTMLAttributes, ReactNode } from "react";
+import { useState } from "react";
+
+import { EyeIcon } from "hugeicons-react";
 
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/cn";
@@ -19,10 +22,14 @@ export function AuthField({
     id,
     label,
     trailing,
+    type,
     ...props
 }: AuthFieldProps) {
+    const [showPassword, setShowPassword] = useState(false);
     const fieldId = id ?? label.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const describedBy = error ? `${fieldId}-error` : hint ? `${fieldId}-hint` : undefined;
+    const isPasswordField = type === "password";
+    const displayType = isPasswordField && showPassword ? "text" : type;
 
     return (
         <label className="flex flex-col gap-2" htmlFor={fieldId}>
@@ -45,9 +52,21 @@ export function AuthField({
                     )}
                     hasError={Boolean(error)}
                     id={fieldId}
+                    type={displayType}
                     {...props}
                 />
-                {trailing ? <span className="ml-3 flex items-center text-text-secondary">{trailing}</span> : null}
+                {isPasswordField ? (
+                    <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="ml-3 flex items-center text-text-secondary transition hover:text-text-primary"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                        <EyeIcon size={18} strokeWidth={showPassword ? 1.5 : 1} opacity={showPassword ? 1 : 0.5} />
+                    </button>
+                ) : trailing ? (
+                    <span className="ml-3 flex items-center text-text-secondary">{trailing}</span>
+                ) : null}
             </span>
             {error ? (
                 <span className="text-sm text-error" id={`${fieldId}-error`}>
