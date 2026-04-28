@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import { Mail01Icon, LockPasswordIcon, User02Icon } from "hugeicons-react";
 
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { AuthField } from "@/components/auth/AuthField";
 import { AuthApiError } from "@/lib/auth-client";
 import { useRegisterMutation } from "@/hooks/useAuthMutations";
@@ -166,13 +167,15 @@ export function RegisterClient() {
             </motion.form>
 
             <motion.div className="flex flex-col gap-2.5" variants={itemVariants}>
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Link
-                        href="/login"
-                        className="inline-flex w-full h-12 items-center justify-center rounded-2xl bg-surface text-sm font-semibold text-text-primary ring-1 ring-inset ring-border hover:bg-background-subtle transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background focus-visible:ring-primary-300"
-                    >
-                        Already have an account? Log in
-                    </Link>
+                <motion.div
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                >
+                    <Button asChild variant="secondary" className="w-full h-12 text-sm font-semibold">
+                        <Link href="/login">
+                            Already have an account? Log in
+                        </Link>
+                    </Button>
                 </motion.div>
             </motion.div>
         </motion.div>
