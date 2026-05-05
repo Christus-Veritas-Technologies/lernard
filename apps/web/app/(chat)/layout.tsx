@@ -12,11 +12,11 @@ function ChatSidebar() {
     const { data: me } = useAuthMeQuery();
     const initials = me?.name
         ? me.name
-              .split(" ")
-              .slice(0, 2)
-              .map((w) => w[0])
-              .join("")
-              .toUpperCase()
+            .split(" ")
+            .slice(0, 2)
+            .map((w) => w[0])
+            .join("")
+            .toUpperCase()
         : "?";
 
     return (
