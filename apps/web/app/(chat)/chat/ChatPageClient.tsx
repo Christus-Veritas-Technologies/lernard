@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpen01Icon, BulbIcon, MessageSquare01Icon } from "hugeicons-react";
+import { BookOpen01Icon, BulbIcon, Message01Icon } from "hugeicons-react";
 
 const suggestions = [
     {
@@ -14,7 +14,7 @@ const suggestions = [
         detail: "Stuck on a concept? Lernard will guide you through it step by step.",
     },
     {
-        icon: MessageSquare01Icon,
+        icon: Message01Icon,
         label: "Quiz me",
         detail: "Ask for a quick quiz on anything you are studying right now.",
     },
@@ -27,7 +27,7 @@ export function ChatPageClient() {
             <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 py-12">
                 {/* Logo mark */}
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-500 shadow-lg shadow-primary-500/25">
-                    <MessageSquare01Icon className="text-white" size={32} />
+                    <Message01Icon className="text-white" size={32} />
                 </div>
 
                 <div className="text-center">
@@ -67,7 +67,7 @@ export function ChatPageClient() {
                         type="text"
                     />
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-500/30">
-                        <MessageSquare01Icon className="text-primary-400" size={16} />
+                        <Message01Icon className="text-primary-400" size={16} />
                     </div>
                 </div>
             </div>

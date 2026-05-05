@@ -4,7 +4,7 @@ import type { ComponentType } from "react";
 import {
     ChartBarLineIcon,
     Home01Icon,
-    MessageSquare01Icon,
+    Message01Icon,
     Settings02Icon,
     UserGroupIcon,
 } from "hugeicons-react";
@@ -27,7 +27,7 @@ interface NavItem {
 const studentNavItems: NavItem[] = [
     { href: "/home", label: "Home", description: "Today", icon: Home01Icon },
     { href: "/progress", label: "Progress", description: "Read on You", icon: ChartBarLineIcon },
-    { href: "/chat", label: "Chat", description: "Ask Lernard", icon: MessageSquare01Icon },
+    { href: "/chat", label: "Chat", description: "Ask Lernard", icon: Message01Icon },
     { href: "/settings", label: "Settings", description: "Your setup", icon: Settings02Icon },
 ];
 

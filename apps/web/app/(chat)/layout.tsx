@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { Add01Icon, MessageSquare01Icon } from "hugeicons-react";
+import { Add01Icon, Message01Icon } from "hugeicons-react";
 
 import { useAuthMeQuery } from "@/hooks/useAuthMutations";
 
@@ -23,7 +23,7 @@ function ChatSidebar() {
             {/* Brand header */}
             <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-border px-5">
                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary-500">
-                    <MessageSquare01Icon className="text-white" size={15} />
+                    <Message01Icon className="text-white" size={15} />
                 </div>
                 <span className="text-[15px] font-semibold text-text-primary">Chat</span>
                 <div className="flex-1" />
@@ -51,7 +51,7 @@ function ChatSidebar() {
 
             {/* Conversation list empty state */}
             <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-8">
-                <MessageSquare01Icon className="text-text-tertiary" size={32} />
+                <Message01Icon className="text-text-tertiary" size={32} />
                 <p className="text-center text-sm text-text-tertiary">
                     Your conversations will appear here once chat is available.
                 </p>

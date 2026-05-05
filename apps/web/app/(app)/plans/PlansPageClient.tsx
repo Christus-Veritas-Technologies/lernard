@@ -1,6 +1,6 @@
 "use client";
 
-import { Check01Icon } from "hugeicons-react";
+import { CheckmarkCircle01Icon } from "hugeicons-react";
 
 import { Plan } from "@lernard/shared-types";
 
@@ -141,7 +141,7 @@ export function PlansPageClient() {
                                 <ul className="flex flex-col gap-2.5">
                                     {plan.features.map((feature) => (
                                         <li className="flex items-start gap-2.5 text-sm text-text-secondary" key={feature}>
-                                            <Check01Icon className="mt-0.5 shrink-0 text-primary-500" size={16} />
+                                            <CheckmarkCircle01Icon className="mt-0.5 shrink-0 text-primary-500" size={16} />
                                             <span>{feature}</span>
                                         </li>
                                     ))}
