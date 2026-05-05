@@ -1,44 +1,61 @@
-import { ScrollView, View } from 'react-native';
+﻿import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+import {
+    ArrowRight01Icon,
+    BookOpen01Icon,
+    Bookmark01Icon,
+    PaintBrushIcon,
+    Settings02Icon,
+    Target01Icon,
+    UserCircleIcon,
+} from 'hugeicons-react-native';
 
 import { can } from '@lernard/auth-core';
 import { ROUTES } from '@lernard/routes';
 import {
-    Appearance,
-    LearningMode,
     type CompanionControls,
     type SettingsContent,
     type UserSettings,
 } from '@lernard/shared-types';
-import { useEffect, useState } from 'react';
 
+import { Switch } from '@rnr/switch';
 import { Text } from '@rnr/text';
 
-import { Button } from '@/components/Button';
 import { StateNotice } from '@/components/StateNotice';
-import { ToggleRow } from '@/components/ToggleRow';
 import { usePagePayload } from '@/hooks/usePagePayload';
-import { capitalize, formatDepthLabel } from '@/lib/formatters';
+import { capitalize } from '@/lib/formatters';
 import { nativeApiFetch } from '@/lib/native-api';
 
+interface AuthUser {
+    id: string;
+    name: string;
+    email: string | null;
+    role: string;
+    plan: string;
+}
+
 export default function SettingsScreen() {
+    const router = useRouter();
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<SettingsContent>(
         ROUTES.SETTINGS.PAYLOAD,
     );
     const [settings, setSettings] = useState<UserSettings | null>(null);
     const [lockedSettings, setLockedSettings] = useState<string[]>([]);
     const [savingField, setSavingField] = useState<string | null>(null);
-    const [statusMessage, setStatusMessage] = useState('Changes have not been saved yet.');
+    const [user, setUser] = useState<AuthUser | null>(null);
 
     useEffect(() => {
-        if (!data?.content) {
-            return;
-        }
-
+        if (!data?.content) return;
         setSettings(data.content.settings);
         setLockedSettings(data.content.lockedSettings);
-        setStatusMessage('Live settings loaded.');
     }, [data]);
+
+    useEffect(() => {
+        nativeApiFetch<AuthUser>(ROUTES.AUTH.ME).then(setUser).catch(() => null);
+    }, []);
 
     if (!isAuthenticated) {
         return (
@@ -61,7 +78,7 @@ export default function SettingsScreen() {
                 <View className="flex-1 px-4 pb-24 pt-6">
                     <StateNotice
                         badge="Loading"
-                        description="Pulling your live learning mode, appearance, daily goal, and companion defaults."
+                        description="Pulling your settings from the backend."
                         title="Loading settings"
                     />
                 </View>
@@ -75,7 +92,7 @@ export default function SettingsScreen() {
                 <View className="flex-1 px-4 pb-24 pt-6">
                     <StateNotice
                         actionTitle="Try again"
-                        badge="Live payload failed"
+                        badge="Failed to load"
                         description={error.message}
                         onActionPress={refetch}
                         title="Settings could not load right now"
@@ -88,221 +105,147 @@ export default function SettingsScreen() {
 
     const permissions = data?.permissions ?? [];
     const canEditMode = can(permissions, 'can_edit_mode') && !isLocked(lockedSettings, 'mode');
-    const canEditAppearance = !isLocked(lockedSettings, 'appearance');
-    const canEditDailyGoal = !isLocked(lockedSettings, 'daily-goal');
     const companionControls = ensureCompanionControls(settings.companionControls);
     const companionControlsLocked = companionControls.lockedByGuardian || isLocked(lockedSettings, 'companion-controls');
+
+    const initials = (user?.name ?? '?')
+        .split(' ')
+        .map((w) => w[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
-                <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
-                    <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Settings</Text>
-                    <Text className="mt-3 text-3xl font-semibold text-slate-900">Shape how Lernard shows up for you</Text>
-                    <Text className="mt-3 text-base leading-7 text-slate-600">
-                        Fine-tune how Lernard teaches, looks, and nudges you through each study session.
-                    </Text>
-                    <View className="mt-5 flex-row flex-wrap gap-2">
-                        <View className="rounded-full bg-indigo-100 px-3 py-1">
-                            <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">
-                                {capitalize(settings.learningMode)} mode
-                            </Text>
+
+                {/* Profile header */}
+                <View className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                    <View className="flex-row items-center gap-4">
+                        <View className="h-14 w-14 items-center justify-center rounded-full bg-indigo-100">
+                            <Text className="text-lg font-semibold text-indigo-600">{initials}</Text>
                         </View>
-                        <View className="rounded-full bg-sky-100 px-3 py-1">
-                            <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
-                                {capitalize(settings.appearance)} appearance
-                            </Text>
+                        <View className="flex-1">
+                            <Text className="text-base font-semibold text-slate-900">{user?.name ?? '—'}</Text>
+                            <Text className="mt-0.5 text-sm text-slate-500">{user?.email ?? '—'}</Text>
+                            <View className="mt-2 flex-row flex-wrap gap-1.5">
+                                <View className="rounded-full bg-indigo-100 px-2.5 py-0.5">
+                                    <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
+                                        {capitalize(user?.plan ?? 'explorer')}
+                                    </Text>
+                                </View>
+                                <View className="rounded-full bg-sky-100 px-2.5 py-0.5">
+                                    <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
+                                        {capitalize(user?.role ?? 'student')}
+                                    </Text>
+                                </View>
+                            </View>
                         </View>
-                        <View className="rounded-full bg-amber-100 px-3 py-1">
-                            <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">
-                                Goal {settings.dailyGoal} sessions
-                            </Text>
+                    </View>
+                    <Pressable
+                        className="mt-4 flex-row items-center justify-between rounded-[20px] bg-slate-50 px-4 py-3"
+                        onPress={() => router.push('/settings/profile')}
+                    >
+                        <View className="flex-row items-center gap-3">
+                            <UserCircleIcon color="#6366f1" size={20} />
+                            <Text className="text-sm font-semibold text-slate-800">Edit profile</Text>
                         </View>
-                    </View>
+                        <ArrowRight01Icon color="#94a3b8" size={18} />
+                    </Pressable>
                 </View>
 
-                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <Text className="text-2xl font-semibold text-slate-900">Learning mode</Text>
-                    <Text className="mt-2 text-base leading-7 text-slate-600">
-                        Choose whether Lernard takes the lead or stays beside you with a lighter touch.
-                    </Text>
-                    <View className="mt-5 flex-row flex-wrap gap-3">
-                        {([LearningMode.GUIDE, LearningMode.COMPANION] as const).map((mode) => (
-                            <Button
-                                disabled={!canEditMode || savingField === 'mode'}
-                                key={mode}
-                                onPress={() => updateMode(mode)}
-                                title={capitalize(mode)}
-                                variant={settings.learningMode === mode ? 'primary' : 'secondary'}
-                            />
-                        ))}
-                    </View>
+                {/* Section: Learning */}
+                <SectionHeader title="Learning" />
+                <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+                    <NavRow
+                        icon={<BookOpen01Icon color="#6366f1" size={20} />}
+                        label="Learning mode"
+                        onPress={() => router.push('/settings/mode')}
+                        value={capitalize(settings.learningMode)}
+                    />
                 </View>
 
-                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <Text className="text-2xl font-semibold text-slate-900">Appearance</Text>
-                    <Text className="mt-2 text-base leading-7 text-slate-600">
-                        Match Lernard to your preferred light, dark, or system appearance.
-                    </Text>
-                    <View className="mt-5 flex-row flex-wrap gap-3">
-                        {([Appearance.LIGHT, Appearance.DARK, Appearance.SYSTEM] as const).map((appearance) => (
-                            <Button
-                                disabled={!canEditAppearance || savingField === 'appearance'}
-                                key={appearance}
-                                onPress={() => updateAppearance(appearance)}
-                                title={capitalize(appearance)}
-                                variant={settings.appearance === appearance ? 'primary' : 'secondary'}
-                            />
-                        ))}
-                    </View>
+                {/* Section: Preferences */}
+                <SectionHeader title="Preferences" />
+                <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+                    <NavRow
+                        icon={<PaintBrushIcon color="#6366f1" size={20} />}
+                        label="Appearance"
+                        onPress={() => router.push('/settings/preferences')}
+                        value={capitalize(settings.appearance)}
+                    />
+                    <View className="mx-4 h-px bg-slate-100" />
+                    <NavRow
+                        icon={<Target01Icon color="#6366f1" size={20} />}
+                        label="Daily goal"
+                        onPress={() => router.push('/settings/preferences')}
+                        value={`${settings.dailyGoal} sessions`}
+                    />
                 </View>
 
-                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <Text className="text-2xl font-semibold text-slate-900">Daily goal</Text>
-                    <Text className="mt-2 text-base leading-7 text-slate-600">
-                        Adjust the number of focused sessions you want to complete each day.
-                    </Text>
-                    <View className="mt-5 flex-row flex-wrap items-center gap-3">
-                        <Button
-                            disabled={!canEditDailyGoal || savingField === 'daily-goal' || settings.dailyGoal <= 1}
-                            onPress={() => updateDailyGoal(settings.dailyGoal - 1)}
-                            title="-1"
-                            variant="secondary"
-                        />
-                        <View className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3">
-                            <Text className="text-base font-semibold text-slate-900">{settings.dailyGoal} sessions</Text>
-                        </View>
-                        <Button
-                            disabled={!canEditDailyGoal || savingField === 'daily-goal' || settings.dailyGoal >= 10}
-                            onPress={() => updateDailyGoal(settings.dailyGoal + 1)}
-                            title="+1"
-                        />
-                    </View>
-                </View>
-
-                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <Text className="text-2xl font-semibold text-slate-900">Session defaults</Text>
-                    <View className="mt-5 gap-3">
-                        <Text className="text-base leading-7 text-slate-600">Preferred depth: {formatDepthLabel(settings.preferredDepth)}</Text>
-                        <Text className="text-base leading-7 text-slate-600">
-                            Preferred session length: {settings.preferredSessionLength ? `${settings.preferredSessionLength} minutes` : 'Flexible'}
-                        </Text>
-                        <Text className="text-base leading-7 text-slate-600">
-                            Notifications: {settings.notificationsEnabled ? 'Enabled' : 'Disabled'}
-                        </Text>
-                    </View>
-                </View>
-
-                <View className="gap-4">
-                    <ToggleRow
+                {/* Section: Study controls */}
+                <SectionHeader title="Study controls" />
+                <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+                    <InlineToggleRow
                         checked={companionControls.showCorrectAnswers}
-                        description="Show the correct answer after a miss when you want feedback to feel direct and reassuring."
                         disabled={companionControlsLocked || savingField === 'companion-controls'}
-                        onCheckedChange={(value) => updateCompanionControl('showCorrectAnswers', value)}
-                        title="Show correct answers"
+                        label="Show correct answers"
+                        onCheckedChange={(v) => updateCompanionControl('showCorrectAnswers', v)}
                     />
-                    <ToggleRow
+                    <View className="mx-4 h-px bg-slate-100" />
+                    <InlineToggleRow
                         checked={companionControls.allowHints}
-                        description="Offer a hint before the full answer when you want to support persistence without giving too much away."
                         disabled={companionControlsLocked || savingField === 'companion-controls'}
-                        onCheckedChange={(value) => updateCompanionControl('allowHints', value)}
-                        title="Allow hints"
+                        label="Allow hints"
+                        onCheckedChange={(v) => updateCompanionControl('allowHints', v)}
                     />
-                    <ToggleRow
+                    <View className="mx-4 h-px bg-slate-100" />
+                    <InlineToggleRow
                         checked={companionControls.allowSkip}
-                        description="Let yourself skip when momentum matters more than sitting with one stuck point."
                         disabled={companionControlsLocked || savingField === 'companion-controls'}
-                        onCheckedChange={(value) => updateCompanionControl('allowSkip', value)}
-                        title="Allow skip"
+                        label="Allow skip"
+                        onCheckedChange={(v) => updateCompanionControl('allowSkip', v)}
                     />
                 </View>
 
-                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <Text className="text-2xl font-semibold text-slate-900">Update status</Text>
-                    <Text className="mt-3 text-base leading-7 text-slate-600">{statusMessage}</Text>
+                {/* Section: Account */}
+                <SectionHeader title="Account" />
+                <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+                    <NavRow
+                        icon={<Bookmark01Icon color="#6366f1" size={20} />}
+                        label="My subjects"
+                        onPress={() => router.push('/settings/subjects')}
+                    />
+                    <View className="mx-4 h-px bg-slate-100" />
+                    <NavRow
+                        icon={<UserCircleIcon color="#6366f1" size={20} />}
+                        label="Profile"
+                        onPress={() => router.push('/settings/profile')}
+                    />
                 </View>
+
+                {/* Plans & billing */}
+                <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+                    <NavRow
+                        icon={<Settings02Icon color="#6366f1" size={20} />}
+                        label="Plans & billing"
+                        onPress={() => router.push('/settings/plans')}
+                        value={capitalize(user?.plan ?? 'Explorer')}
+                    />
+                </View>
+
             </ScrollView>
         </SafeAreaView>
     );
-
-    async function updateMode(mode: LearningMode) {
-        setSavingField('mode');
-        setStatusMessage('Saving your learning mode...');
-
-        try {
-            const nextSettings = await nativeApiFetch<UserSettings>(ROUTES.SETTINGS.MODE, {
-                method: 'PATCH',
-                body: JSON.stringify({ mode }),
-            });
-
-            setSettings(nextSettings);
-            setStatusMessage(`Learning mode updated to ${capitalize(mode)}.`);
-        } catch (saveError) {
-            setStatusMessage(getErrorMessage(saveError));
-        } finally {
-            setSavingField(null);
-        }
-    }
-
-    async function updateAppearance(appearance: Appearance) {
-        setSavingField('appearance');
-        setStatusMessage('Saving your appearance preference...');
-
-        try {
-            const nextSettings = await nativeApiFetch<UserSettings>(ROUTES.SETTINGS.APPEARANCE, {
-                method: 'PATCH',
-                body: JSON.stringify({ appearance }),
-            });
-
-            setSettings(nextSettings);
-            setStatusMessage(`Appearance updated to ${capitalize(appearance)}.`);
-        } catch (saveError) {
-            setStatusMessage(getErrorMessage(saveError));
-        } finally {
-            setSavingField(null);
-        }
-    }
-
-    async function updateDailyGoal(dailyTarget: number) {
-        setSavingField('daily-goal');
-        setStatusMessage('Saving your daily goal...');
-
-        try {
-            const nextSettings = await nativeApiFetch<UserSettings>(ROUTES.SETTINGS.DAILY_GOAL, {
-                method: 'PATCH',
-                body: JSON.stringify({ dailyTarget }),
-            });
-
-            setSettings(nextSettings);
-            setStatusMessage(`Daily goal updated to ${dailyTarget} sessions.`);
-        } catch (saveError) {
-            setStatusMessage(getErrorMessage(saveError));
-        } finally {
-            setSavingField(null);
-        }
-    }
 
     async function updateCompanionControl(
         key: 'showCorrectAnswers' | 'allowHints' | 'allowSkip',
         value: boolean,
     ) {
-        if (companionControlsLocked) {
-            setStatusMessage('These companion controls are locked right now.');
-            return;
-        }
-
-        const nextControls = {
-            ...companionControls,
-            [key]: value,
-        };
-
-        setSettings((current) => current ? {
-            ...current,
-            companionControls: nextControls,
-        } : current);
+        if (companionControlsLocked) return;
+        const nextControls = { ...companionControls, [key]: value };
+        setSettings((current) => current ? { ...current, companionControls: nextControls } : current);
         setSavingField('companion-controls');
-        setStatusMessage('Saving your companion controls...');
-
         try {
             const savedControls = await nativeApiFetch<CompanionControls>(ROUTES.SETTINGS.COMPANION_CONTROLS, {
                 method: 'PATCH',
@@ -312,22 +255,72 @@ export default function SettingsScreen() {
                     allowSkip: nextControls.allowSkip,
                 }),
             });
-
-            setSettings((current) => current ? {
-                ...current,
-                companionControls: savedControls,
-            } : current);
-            setStatusMessage('Companion controls updated.');
-        } catch (saveError) {
-            setSettings((current) => current ? {
-                ...current,
-                companionControls,
-            } : current);
-            setStatusMessage(getErrorMessage(saveError));
+            setSettings((current) => current ? { ...current, companionControls: savedControls } : current);
+        } catch {
+            setSettings((current) => current ? { ...current, companionControls } : current);
         } finally {
             setSavingField(null);
         }
     }
+}
+
+function SectionHeader({ title }: { title: string }) {
+    return (
+        <Text className="px-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            {title}
+        </Text>
+    );
+}
+
+function NavRow({
+    icon,
+    label,
+    value,
+    onPress,
+}: {
+    icon: React.ReactNode;
+    label: string;
+    value?: string;
+    onPress: () => void;
+}) {
+    return (
+        <Pressable className="flex-row items-center justify-between px-4 py-3.5" onPress={onPress}>
+            <View className="flex-row items-center gap-3">
+                {icon}
+                <Text className="text-sm font-semibold text-slate-800">{label}</Text>
+            </View>
+            <View className="flex-row items-center gap-2">
+                {value ? <Text className="text-sm text-slate-500">{value}</Text> : null}
+                <ArrowRight01Icon color="#94a3b8" size={18} />
+            </View>
+        </Pressable>
+    );
+}
+
+function InlineToggleRow({
+    checked,
+    disabled,
+    label,
+    onCheckedChange,
+}: {
+    checked: boolean;
+    disabled: boolean;
+    label: string;
+    onCheckedChange: (v: boolean) => void;
+}) {
+    return (
+        <View className={`flex-row items-center justify-between px-4 py-3.5 ${disabled ? 'opacity-60' : ''}`}>
+            <Text className="text-sm font-semibold text-slate-800">{label}</Text>
+            <Switch
+                disabled={disabled}
+                ios_backgroundColor="#cbd5e1"
+                onValueChange={onCheckedChange}
+                thumbColor="#ffffff"
+                trackColor={{ false: '#cbd5e1', true: '#818cf8' }}
+                value={checked}
+            />
+        </View>
+    );
 }
 
 function ensureCompanionControls(companionControls: CompanionControls | null) {
@@ -343,8 +336,4 @@ function ensureCompanionControls(companionControls: CompanionControls | null) {
 
 function isLocked(lockedSettings: string[], key: string) {
     return lockedSettings.includes(key);
-}
-
-function getErrorMessage(error: unknown) {
-    return error instanceof Error ? error.message : 'Something interrupted the save.';
 }
