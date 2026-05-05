@@ -2,9 +2,6 @@ import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
-import Constants from 'expo-constants';
 
 import { ROUTES } from '@lernard/routes';
 import type {
