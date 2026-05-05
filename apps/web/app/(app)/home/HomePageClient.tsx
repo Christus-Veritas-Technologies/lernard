@@ -1,37 +1,41 @@
 ﻿"use client";
 
+import {
+    BookOpen01Icon,
+    CheckmarkCircle01Icon,
+    ChartBarLineIcon,
+    FireIcon,
+    GridViewIcon,
+} from "hugeicons-react";
+import Link from "next/link";
+
 import { ROUTES } from "@lernard/routes";
 import type { HomeContent } from "@lernard/shared-types";
 
-import { PageHero } from "@/components/dashboard/PageHero";
-import { PerformanceList } from "@/components/dashboard/PerformanceList";
-import { StatCard } from "@/components/dashboard/StatCard";
+import { DashStatCard } from "@/components/dashboard/DashStatCard";
+import { SessionsHighlightCard } from "@/components/dashboard/SessionsHighlightCard";
+import { StrengthDonut } from "@/components/dashboard/StrengthDonut";
+import { SubjectTopicsChart } from "@/components/dashboard/SubjectTopicsChart";
+import { TopicListCard } from "@/components/dashboard/TopicListCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { usePagePayload } from "@/hooks/usePagePayload";
-import { formatRelativeDate } from "@/lib/formatters";
-
-function getStrengthTone(strengthLevel: string) {
-    if (strengthLevel === "strong") return "success" as const;
-    if (strengthLevel === "developing") return "warning" as const;
-    return "warm" as const;
-}
 
 export function HomePageClient() {
-    const { data, error, isAuthenticated, loading, refetch } = usePagePayload<HomeContent>(
-        ROUTES.HOME.PAYLOAD,
-    );
+    const { data, error, isAuthenticated, loading, refetch } =
+        usePagePayload<HomeContent>(ROUTES.HOME.PAYLOAD);
 
     if (!isAuthenticated) {
         return (
             <Card>
                 <CardHeader>
-                    <Badge className="w-fit" tone="warm">Sign in required</Badge>
+                    <Badge className="w-fit" tone="warm">
+                        Sign in required
+                    </Badge>
                     <CardTitle>Your dashboard is ready when you are</CardTitle>
                     <CardDescription>
-                        Lernard needs your session token before it can load your real Home payload.
+                        Lernard needs your session before it can load your dashboard.
                     </CardDescription>
                 </CardHeader>
             </Card>
@@ -39,35 +43,17 @@ export function HomePageClient() {
     }
 
     if (loading) {
-        return (
-            <div className="grid gap-6">
-                <Card>
-                    <CardContent className="mt-0 grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(260px,0.9fr)] lg:items-start">
-                        <div className="space-y-4">
-                            <div className="h-4 w-28 rounded-full bg-background-subtle" />
-                            <div className="h-10 w-3/4 rounded-2xl bg-background-subtle" />
-                            <div className="h-20 w-full rounded-3xl bg-background-subtle" />
-                        </div>
-                        <div className="grid gap-4">
-                            <div className="h-36 rounded-3xl bg-background-subtle" />
-                            <div className="h-36 rounded-3xl bg-background-subtle" />
-                        </div>
-                    </CardContent>
-                </Card>
-                <div className="grid gap-4 lg:grid-cols-2">
-                    <div className="h-52 rounded-3xl bg-background-subtle" />
-                    <div className="h-52 rounded-3xl bg-background-subtle" />
-                </div>
-            </div>
-        );
+        return <DashboardSkeleton />;
     }
 
     if (error || !data) {
         return (
             <Card>
                 <CardHeader>
-                    <Badge className="w-fit" tone="warning">Live payload failed</Badge>
-                    <CardTitle>Home could not load right now</CardTitle>
+                    <Badge className="w-fit" tone="warning">
+                        Could not load
+                    </Badge>
+                    <CardTitle>Dashboard unavailable right now</CardTitle>
                     <CardDescription>
                         {error?.message ?? "Something interrupted the API request."}
                     </CardDescription>
@@ -80,132 +66,142 @@ export function HomePageClient() {
     }
 
     const { content } = data;
-    const dailyGoalPercent = Math.round(
-        (content.dailyGoalProgress / Math.max(content.dailyGoalTarget, 1)) * 100,
-    );
-    const momentum = buildMomentum(content, dailyGoalPercent);
-
-    if (!content.subjects.length) {
-        return (
-            <Card>
-                <CardHeader>
-                    <Badge className="w-fit" tone="primary">Fresh start</Badge>
-                    <CardTitle>{content.greeting}</CardTitle>
-                    <CardDescription>
-                        Add subjects during onboarding and your dashboard will populate with live progress data.
-                    </CardDescription>
-                </CardHeader>
-            </Card>
-        );
-    }
 
     return (
         <div className="flex flex-col gap-6">
-            <PageHero
-                aside={
-                    <>
-                        <StatCard
-                            detail="Sessions completed today vs your daily goal."
-                            eyebrow="Today"
-                            label="Daily goal"
-                            progress={dailyGoalPercent}
-                            tone="primary"
-                            value={`${content.dailyGoalProgress}/${content.dailyGoalTarget}`}
-                        />
-                        <StatCard
-                            detail="Based on total sessions completed."
-                            eyebrow="Current level"
-                            label="XP level"
-                            tone="cool"
-                            value={`Level ${content.xpLevel}`}
-                        />
-                    </>
-                }
-                description="Track your subject strength, daily goal, and streak from one place."
-                eyebrow="Your dashboard"
-                title={content.greeting}
-            >
-                <Badge tone="success">{content.streak}-day streak</Badge>
-                <Badge tone="primary">Level {content.xpLevel}</Badge>
-                {content.subjects[0] ? (
-                    <Badge tone="warm">Focus: {content.subjects[0].name}</Badge>
-                ) : null}
-            </PageHero>
+            {/* ── Page header ── */}
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <p className="text-sm font-medium uppercase tracking-[0.18em] text-primary-500">
+                        Your dashboard
+                    </p>
+                    <h1 className="mt-1 text-2xl font-bold text-text-primary sm:text-3xl">
+                        {content.greeting}
+                    </h1>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="success">
+                        {content.streak} day{content.streak === 1 ? "" : "s"} streak
+                    </Badge>
+                    <Badge tone="primary">Level {content.xpLevel}</Badge>
+                    {content.subjects[0] ? (
+                        <Badge tone="warm">Focus: {content.subjects[0].name}</Badge>
+                    ) : null}
+                </div>
+            </div>
 
-            <section className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(300px,0.8fr)]">
-                <Card>
+            {/* ── Stat cards row ── */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <DashStatCard
+                    icon={<BookOpen01Icon size={22} strokeWidth={1.8} />}
+                    iconBg="bg-primary-100"
+                    iconColor="text-primary-500"
+                    label="Total sessions"
+                    value={content.totalSessions.toLocaleString()}
+                />
+                <DashStatCard
+                    icon={<GridViewIcon size={22} strokeWidth={1.8} />}
+                    iconBg="bg-accent-cool-100"
+                    iconColor="text-secondary-600"
+                    label="Active subjects"
+                    value={content.subjects.length}
+                />
+                <DashStatCard
+                    icon={<CheckmarkCircle01Icon size={22} strokeWidth={1.8} />}
+                    iconBg="bg-accent-warm-100"
+                    iconColor="text-accent-warm-500"
+                    label="Pass rate"
+                    value={`${content.passRate}%`}
+                />
+                <DashStatCard
+                    icon={<FireIcon size={22} strokeWidth={1.8} />}
+                    iconBg="bg-[#FFF8EC]"
+                    iconColor="text-warning"
+                    label="Study streak"
+                    value={`${content.streak}d`}
+                />
+            </div>
+
+            {/* ── Chart row: Topics chart + Strength donut ── */}
+            <div className="grid gap-6 lg:grid-cols-3">
+                <Card className="lg:col-span-2">
                     <CardHeader>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
                             <div>
-                                <CardTitle>Subject focus</CardTitle>
+                                <CardTitle>Topics by subject</CardTitle>
                                 <CardDescription>
-                                    Strength level and priority for each subject you are tracking.
+                                    Strong vs developing topics per subject
                                 </CardDescription>
                             </div>
-                            <Button variant="secondary">Manage subjects</Button>
+                            <Link href="/progress">
+                                <Button size="sm" variant="secondary">
+                                    <ChartBarLineIcon size={15} strokeWidth={1.8} />
+                                    Full progress
+                                </Button>
+                            </Link>
                         </div>
                     </CardHeader>
-                    <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                        {content.subjects.map((subject) => (
-                            <div
-                                className="rounded-2xl border border-border bg-background/70 p-4"
-                                key={subject.subjectId}
-                            >
-                                <div className="flex items-center justify-between gap-3">
-                                    <p className="text-base font-semibold text-text-primary">
-                                        {subject.name}
-                                    </p>
-                                    <Badge tone={getStrengthTone(subject.strengthLevel)}>
-                                        {subject.strengthLevel.replace("_", " ")}
-                                    </Badge>
-                                </div>
-                                <p className="mt-3 text-sm leading-6 text-text-secondary">
-                                    Last active {formatRelativeDate(subject.lastActiveAt)}
-                                </p>
-                                <div className="mt-4 space-y-2">
-                                    <div className="flex items-center justify-between text-xs text-text-secondary">
-                                        <span>Priority in queue</span>
-                                        <span>#{subject.priorityIndex + 1}</span>
-                                    </div>
-                                    <Progress value={Math.max(20, 100 - subject.priorityIndex * 20)} />
-                                </div>
-                            </div>
-                        ))}
+                    <CardContent>
+                        <SubjectTopicsChart data={content.subjectTopics} />
                     </CardContent>
                 </Card>
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Study momentum</CardTitle>
+                        <CardTitle>Strength breakdown</CardTitle>
+                        <CardDescription>Your topics by mastery level</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <StrengthDonut breakdown={content.strengthBreakdown} />
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* ── Bottom row: Topic list + Sessions highlight ── */}
+            <div className="grid gap-6 lg:grid-cols-3">
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle>Your top topics</CardTitle>
                         <CardDescription>
-                            A quick read on your daily goal, streak, and subject mix.
+                            Highest scoring topics across all subjects
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <PerformanceList items={momentum} />
+                        <TopicListCard topics={content.topTopics} />
                     </CardContent>
                 </Card>
-            </section>
+
+                <SessionsHighlightCard
+                    dailyGoalProgress={content.dailyGoalProgress}
+                    dailyGoalTarget={content.dailyGoalTarget}
+                    totalSessions={content.totalSessions}
+                    xpLevel={content.xpLevel}
+                />
+            </div>
         </div>
     );
 }
 
-function buildMomentum(content: HomeContent, dailyGoalPercent: number) {
-    return [
-        {
-            label: "Daily goal",
-            value: Math.min(100, dailyGoalPercent),
-            trailing: `${content.dailyGoalProgress}/${content.dailyGoalTarget} sessions`,
-        },
-        {
-            label: "Streak",
-            value: Math.min(100, content.streak * 10),
-            trailing: `${content.streak} day${content.streak === 1 ? "" : "s"}`,
-        },
-        {
-            label: "Subjects active",
-            value: Math.min(100, content.subjects.length * 25),
-            trailing: `${content.subjects.length} subject${content.subjects.length === 1 ? "" : "s"}`,
-        },
-    ];
+function DashboardSkeleton() {
+    return (
+        <div className="flex flex-col gap-6">
+            <div className="space-y-2">
+                <div className="h-3 w-28 rounded-full bg-background-subtle" />
+                <div className="h-8 w-64 rounded-xl bg-background-subtle" />
+            </div>
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                    <div className="h-22 rounded-2xl bg-background-subtle" key={i} />
+                ))}
+            </div>
+            <div className="grid gap-6 lg:grid-cols-3">
+                <div className="h-72 rounded-3xl bg-background-subtle lg:col-span-2" />
+                <div className="h-72 rounded-3xl bg-background-subtle" />
+            </div>
+            <div className="grid gap-6 lg:grid-cols-3">
+                <div className="h-64 rounded-3xl bg-background-subtle lg:col-span-2" />
+                <div className="h-64 rounded-3xl bg-background-subtle" />
+            </div>
+        </div>
+    );
 }

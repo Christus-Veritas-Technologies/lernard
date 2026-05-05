@@ -25,7 +25,12 @@ export type {
 } from './contracts/page-payload'
 
 // Payloads
-export type { HomeContent } from './payloads/home'
+export type {
+  HomeContent,
+  StrengthBreakdown,
+  TopicSummary,
+  SubjectTopicBreakdown,
+} from './payloads/home'
 export type { ProgressContent, SubjectDetailContent } from './payloads/progress'
 export type { SettingsContent } from './payloads/settings'
 export type {

@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import type { HomeContent, PagePayload, ScopedPermission, SlotAssignments } from '@lernard/shared-types';
+import type {
+  HomeContent,
+  PagePayload,
+  ScopedPermission,
+  SlotAssignments,
+  StrengthBreakdown,
+  SubjectTopicBreakdown,
+  TopicSummary,
+} from '@lernard/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildNullSlots, buildPagePayload } from '../../common/utils/build-page-payload';
 import { toSharedStrengthLevel } from '../../common/utils/shared-model-mappers';
@@ -30,6 +38,8 @@ export class HomeService {
           subjectId: true,
           strengthLevel: true,
           updatedAt: true,
+          topicScores: true,
+          subject: { select: { name: true } },
         },
       }),
     ]);
@@ -37,6 +47,57 @@ export class HomeService {
     const subjectProgressById = new Map(
       subjectProgress.map((progress) => [progress.subjectId, progress]),
     );
+
+    // Aggregate topic scores across all subjects
+    const allTopicScores: Array<{ topic: string; subjectName: string; score: number }> = [];
+    const strengthBreakdown: StrengthBreakdown = { strong: 0, developing: 0, needsWork: 0 };
+
+    for (const sp of subjectProgress) {
+      const topicData = sp.topicScores as Record<string, unknown>;
+      for (const [topic, rawScore] of Object.entries(topicData)) {
+        if (typeof rawScore !== 'number' || Number.isNaN(rawScore)) continue;
+        const score100 = rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
+        allTopicScores.push({ topic, subjectName: sp.subject.name, score: score100 });
+        if (rawScore >= 0.7) strengthBreakdown.strong++;
+        else if (rawScore >= 0.4) strengthBreakdown.developing++;
+        else strengthBreakdown.needsWork++;
+      }
+    }
+
+    const passRate =
+      allTopicScores.length > 0
+        ? Math.round(
+            allTopicScores.reduce((sum, t) => sum + t.score, 0) / allTopicScores.length,
+          )
+        : 0;
+
+    const topTopics: TopicSummary[] = [...allTopicScores]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6);
+
+    const subjectTopics: SubjectTopicBreakdown[] = userSubjects.map((us) => {
+      const sp = subjectProgressById.get(us.subjectId);
+      if (!sp) {
+        return {
+          subjectId: us.subjectId,
+          subjectName: us.subject.name,
+          strongCount: 0,
+          developingCount: 0,
+          needsWorkCount: 0,
+        };
+      }
+      const topicData = sp.topicScores as Record<string, unknown>;
+      const topicValues = Object.values(topicData).filter(
+        (v): v is number => typeof v === 'number' && !Number.isNaN(v),
+      );
+      return {
+        subjectId: us.subjectId,
+        subjectName: us.subject.name,
+        strongCount: topicValues.filter((s) => s >= 0.7).length,
+        developingCount: topicValues.filter((s) => s >= 0.4 && s < 0.7).length,
+        needsWorkCount: topicValues.filter((s) => s < 0.4).length,
+      };
+    });
 
     const content: HomeContent = {
       greeting: buildGreeting(user.name),
@@ -54,6 +115,11 @@ export class HomeService {
         lastActiveAt:
           subjectProgressById.get(userSubject.subjectId)?.updatedAt.toISOString() ?? null,
       })),
+      totalSessions: user.sessionCount,
+      passRate,
+      strengthBreakdown,
+      topTopics,
+      subjectTopics,
     };
 
     return buildPagePayload(content, {
@@ -66,15 +132,8 @@ export class HomeService {
 function buildGreeting(name: string): string {
   const firstName = name.trim().split(/\s+/)[0] ?? 'there';
   const currentHour = new Date().getHours();
-
-  if (currentHour < 12) {
-    return `Good morning, ${firstName}.`;
-  }
-
-  if (currentHour < 18) {
-    return `Good afternoon, ${firstName}.`;
-  }
-
+  if (currentHour < 12) return `Good morning, ${firstName}.`;
+  if (currentHour < 18) return `Good afternoon, ${firstName}.`;
   return `Good evening, ${firstName}.`;
 }
 
@@ -83,9 +142,7 @@ function calculateXpLevel(sessionCount: number): number {
 }
 
 function buildHomePermissions(): ScopedPermission[] {
-  return [
-    { action: 'can_edit_mode' },
-  ];
+  return [{ action: 'can_edit_mode' }];
 }
 
 function buildHomeSlots(sessionCount: number): SlotAssignments {
@@ -96,11 +153,11 @@ function buildHomeSlots(sessionCount: number): SlotAssignments {
         type: 'first_lesson_nudge',
         data: {
           title: 'Start your First Look',
-          description: 'Give Lernard one quick check-in so your next lesson feels personal from day one.',
+          description:
+            'Give Lernard one quick check-in so your next lesson feels personal from day one.',
         },
       },
     };
   }
-
   return buildNullSlots(['urgent_action', 'streak_nudge', 'primary_cta']);
 }
