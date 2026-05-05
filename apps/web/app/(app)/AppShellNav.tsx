@@ -2,9 +2,11 @@
 
 import type { ComponentType } from "react";
 import {
+    BookOpen01Icon,
     ChartBarLineIcon,
     Home01Icon,
     Message01Icon,
+    SchoolBell01Icon,
     Settings02Icon,
     UserGroupIcon,
 } from "hugeicons-react";
@@ -26,6 +28,8 @@ interface NavItem {
 
 const studentNavItems: NavItem[] = [
     { href: "/home", label: "Home", description: "Today", icon: Home01Icon },
+    { href: "/learn", label: "Learn", description: "Set Work", icon: BookOpen01Icon },
+    { href: "/quiz", label: "Quiz", description: "Test yourself", icon: SchoolBell01Icon },
     { href: "/progress", label: "Progress", description: "Read on You", icon: ChartBarLineIcon },
     { href: "/chat", label: "Chat", description: "Ask Lernard", icon: Message01Icon },
     { href: "/settings", label: "Settings", description: "Your setup", icon: Settings02Icon },
@@ -41,11 +45,11 @@ export function AppShellNav() {
     const { data: me } = useAuthMeQuery();
     const isGuardian = me?.role === "guardian";
     const navItems = isGuardian ? guardianNavItems : studentNavItems;
-    const mobileNavItems = isGuardian ? guardianNavItems : studentNavItems.slice(0, 4);
+    const mobileNavItems = isGuardian ? guardianNavItems : studentNavItems.slice(0, 5);
     const sidebarDescription = isGuardian
         ? "Manage your children's learning and configure your household."
         : "Move between home, progress, chat, settings, and your household.";
-    const mobileGridCols = isGuardian ? "grid-cols-2" : "grid-cols-4";
+    const mobileGridCols = isGuardian ? "grid-cols-2" : "grid-cols-5";
 
     return (
         <>
