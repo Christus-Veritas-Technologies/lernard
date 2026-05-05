@@ -1,4 +1,3 @@
-import { Button } from "@/components/ui/button";
 import { GoogleIcon } from "./GoogleIcon";
 
 export function GoogleSignInButton() {
@@ -6,11 +5,12 @@ export function GoogleSignInButton() {
     const href = `${apiUrl}/v1/auth/google?state=${encodeURIComponent("client=web")}`;
 
     return (
-        <Button asChild variant="secondary" className="w-full h-12 text-sm font-semibold">
-            <a href={href} className="flex items-center justify-center gap-3">
-                <GoogleIcon size={18} />
-                Continue with Google
-            </a>
-        </Button>
+        <a
+            href={href}
+            className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl bg-surface text-sm font-semibold text-text-primary ring-1 ring-inset ring-border shadow-sm transition-colors hover:bg-background-subtle focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+            <GoogleIcon size={18} />
+            Continue with Google
+        </a>
     );
 }
