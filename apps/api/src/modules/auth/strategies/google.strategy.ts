@@ -30,13 +30,22 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     done: VerifyCallback,
   ): Promise<void> {
     try {
+      console.log('GoogleStrategy.validate - Processing Google profile:', {
+        googleId: profile.id,
+        displayName: profile.displayName,
+        hasEmail: !!profile.emails?.length,
+      });
+      
       const user = await this.authService.findOrCreateGoogleUser({
         googleId: profile.id,
         name: profile.displayName,
         email: profile.emails?.[0]?.value ?? null,
       });
+      
+      console.log('GoogleStrategy.validate - Successfully created/found user with tokens');
       done(null, user);
     } catch (err) {
+      console.error('GoogleStrategy.validate - Error:', err);
       done(err as Error);
     }
   }

@@ -59,24 +59,35 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   @Get('google/callback')
   async googleCallback(@Req() req: Request, @Res() res: Response) {
-    const tokens = req.user as {
-      accessToken: string;
-      refreshToken: string;
-      user: { onboardingComplete: boolean };
-    };
+    try {
+      const tokens = req.user as {
+        accessToken?: string;
+        refreshToken?: string;
+        user?: { onboardingComplete: boolean };
+      };
 
-    const state = typeof req.query.state === 'string' ? req.query.state : '';
-    const params = new URLSearchParams(state);
-    const client = params.get('client');
+      // Validate that tokens were issued
+      if (!tokens?.accessToken || !tokens?.refreshToken || !tokens?.user) {
+        console.error('Google callback: Missing tokens in req.user', { tokens });
+        return res.redirect(`${this.configService.get('WEB_APP_URL')}/login?error=auth_failed`);
+      }
 
-    const hash = `#accessToken=${encodeURIComponent(tokens.accessToken)}&refreshToken=${encodeURIComponent(tokens.refreshToken)}&onboardingComplete=${tokens.user.onboardingComplete ? '1' : '0'}`;
+      const state = typeof req.query.state === 'string' ? req.query.state : '';
+      const params = new URLSearchParams(state);
+      const client = params.get('client');
 
-    if (client === 'native') {
-      return res.redirect(`lernard://auth/callback${hash}`);
+      const hash = `#accessToken=${encodeURIComponent(tokens.accessToken)}&refreshToken=${encodeURIComponent(tokens.refreshToken)}&onboardingComplete=${tokens.user.onboardingComplete ? '1' : '0'}`;
+
+      if (client === 'native') {
+        return res.redirect(`lernard://auth/callback${hash}`);
+      }
+
+      const webAppUrl = this.configService.getOrThrow<string>('WEB_APP_URL');
+      return res.redirect(`${webAppUrl}/google/callback${hash}`);
+    } catch (error) {
+      console.error('Google callback error:', error);
+      return res.redirect(`${this.configService.get('WEB_APP_URL')}/login?error=server_error`);
     }
-
-    const webAppUrl = this.configService.getOrThrow<string>('WEB_APP_URL');
-    return res.redirect(`${webAppUrl}/google/callback${hash}`);
   }
 
   @Post('apple')
