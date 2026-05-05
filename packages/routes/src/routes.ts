@@ -41,6 +41,27 @@ export const ROUTES = {
     SUBJECTS: '/v1/progress/subjects',
     SUBJECT: (subjectId: string) => `/v1/progress/subjects/${subjectId}` as const,
     GROWTH_AREAS: '/v1/progress/growth-areas',
+    HISTORY: '/v1/progress/history',
+  },
+
+  LESSONS: {
+    GENERATE: '/v1/lessons/generate',
+    GET: (lessonId: string) => `/v1/lessons/${lessonId}` as const,
+    SECTION_CHECK: (lessonId: string) => `/v1/lessons/${lessonId}/section-check` as const,
+    COMPLETE: (lessonId: string) => `/v1/lessons/${lessonId}/complete` as const,
+  },
+
+  QUIZZES: {
+    GENERATE: '/v1/quizzes/generate',
+    GET: (quizId: string) => `/v1/quizzes/${quizId}` as const,
+    ANSWER: (quizId: string) => `/v1/quizzes/${quizId}/answer` as const,
+    COMPLETE: (quizId: string) => `/v1/quizzes/${quizId}/complete` as const,
+  },
+
+  CHAT: {
+    CONVERSATIONS: '/v1/chat/conversations',
+    MESSAGE: '/v1/chat/message',
+    MESSAGE_STREAM: '/v1/chat/message/stream',
   },
 
   SETTINGS: {
