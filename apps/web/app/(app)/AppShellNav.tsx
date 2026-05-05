@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 import {
     ChartBarLineIcon,
     Home01Icon,
+    MessageSquare01Icon,
     Settings02Icon,
     UserGroupIcon,
 } from "hugeicons-react";
@@ -26,6 +27,7 @@ interface NavItem {
 const studentNavItems: NavItem[] = [
     { href: "/home", label: "Home", description: "Today", icon: Home01Icon },
     { href: "/progress", label: "Progress", description: "Read on You", icon: ChartBarLineIcon },
+    { href: "/chat", label: "Chat", description: "Ask Lernard", icon: MessageSquare01Icon },
     { href: "/settings", label: "Settings", description: "Your setup", icon: Settings02Icon },
 ];
 
@@ -39,11 +41,11 @@ export function AppShellNav() {
     const { data: me } = useAuthMeQuery();
     const isGuardian = me?.role === "guardian";
     const navItems = isGuardian ? guardianNavItems : studentNavItems;
-    const mobileNavItems = isGuardian ? guardianNavItems : studentNavItems.slice(0, 3);
+    const mobileNavItems = isGuardian ? guardianNavItems : studentNavItems.slice(0, 4);
     const sidebarDescription = isGuardian
         ? "Manage your children's learning and configure your household."
-        : "Move between home, progress, settings, and your household.";
-    const mobileGridCols = isGuardian ? "grid-cols-2" : "grid-cols-3";
+        : "Move between home, progress, chat, settings, and your household.";
+    const mobileGridCols = isGuardian ? "grid-cols-2" : "grid-cols-4";
 
     return (
         <>

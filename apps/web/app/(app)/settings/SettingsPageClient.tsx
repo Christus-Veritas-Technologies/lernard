@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { can } from "@lernard/auth-core";
 import { ROUTES } from "@lernard/routes";
 import {
@@ -11,44 +10,25 @@ import {
     type UserSettings,
 } from "@lernard/shared-types";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
-import { PageHero } from "@/components/dashboard/PageHero";
-import { StatCard } from "@/components/dashboard/StatCard";
-import { ToggleCard } from "@/components/guardian/ToggleCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { useAuthMeQuery } from "@/hooks/useAuthMutations";
 import { usePagePayload } from "@/hooks/usePagePayload";
 import { browserApiFetch } from "@/lib/browser-api";
-
-const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-        opacity: 1,
-        transition: {
-            staggerChildren: 0.08,
-            delayChildren: 0.1,
-        },
-    },
-};
-
-const itemVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: {
-        opacity: 1,
-        y: 0,
-        transition: { duration: 0.4, ease: "easeOut" },
-    },
-};
 
 export function SettingsPageClient() {
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<SettingsContent>(
         ROUTES.SETTINGS.PAYLOAD,
     );
+    const { data: me } = useAuthMeQuery();
     const [settings, setSettings] = useState<UserSettings | null>(null);
     const [lockedSettings, setLockedSettings] = useState<string[]>([]);
     const [savingField, setSavingField] = useState<string | null>(null);
-    const [statusMessage, setStatusMessage] = useState("Changes have not been saved yet.");
+    const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
     useEffect(() => {
         if (!data?.content) {
@@ -57,7 +37,7 @@ export function SettingsPageClient() {
 
         setSettings(data.content.settings);
         setLockedSettings(data.content.lockedSettings);
-        setStatusMessage("Live settings loaded.");
+        setStatusMessage(null);
     }, [data]);
 
     if (!isAuthenticated) {
@@ -120,46 +100,59 @@ export function SettingsPageClient() {
     const companionControls = ensureCompanionControls(settings.companionControls);
     const companionControlsLocked = companionControls.lockedByGuardian || isLocked(lockedSettings, "companion-controls");
 
+    const initials = (me?.name ?? "?")
+        .split(" ")
+        .map((w) => w[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+
     return (
         <div className="flex flex-col gap-6">
-            <PageHero
-                aside={
-                    <>
-                        <StatCard
-                            detail="Guide and Companion keep the lesson tone aligned with the kind of support you want."
-                            eyebrow="Mode"
-                            label="Current mode"
-                            tone="primary"
-                            value={capitalize(settings.learningMode)}
-                        />
-                        <StatCard
-                            detail="These preferences shape how Lernard presents and paces your study sessions."
-                            eyebrow="Daily goal"
-                            label="Target"
-                            tone="cool"
-                            value={`${settings.dailyGoal} sessions`}
-                        />
-                    </>
-                }
-                description="Fine-tune how Lernard teaches, looks, and nudges you through each study session."
-                eyebrow="Settings"
-                title="Shape how Lernard shows up for you"
-            >
-                <Badge tone="primary">{capitalize(settings.learningMode)} mode</Badge>
-                <Badge tone="cool">{capitalize(settings.appearance)} appearance</Badge>
-                <Badge tone="warm">{settings.notificationsEnabled ? "Reminders on" : "Reminders off"}</Badge>
-            </PageHero>
+            {/* Page heading */}
+            <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-500">Settings</p>
+                <h1 className="mt-1.5 text-2xl font-semibold text-text-primary">Account &amp; preferences</h1>
+                <p className="mt-1 text-sm leading-6 text-text-secondary">
+                    Manage how Lernard teaches, looks, and paces your sessions.
+                </p>
+                {statusMessage && (
+                    <p className="mt-2 text-xs text-text-tertiary">{statusMessage}</p>
+                )}
+            </div>
 
-            <section className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
-                <div className="grid gap-6">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(300px,0.85fr)]">
+                {/* ── Left column ── */}
+                <div className="flex flex-col gap-6">
+                    {/* Profile card */}
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary-100 text-lg font-semibold text-primary-600">
+                                {initials}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="truncate text-base font-semibold text-text-primary">{me?.name ?? "—"}</p>
+                                <p className="truncate text-sm text-text-secondary">{me?.email ?? "—"}</p>
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                    <Badge tone="primary">{capitalize(me?.plan ?? "explorer")}</Badge>
+                                    <Badge tone="cool">{capitalize(me?.role ?? "student")}</Badge>
+                                </div>
+                            </div>
+                            <Button asChild size="sm" variant="secondary">
+                                <Link href="/settings/profile">Edit</Link>
+                            </Button>
+                        </CardContent>
+                    </Card>
+
+                    {/* Learning mode */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Learning mode</CardTitle>
                             <CardDescription>
-                                Choose whether Lernard takes the lead or stays beside you with a lighter touch.
+                                Choose whether Lernard takes the lead (Guide) or stays beside you (Companion).
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="flex flex-wrap gap-3">
+                        <CardContent className="flex flex-wrap gap-2">
                             {([LearningMode.GUIDE, LearningMode.COMPANION] as const).map((mode) => (
                                 <Button
                                     disabled={!canEditMode || savingField === "mode"}
@@ -167,22 +160,21 @@ export function SettingsPageClient() {
                                     onClick={() => updateMode(mode)}
                                     variant={settings.learningMode === mode ? "primary" : "secondary"}
                                 >
-                                    {savingField === "mode" && settings.learningMode !== mode
-                                        ? "Saving..."
-                                        : capitalize(mode)}
+                                    {capitalize(mode)}
                                 </Button>
                             ))}
                         </CardContent>
                     </Card>
 
+                    {/* Appearance */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Appearance</CardTitle>
                             <CardDescription>
-                                Match Lernard to your preferred light, dark, or system appearance.
+                                Match Lernard to light, dark, or your system preference.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="flex flex-wrap gap-3">
+                        <CardContent className="flex flex-wrap gap-2">
                             {([Appearance.LIGHT, Appearance.DARK, Appearance.SYSTEM] as const).map((appearance) => (
                                 <Button
                                     disabled={!canEditAppearance || savingField === "appearance"}
@@ -196,11 +188,28 @@ export function SettingsPageClient() {
                         </CardContent>
                     </Card>
 
+                    {/* Plans link */}
+                    <div className="flex items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3">
+                        <div>
+                            <p className="text-sm font-semibold text-text-primary">Plans &amp; billing</p>
+                            <p className="mt-0.5 text-xs text-text-secondary">
+                                You are on the <span className="font-medium text-primary-500">{capitalize(me?.plan ?? "Explorer")}</span> plan.
+                            </p>
+                        </div>
+                        <Button asChild size="sm" variant="secondary">
+                            <Link href="/plans">View plans</Link>
+                        </Button>
+                    </div>
+                </div>
+
+                {/* ── Right column ── */}
+                <div className="flex flex-col gap-6">
+                    {/* Daily goal */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Daily goal</CardTitle>
                             <CardDescription>
-                                Adjust the number of focused sessions you want to complete each day.
+                                How many focused sessions do you want to complete each day?
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="flex items-center gap-3">
@@ -209,86 +218,75 @@ export function SettingsPageClient() {
                                 onClick={() => updateDailyGoal(settings.dailyGoal - 1)}
                                 variant="secondary"
                             >
-                                -1
+                                −
                             </Button>
-                            <div className="rounded-2xl border border-border bg-background px-4 py-3 text-sm font-semibold text-text-primary">
-                                {settings.dailyGoal} sessions
+                            <div className="min-w-[80px] rounded-2xl border border-border bg-background px-4 py-2.5 text-center text-sm font-semibold text-text-primary">
+                                {settings.dailyGoal}
                             </div>
                             <Button
                                 disabled={!canEditDailyGoal || savingField === "daily-goal" || settings.dailyGoal >= 10}
                                 onClick={() => updateDailyGoal(settings.dailyGoal + 1)}
                             >
-                                +1
+                                +
                             </Button>
+                            <span className="text-sm text-text-secondary">sessions / day</span>
                         </CardContent>
                     </Card>
-                </div>
 
-                <div className="grid gap-6">
+                    {/* Session defaults (read-only) */}
                     <Card>
                         <CardHeader>
                             <CardTitle>Session defaults</CardTitle>
                             <CardDescription>
-                                These defaults help Lernard shape each lesson before you even start typing.
+                                These shape how Lernard structures each session. Edit via Profile.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-3 text-sm text-text-secondary">
-                            <div className="flex items-center justify-between gap-3">
-                                <span>Preferred depth</span>
-                                <span className="font-medium text-text-primary">{capitalize(settings.preferredDepth)}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                                <span>Preferred session length</span>
-                                <span className="font-medium text-text-primary">
-                                    {settings.preferredSessionLength ? `${settings.preferredSessionLength} minutes` : "Flexible"}
-                                </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-3">
-                                <span>Notifications</span>
-                                <span className="font-medium text-text-primary">
-                                    {settings.notificationsEnabled ? "Enabled" : "Disabled"}
-                                </span>
-                            </div>
+                        <CardContent className="space-y-0 divide-y divide-border">
+                            <SettingsRow label="Preferred depth" value={capitalize(settings.preferredDepth)} />
+                            <SettingsRow
+                                label="Session length"
+                                value={settings.preferredSessionLength ? `${settings.preferredSessionLength} min` : "Flexible"}
+                            />
+                            <SettingsRow
+                                label="Reminders"
+                                value={settings.notificationsEnabled ? "On" : "Off"}
+                            />
                         </CardContent>
                     </Card>
 
+                    {/* Study controls */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Update status</CardTitle>
+                            <CardTitle>Study controls</CardTitle>
                             <CardDescription>
-                                Settings now save to the live backend routes instead of static placeholders.
+                                {companionControlsLocked
+                                    ? "These controls are locked by your guardian."
+                                    : "Adjust how Lernard supports you during sessions."}
                             </CardDescription>
                         </CardHeader>
-                        <CardContent>
-                            <p className="text-sm leading-6 text-text-secondary">{statusMessage}</p>
+                        <CardContent className="space-y-0 divide-y divide-border">
+                            <ToggleRow
+                                checked={companionControls.showCorrectAnswers}
+                                disabled={companionControlsLocked || savingField === "companion-controls"}
+                                label="Show correct answers"
+                                onCheckedChange={(v) => updateCompanionControl("showCorrectAnswers", v)}
+                            />
+                            <ToggleRow
+                                checked={companionControls.allowHints}
+                                disabled={companionControlsLocked || savingField === "companion-controls"}
+                                label="Allow hints"
+                                onCheckedChange={(v) => updateCompanionControl("allowHints", v)}
+                            />
+                            <ToggleRow
+                                checked={companionControls.allowSkip}
+                                disabled={companionControlsLocked || savingField === "companion-controls"}
+                                label="Allow skip"
+                                onCheckedChange={(v) => updateCompanionControl("allowSkip", v)}
+                            />
                         </CardContent>
                     </Card>
                 </div>
-            </section>
-
-            <section className="grid gap-4 lg:grid-cols-3">
-                <ToggleCard
-                    checked={companionControls.showCorrectAnswers}
-                    className={companionControlsLocked ? "opacity-70" : undefined}
-                    description="Show the correct answer after a miss when you want feedback to feel direct and reassuring."
-                    onCheckedChange={(value) => updateCompanionControl("showCorrectAnswers", value)}
-                    title="Show correct answers"
-                />
-                <ToggleCard
-                    checked={companionControls.allowHints}
-                    className={companionControlsLocked ? "opacity-70" : undefined}
-                    description="Offer a hint before the full answer when you want to support persistence without giving too much away."
-                    onCheckedChange={(value) => updateCompanionControl("allowHints", value)}
-                    title="Allow hints"
-                />
-                <ToggleCard
-                    checked={companionControls.allowSkip}
-                    className={companionControlsLocked ? "opacity-70" : undefined}
-                    description="Let yourself skip when momentum matters more than sitting with one stuck point."
-                    onCheckedChange={(value) => updateCompanionControl("allowSkip", value)}
-                    title="Allow skip"
-                />
-            </section>
+            </div>
         </div>
     );
 
@@ -397,8 +395,7 @@ export function SettingsPageClient() {
     }
 }
 
-function ensureCompanionControls(companionControls: CompanionControls | null) {
-    return companionControls ?? {
+function ensureCompanionControls(companionControls: CompanionControls | null) {    return companionControls ?? {
         showCorrectAnswers: true,
         allowHints: true,
         allowSkip: false,
@@ -418,4 +415,36 @@ function capitalize(value: string) {
 
 function getErrorMessage(error: unknown) {
     return error instanceof Error ? error.message : "Something interrupted the save.";
+}
+
+function SettingsRow({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="flex items-center justify-between gap-3 py-3 text-sm">
+            <span className="text-text-secondary">{label}</span>
+            <span className="font-medium text-text-primary">{value}</span>
+        </div>
+    );
+}
+
+function ToggleRow({
+    checked,
+    disabled,
+    label,
+    onCheckedChange,
+}: {
+    checked: boolean;
+    disabled: boolean;
+    label: string;
+    onCheckedChange: (value: boolean) => void;
+}) {
+    return (
+        <div className="flex items-center justify-between gap-3 py-3">
+            <span className="text-sm text-text-secondary">{label}</span>
+            <Switch
+                checked={checked}
+                disabled={disabled}
+                onCheckedChange={onCheckedChange}
+            />
+        </div>
+    );
 }
