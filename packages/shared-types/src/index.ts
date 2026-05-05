@@ -31,9 +31,24 @@ export type {
   TopicSummary,
   SubjectTopicBreakdown,
   DayActivity,
+  RecentSession,
 } from './payloads/home'
-export type { ProgressContent, SubjectDetailContent } from './payloads/progress'
+export type {
+  ProgressContent,
+  SubjectDetailContent,
+  HistorySessionItem,
+  PaginatedHistoryResponse,
+} from './payloads/progress'
 export type { SettingsContent } from './payloads/settings'
+export type { LessonContent, LessonSection, LessonTermDefinition, PostLessonResult } from './payloads/lessons'
+export type { QuizQuestionType, QuizQuestion, QuizContent, QuizQuestionReview, QuizCompletionResult } from './payloads/quizzes'
+export type {
+  ConversationListItem,
+  ChatMessageBlock,
+  QuizCardProps,
+  ConceptBreakdownProps,
+  ProgressNudgeProps,
+} from './payloads/chat'
 export type {
   GuardianDashboardContent,
   GuardianSummary,

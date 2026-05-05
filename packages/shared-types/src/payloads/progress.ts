@@ -9,3 +9,18 @@ export interface ProgressContent {
 export interface SubjectDetailContent {
   subject: SubjectProgress
 }
+
+export interface HistorySessionItem {
+  id: string
+  type: 'lesson' | 'quiz'
+  subjectName: string
+  topic: string
+  durationMinutes: number
+  completedAt: string
+}
+
+export interface PaginatedHistoryResponse {
+  sessions: HistorySessionItem[]
+  nextCursor: string | null
+  hasMore: boolean
+}

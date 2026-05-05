@@ -15,6 +15,7 @@ export interface HomeContent {
   topTopics: TopicSummary[]
   subjectTopics: SubjectTopicBreakdown[]
   recentActivity: DayActivity[]
+  recentSessions: RecentSession[]
 }
 
 export interface DayActivity {
@@ -40,4 +41,12 @@ export interface SubjectTopicBreakdown {
   strongCount: number
   developingCount: number
   needsWorkCount: number
+}
+
+export interface RecentSession {
+  id: string
+  type: 'lesson' | 'quiz'
+  topic: string
+  subjectName: string
+  completedAt: string
 }
