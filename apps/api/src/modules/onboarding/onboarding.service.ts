@@ -95,6 +95,10 @@ export class OnboardingService {
 
   async setupProfile(userId: string, dto: ProfileSetupDto): Promise<ProfileSetupResponse> {
     const subjectNames = normalizeSubjectNames(dto.subjects);
+    const normalizedName = normalizeOptionalText(dto.name);
+    const normalizedGrade = normalizeOptionalText(dto.grade ?? undefined);
+    const normalizedTimezone = normalizeOptionalText(dto.timezone);
+
     if (!subjectNames.length) {
       throw new BadRequestException('Select at least one subject to continue onboarding.');
     }
@@ -103,11 +107,11 @@ export class OnboardingService {
       await transaction.user.update({
         where: { id: userId },
         data: {
-          ...(dto.name ? { name: dto.name } : {}),
+          ...(normalizedName ? { name: normalizedName } : {}),
           ageGroup: toPrismaAgeGroup(dto.ageGroup),
-          grade: dto.grade ?? null,
+          grade: normalizedGrade ?? null,
           learningGoal: dto.learningGoal ? toPrismaLearningGoal(dto.learningGoal) : null,
-          timezone: dto.timezone ?? undefined,
+          timezone: normalizedTimezone,
           sessionLength: dto.preferredSessionLength ?? undefined,
           preferredDepth: dto.preferredDepth ?? undefined,
           dailyGoal: dto.dailyGoal ?? undefined,
@@ -188,7 +192,7 @@ export class OnboardingService {
     }
 
     const storedQuestions = this.generateFirstLookQuestions(subjects, user.ageGroup);
-    const answersByIndex = new Map(dto.answers.map((answer) => [answer.index, answer.answer]));
+    const answersByIndex = buildAnswerMap(dto.answers, storedQuestions.length);
 
     if (answersByIndex.size !== storedQuestions.length) {
       throw new BadRequestException('Answer every First Look question before submitting.');
@@ -399,6 +403,41 @@ export class OnboardingService {
     });
   }
 
+}
+
+function buildAnswerMap(
+  answers: FirstLookSubmitDto['answers'],
+  totalQuestions: number,
+): Map<number, string> {
+  const map = new Map<number, string>();
+
+  for (const answer of answers) {
+    if (answer.index < 0 || answer.index >= totalQuestions) {
+      throw new BadRequestException(`Invalid question index ${answer.index}.`);
+    }
+
+    if (map.has(answer.index)) {
+      throw new BadRequestException(`Duplicate answer for question ${answer.index + 1}.`);
+    }
+
+    const normalizedAnswer = answer.answer.trim();
+    if (!normalizedAnswer) {
+      throw new BadRequestException(`Answer for question ${answer.index + 1} cannot be empty.`);
+    }
+
+    map.set(answer.index, normalizedAnswer);
+  }
+
+  return map;
+}
+
+function normalizeOptionalText(value?: string | null): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const normalized = value.trim().replace(/\s+/g, ' ');
+  return normalized.length > 0 ? normalized : undefined;
 }
 
 type PrismaAgeGroupValue = 'PRIMARY' | 'SECONDARY' | 'UNIVERSITY' | 'PROFESSIONAL';
