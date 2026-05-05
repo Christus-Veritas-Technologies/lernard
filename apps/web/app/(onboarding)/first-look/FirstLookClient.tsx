@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { motion } from "framer-motion";
 
 import { CheckmarkCircle02Icon, BookOpen01Icon } from "hugeicons-react";
 
@@ -14,29 +13,15 @@ import {
 } from "@/hooks/useAuthMutations";
 import type { FirstLookQuestion } from "@lernard/shared-types";
 
-const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-        opacity: 1,
-        transition: {
-            staggerChildren: 0.08,
-            delayChildren: 0.1,
-        },
-    },
-};
-
-const itemVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: {
-        opacity: 1,
-        y: 0,
-        transition: { duration: 0.4, ease: "easeOut" },
-    },
-};
-
 export function FirstLookClient() {
     const router = useRouter();
-    const { data: firstLookData, isLoading, isError: startError } = useFirstLookStartQuery();
+    const {
+        data: firstLookData,
+        isLoading,
+        isError: startError,
+        error: startErrorPayload,
+        refetch,
+    } = useFirstLookStartQuery();
     const submitMutation = useFirstLookSubmitMutation();
     const skipMutation = useFirstLookSkipMutation();
 
@@ -97,17 +82,28 @@ export function FirstLookClient() {
                 <div>
                     <h1 className="text-3xl font-bold text-text-primary">First Look</h1>
                     <p className="mt-1 text-text-secondary">
-                        We couldn&apos;t generate your questions right now.
+                        {startErrorPayload instanceof Error
+                            ? startErrorPayload.message
+                            : "We couldn&apos;t generate your questions right now."}
                     </p>
                 </div>
-                <button
-                    type="button"
-                    onClick={handleSkip}
-                    disabled={skipMutation.isPending}
-                    className="flex h-12 items-center justify-center rounded-2xl bg-primary-500 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                    {skipMutation.isPending ? "Skipping…" : "Skip for now and go to Lernard"}
-                </button>
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <button
+                        className="flex h-12 items-center justify-center rounded-2xl border border-border bg-surface text-sm font-semibold text-text-primary"
+                        onClick={() => void refetch()}
+                        type="button"
+                    >
+                        Retry
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSkip}
+                        disabled={skipMutation.isPending}
+                        className="flex h-12 items-center justify-center rounded-2xl bg-primary-500 text-sm font-semibold text-white disabled:opacity-60"
+                    >
+                        {skipMutation.isPending ? "Skipping…" : "Skip for now and go to Lernard"}
+                    </button>
+                </div>
             </div>
         );
     }
@@ -123,7 +119,8 @@ export function FirstLookClient() {
                 <div>
                     <h1 className="text-3xl font-bold text-text-primary">First Look complete!</h1>
                     <p className="mt-2 text-text-secondary">
-                        You scored {result.score} / {result.totalQuestions}. Lernard now knows where to start.
+                        You scored {result.score} / {result.totalQuestions}.
+                        Lernard now has your baseline and can personalize your next session.
                     </p>
                 </div>
                 <div className="w-full rounded-2xl bg-background p-4 text-left">
@@ -131,7 +128,8 @@ export function FirstLookClient() {
                         <div key={sr.subjectId} className="flex items-center justify-between py-2">
                             <span className="text-sm font-medium text-text-primary">{sr.subject}</span>
                             <span className="text-sm text-text-secondary">
-                                {sr.score}/{sr.totalQuestions} — {sr.strengthLevel.replace("_", " ")}
+                                {Math.round((sr.score / Math.max(sr.totalQuestions, 1)) * 100)}% - {" "}
+                                {sr.strengthLevel.replace("_", " ")}
                             </span>
                         </div>
                     ))}
@@ -148,6 +146,7 @@ export function FirstLookClient() {
     }
 
     const progressPercent = Math.round(((currentIndex + 1) / questions.length) * 100);
+    const hasSelectedCurrent = Boolean(answers[currentIndex]);
 
     if (!current) return null;
 
@@ -244,13 +243,17 @@ export function FirstLookClient() {
                     <button
                         type="button"
                         onClick={handleNext}
-                        disabled={!answers[currentIndex]}
+                        disabled={!hasSelectedCurrent}
                         className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-primary-500 text-sm font-semibold text-white disabled:opacity-50"
                     >
                         Next
                     </button>
                 )}
             </div>
+
+            {!hasSelectedCurrent && !isLast ? (
+                <p className="text-xs text-text-tertiary">Choose an option to continue.</p>
+            ) : null}
 
             <button
                 type="button"
