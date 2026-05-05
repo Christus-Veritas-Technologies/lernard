@@ -44,14 +44,6 @@ export enum SessionDepth {
   DEEP = 'deep',
 }
 
-export enum QuestionType {
-  MULTIPLE_CHOICE = 'multiple_choice',
-  TRUE_FALSE = 'true_false',
-  FILL_BLANK = 'fill_blank',
-  SHORT_ANSWER = 'short_answer',
-  ORDERING = 'ordering',
-}
-
 export enum Appearance {
   LIGHT = 'light',
   DARK = 'dark',

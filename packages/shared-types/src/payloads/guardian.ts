@@ -1,6 +1,5 @@
 import type { CompanionControls } from '../entities/settings'
-import type { GuardianChild } from '../entities/user'
-import type { SubjectProgress, SessionRecord } from '../entities/progress'
+import type { SubjectProgress } from '../entities/progress'
 
 export interface GuardianDashboardContent {
   summary: GuardianSummary
@@ -34,7 +33,6 @@ export interface GuardianChildOverview {
 export interface ChildProfileContent {
   child: GuardianChildOverview
   progress: SubjectProgress[]
-  recentSessions: SessionRecord[]
 }
 
 export interface ChildCompanionContent {
