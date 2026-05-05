@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { calculateStrengthLevel } from '@lernard/skill-map';
@@ -15,18 +14,16 @@ import type {
   ProfileSetupResponse,
   SubjectSelectionResponse,
 } from '@lernard/shared-types';
-import type { Prisma, Quiz } from '@prisma/client';
-import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
+import type { Prisma } from '@prisma/client';
 import {
   toPrismaAgeGroup,
   toPrismaLearningGoal,
   toPrismaStrengthLevel,
 } from '../../common/utils/shared-model-mappers';
-import { MastraService } from '../../mastra/mastra.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { getStaticFirstLookQuestion } from './first-look-questions';
 import type { FirstLookSubmitDto, ProfileSetupDto } from './dto/onboarding.dto';
 
-const FIRST_LOOK_TOPIC = '__first_look__';
 const FIRST_LOOK_BASELINE_KEY = '__first_look__';
 const MAX_FIRST_LOOK_SUBJECTS = 6;
 
@@ -41,13 +38,6 @@ interface UserSubjectRecord {
   };
 }
 
-interface GeneratedQuizQuestion {
-  question: string;
-  options: string[];
-  correctAnswer: number;
-  explanation?: string;
-}
-
 interface StoredFirstLookQuestion {
   index: number;
   subjectId: string;
@@ -60,10 +50,7 @@ interface StoredFirstLookQuestion {
 
 @Injectable()
 export class OnboardingService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly mastra: MastraService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async setAccountType(userId: string, accountType: AccountType): Promise<AccountTypePayload> {
     const user = await this.prisma.user.findUniqueOrThrow({
@@ -129,7 +116,6 @@ export class OnboardingService {
       });
 
       await this.replaceUserSubjects(transaction, userId, subjectNames);
-      await this.clearPendingFirstLook(transaction, userId);
     });
 
     const state = await this.getOnboardingState(userId);
@@ -147,7 +133,6 @@ export class OnboardingService {
 
     await this.prisma.$transaction(async (transaction) => {
       await this.replaceUserSubjects(transaction, userId, subjectNames);
-      await this.clearPendingFirstLook(transaction, userId);
     });
 
     const state = await this.getOnboardingState(userId);
@@ -170,46 +155,39 @@ export class OnboardingService {
       throw new BadRequestException('First Look is already complete for this account.');
     }
 
-    const existingQuiz = await this.findPendingFirstLookQuiz(userId);
-    if (existingQuiz) {
-      return {
-        questions: this.toPublicFirstLookQuestions(existingQuiz.questions),
-      };
-    }
-
     const subjects = await this.getOnboardingSubjects(userId);
     if (!subjects.length) {
       throw new BadRequestException('Select subjects before starting First Look.');
     }
 
-    const questions = await this.generateFirstLookQuestions(
-      subjects,
-      user.ageGroup,
-      userId,
-    );
-
-    await this.prisma.quiz.create({
-      data: {
-        userId,
-        topic: FIRST_LOOK_TOPIC,
-        length: questions.length,
-        idempotencyKey: `first-look:${userId}:${Date.now()}`,
-        questions: questions as unknown as Prisma.InputJsonValue,
-      },
-    });
+    const questions = this.generateFirstLookQuestions(subjects, user.ageGroup);
 
     return {
-      questions: this.toPublicFirstLookQuestions(questions),
+      questions: questions.map((q) => ({
+        index: q.index,
+        subject: q.subject,
+        question: q.question,
+        options: q.options,
+      })),
     };
   }
 
   async submitFirstLook(userId: string, dto: FirstLookSubmitDto): Promise<FirstLookResult> {
-    const quiz = await this.findPendingFirstLookQuiz(userId);
-    if (!quiz) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { ageGroup: true, firstLookComplete: true },
+    });
+
+    if (user.firstLookComplete) {
+      throw new BadRequestException('First Look is already complete for this account.');
+    }
+
+    const subjects = await this.getOnboardingSubjects(userId);
+    if (!subjects.length) {
       throw new NotFoundException('No active First Look assessment was found.');
     }
 
-    const storedQuestions = this.parseStoredFirstLookQuestions(quiz.questions);
+    const storedQuestions = this.generateFirstLookQuestions(subjects, user.ageGroup);
     const answersByIndex = new Map(dto.answers.map((answer) => [answer.index, answer.answer]));
 
     if (answersByIndex.size !== storedQuestions.length) {
@@ -235,16 +213,6 @@ export class OnboardingService {
     );
 
     await this.prisma.$transaction(async (transaction) => {
-      await transaction.quiz.update({
-        where: { id: quiz.id },
-        data: {
-          answers: Object.fromEntries(answersByIndex),
-          score: totalScore,
-          completed: true,
-          completedAt: new Date(),
-        },
-      });
-
       for (const result of subjectResults) {
         const ratio = result.totalQuestions === 0 ? 0.5 : result.score / result.totalQuestions;
         const nextTopicScores = {
@@ -339,19 +307,6 @@ export class OnboardingService {
         });
       }
 
-      await transaction.quiz.updateMany({
-        where: {
-          userId,
-          topic: FIRST_LOOK_TOPIC,
-          completed: false,
-          deletedAt: null,
-        },
-        data: {
-          completed: true,
-          completedAt: new Date(),
-        },
-      });
-
       await transaction.user.update({
         where: { id: userId },
         data: {
@@ -399,20 +354,7 @@ export class OnboardingService {
     });
   }
 
-  private async clearPendingFirstLook(
-    transaction: Prisma.TransactionClient,
-    userId: string,
-  ): Promise<void> {
-    await transaction.quiz.deleteMany({
-      where: {
-        userId,
-        topic: FIRST_LOOK_TOPIC,
-        completed: false,
-      },
-    });
-  }
-
-  private async getOnboardingState(userId: string) {
+  private async getOnboardingSubjects(userId: string): Promise<UserSubjectRecord[]> {
     return this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: {
@@ -438,87 +380,25 @@ export class OnboardingService {
     });
   }
 
-  private async findPendingFirstLookQuiz(userId: string): Promise<Quiz | null> {
-    return this.prisma.quiz.findFirst({
-      where: {
-        userId,
-        topic: FIRST_LOOK_TOPIC,
-        completed: false,
-        deletedAt: null,
-      },
-      orderBy: { createdAt: 'desc' },
+  private generateFirstLookQuestions(
+    subjects: UserSubjectRecord[],
+    ageGroup: PrismaAgeGroupValue | null,
+  ): Promise<StoredFirstLookQuestion[]> {
+    const difficulty = toQuizDifficulty(ageGroup);
+    return subjects.map((subject, index) => {
+      const q = getStaticFirstLookQuestion(subject.subject.name, difficulty);
+      return {
+        index,
+        subjectId: subject.subject.id,
+        subject: subject.subject.name,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        explanation: q.explanation,
+      };
     });
   }
 
-  private async generateFirstLookQuestions(
-    subjects: UserSubjectRecord[],
-    ageGroup: PrismaAgeGroupValue | null,
-    userId: string,
-  ): Promise<StoredFirstLookQuestion[]> {
-    const difficulty = toQuizDifficulty(ageGroup);
-    const questions = await Promise.all(
-      subjects.map(async (subject, index) => {
-        const rawQuiz = await this.mastra.generateQuiz({
-          topic: `${subject.subject.name} fundamentals`,
-          level: difficulty,
-          questionCount: 1,
-          studentId: userId,
-        });
-        const generatedQuestions = this.parseGeneratedQuiz(rawQuiz, subject.subject.name);
-        await validateGeneratedContent(generatedQuestions, this.mastra);
-
-        const [generatedQuestion] = generatedQuestions;
-        return {
-          index,
-          subjectId: subject.subject.id,
-          subject: subject.subject.name,
-          question: generatedQuestion.question,
-          options: generatedQuestion.options,
-          correctAnswer: generatedQuestion.correctAnswer,
-          explanation: generatedQuestion.explanation,
-        } satisfies StoredFirstLookQuestion;
-      }),
-    );
-
-    return questions;
-  }
-
-  private parseGeneratedQuiz(rawQuiz: string, subjectName: string): GeneratedQuizQuestion[] {
-    let parsed: unknown;
-
-    try {
-      parsed = JSON.parse(rawQuiz);
-    } catch {
-      throw new InternalServerErrorException(
-        `First Look generation returned invalid JSON for ${subjectName}.`,
-      );
-    }
-
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      throw new InternalServerErrorException(
-        `First Look generation returned no questions for ${subjectName}.`,
-      );
-    }
-
-    return parsed.map((question, index) => validateGeneratedQuizQuestion(question, subjectName, index));
-  }
-
-  private toPublicFirstLookQuestions(questions: unknown): FirstLookQuestion[] {
-    return this.parseStoredFirstLookQuestions(questions).map((question) => ({
-      index: question.index,
-      subject: question.subject,
-      question: question.question,
-      options: question.options,
-    }));
-  }
-
-  private parseStoredFirstLookQuestions(questions: unknown): StoredFirstLookQuestion[] {
-    if (!Array.isArray(questions)) {
-      throw new InternalServerErrorException('Stored First Look questions are invalid.');
-    }
-
-    return questions.map((question, index) => validateStoredFirstLookQuestion(question, index));
-  }
 }
 
 type PrismaAgeGroupValue = 'PRIMARY' | 'SECONDARY' | 'UNIVERSITY' | 'PROFESSIONAL';
@@ -552,92 +432,6 @@ function toQuizDifficulty(ageGroup: PrismaAgeGroupValue | null): QuizDifficulty 
     default:
       return 'beginner';
   }
-}
-
-function validateGeneratedQuizQuestion(
-  question: unknown,
-  subjectName: string,
-  index: number,
-): GeneratedQuizQuestion {
-  if (!question || typeof question !== 'object') {
-    throw new InternalServerErrorException(
-      `Generated First Look question ${index + 1} for ${subjectName} is invalid.`,
-    );
-  }
-
-  const candidate = question as Record<string, unknown>;
-  const questionText = candidate.question;
-  const options = candidate.options;
-  const correctAnswer = candidate.correctAnswer;
-
-  if (
-    typeof questionText !== 'string' ||
-    !Array.isArray(options) ||
-    options.length < 2 ||
-    options.some((option) => typeof option !== 'string') ||
-    typeof correctAnswer !== 'number' ||
-    !Number.isInteger(correctAnswer) ||
-    correctAnswer < 0 ||
-    correctAnswer >= options.length
-  ) {
-    throw new InternalServerErrorException(
-      `Generated First Look question ${index + 1} for ${subjectName} is malformed.`,
-    );
-  }
-
-  return {
-    question: questionText,
-    options,
-    correctAnswer,
-    explanation: typeof candidate.explanation === 'string' ? candidate.explanation : undefined,
-  };
-}
-
-function validateStoredFirstLookQuestion(
-  question: unknown,
-  index: number,
-): StoredFirstLookQuestion {
-  if (!question || typeof question !== 'object') {
-    throw new InternalServerErrorException(
-      `Stored First Look question ${index + 1} is invalid.`,
-    );
-  }
-
-  const candidate = question as Record<string, unknown>;
-  const questionIndex = candidate.index;
-  const subjectId = candidate.subjectId;
-  const subject = candidate.subject;
-  const questionText = candidate.question;
-  const options = candidate.options;
-  const correctAnswer = candidate.correctAnswer;
-
-  if (
-    typeof questionIndex !== 'number' ||
-    !Number.isInteger(questionIndex) ||
-    typeof subjectId !== 'string' ||
-    typeof subject !== 'string' ||
-    typeof questionText !== 'string' ||
-    !Array.isArray(options) ||
-    options.some((option) => typeof option !== 'string') ||
-    typeof correctAnswer !== 'number' ||
-    !Number.isInteger(correctAnswer) ||
-    correctAnswer < 0 ||
-    correctAnswer >= options.length
-  ) {
-    throw new InternalServerErrorException(
-      `Stored First Look question ${index + 1} is malformed.`,
-    );
-  }
-
-  return {
-    index: questionIndex,
-    subjectId,
-    subject,
-    question: questionText,
-    options,
-    correctAnswer,
-    explanation: typeof candidate.explanation === 'string' ? candidate.explanation : undefined,
-  };
 }
 
 function buildSubjectResults(
