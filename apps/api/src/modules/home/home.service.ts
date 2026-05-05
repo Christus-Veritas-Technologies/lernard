@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type {
+  DayActivity,
   HomeContent,
   PagePayload,
   ScopedPermission,
@@ -23,6 +24,7 @@ export class HomeService {
         select: {
           name: true,
           streakDays: true,
+          lastActiveAt: true,
           dailyGoal: true,
           sessionCount: true,
         },
@@ -64,12 +66,20 @@ export class HomeService {
       }
     }
 
+    const masteredTopicCount = allTopicScores.filter((t) => t.score >= 70).length;
+    const totalTopicCount = allTopicScores.length;
+
     const passRate =
       allTopicScores.length > 0
         ? Math.round(
             allTopicScores.reduce((sum, t) => sum + t.score, 0) / allTopicScores.length,
           )
         : 0;
+
+    const recentActivity: DayActivity[] = buildRecentActivity(
+      user.lastActiveAt,
+      user.streakDays,
+    );
 
     const topTopics: TopicSummary[] = [...allTopicScores]
       .sort((a, b) => b.score - a.score)
@@ -117,9 +127,12 @@ export class HomeService {
       })),
       totalSessions: user.sessionCount,
       passRate,
+      masteredTopicCount,
+      totalTopicCount,
       strengthBreakdown,
       topTopics,
       subjectTopics,
+      recentActivity,
     };
 
     return buildPagePayload(content, {
@@ -160,4 +173,24 @@ function buildHomeSlots(sessionCount: number): SlotAssignments {
     };
   }
   return buildNullSlots(['urgent_action', 'streak_nudge', 'primary_cta']);
+}
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+function buildRecentActivity(lastActiveAt: Date | null, streakDays: number): DayActivity[] {
+  const anchor = lastActiveAt ?? new Date();
+  const anchorDay = new Date(anchor);
+  anchorDay.setHours(0, 0, 0, 0);
+
+  const result: DayActivity[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(anchorDay);
+    d.setDate(anchorDay.getDate() - i);
+    const diffDays = i; // days before anchor
+    result.push({
+      day: DAY_LABELS[d.getDay()],
+      active: diffDays < streakDays,
+    });
+  }
+  return result;
 }

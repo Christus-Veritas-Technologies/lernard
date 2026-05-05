@@ -30,6 +30,7 @@ export type {
   StrengthBreakdown,
   TopicSummary,
   SubjectTopicBreakdown,
+  DayActivity,
 } from './payloads/home'
 export type { ProgressContent, SubjectDetailContent } from './payloads/progress'
 export type { SettingsContent } from './payloads/settings'

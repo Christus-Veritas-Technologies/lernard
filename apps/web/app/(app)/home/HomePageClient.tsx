@@ -13,10 +13,11 @@ import { ROUTES } from "@lernard/routes";
 import type { HomeContent } from "@lernard/shared-types";
 
 import { DashStatCard } from "@/components/dashboard/DashStatCard";
+import { PassRateDonut } from "@/components/dashboard/PassRateDonut";
 import { SessionsHighlightCard } from "@/components/dashboard/SessionsHighlightCard";
-import { StrengthDonut } from "@/components/dashboard/StrengthDonut";
+import { SubjectListCard } from "@/components/dashboard/SubjectListCard";
 import { SubjectTopicsChart } from "@/components/dashboard/SubjectTopicsChart";
-import { TopicListCard } from "@/components/dashboard/TopicListCard";
+import { WeeklyActivityChart } from "@/components/dashboard/WeeklyActivityChart";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -148,26 +149,43 @@ export function HomePageClient() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Strength breakdown</CardTitle>
-                        <CardDescription>Your topics by mastery level</CardDescription>
+                        <CardTitle>Mastery rate</CardTitle>
+                        <CardDescription>Topics you&apos;ve mastered vs still learning</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <StrengthDonut breakdown={content.strengthBreakdown} />
+                        <PassRateDonut
+                            masteredCount={content.masteredTopicCount}
+                            totalCount={content.totalTopicCount}
+                        />
                     </CardContent>
                 </Card>
             </div>
 
-            {/* ── Bottom row: Topic list + Sessions highlight ── */}
+            {/* ── Bottom row: Activity chart | Subject list | Sessions ── */}
             <div className="grid gap-6 lg:grid-cols-3">
-                <Card className="lg:col-span-2">
+                <Card>
                     <CardHeader>
-                        <CardTitle>Your top topics</CardTitle>
-                        <CardDescription>
-                            Highest scoring topics across all subjects
-                        </CardDescription>
+                        <CardTitle>Weekly activity</CardTitle>
+                        <CardDescription>Your study days this week</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <TopicListCard topics={content.topTopics} />
+                        <WeeklyActivityChart
+                            activity={content.recentActivity}
+                            streak={content.streak}
+                        />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>By subject</CardTitle>
+                        <CardDescription>Strong topics per subject</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <SubjectListCard
+                            subjectTopics={content.subjectTopics}
+                            subjects={content.subjects}
+                        />
                     </CardContent>
                 </Card>
 
@@ -199,7 +217,8 @@ function DashboardSkeleton() {
                 <div className="h-72 rounded-3xl bg-background-subtle" />
             </div>
             <div className="grid gap-6 lg:grid-cols-3">
-                <div className="h-64 rounded-3xl bg-background-subtle lg:col-span-2" />
+                <div className="h-64 rounded-3xl bg-background-subtle" />
+                <div className="h-64 rounded-3xl bg-background-subtle" />
                 <div className="h-64 rounded-3xl bg-background-subtle" />
             </div>
         </div>

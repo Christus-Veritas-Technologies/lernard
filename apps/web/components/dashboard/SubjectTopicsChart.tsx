@@ -37,6 +37,28 @@ export function SubjectTopicsChart({ data }: SubjectTopicsChartProps) {
     const barW = Math.min(20, groupW * 0.28);
     const barGap = 4;
 
+    // Find subject with highest combined bar for floating badge
+    const totalTopics = data.reduce(
+        (sum, d) => sum + d.strongCount + d.developingCount + d.needsWorkCount,
+        0,
+    );
+    let peakGroupIndex = 0;
+    let peakVal = -1;
+    data.forEach((d, i) => {
+        const top = Math.max(d.strongCount, d.developingCount);
+        if (top > peakVal) {
+            peakVal = top;
+            peakGroupIndex = i;
+        }
+    });
+    const peakCx = PAD_L + (peakGroupIndex + 0.5) * groupW;
+    const peakBarH = (peakVal / yMax) * INNER_H;
+    const peakBarY = PAD_T + INNER_H - peakBarH;
+    const badgeLabel = `${totalTopics} topics`;
+    const badgeW = badgeLabel.length * 6.8 + 16;
+    const badgeH = 22;
+    const badgeY = peakBarY - badgeH - 6;
+
     return (
         <div>
             <svg
@@ -134,6 +156,32 @@ export function SubjectTopicsChart({ data }: SubjectTopicsChartProps) {
                     y1={PAD_T + INNER_H}
                     y2={PAD_T + INNER_H}
                 />
+
+                {/* Floating total topics badge */}
+                {totalTopics > 0 && (
+                    <g>
+                        <rect
+                            fill="#1A1A2E"
+                            height={badgeH}
+                            rx={8}
+                            ry={8}
+                            width={badgeW}
+                            x={peakCx - badgeW / 2}
+                            y={badgeY}
+                        />
+                        <text
+                            dominantBaseline="middle"
+                            fill="white"
+                            fontSize={10}
+                            fontWeight="600"
+                            textAnchor="middle"
+                            x={peakCx}
+                            y={badgeY + badgeH / 2}
+                        >
+                            {badgeLabel}
+                        </text>
+                    </g>
+                )}
             </svg>
 
             {/* Legend */}

@@ -9,9 +9,17 @@ export interface HomeContent {
   subjects: UserSubject[]
   totalSessions: number
   passRate: number
+  masteredTopicCount: number
+  totalTopicCount: number
   strengthBreakdown: StrengthBreakdown
   topTopics: TopicSummary[]
   subjectTopics: SubjectTopicBreakdown[]
+  recentActivity: DayActivity[]
+}
+
+export interface DayActivity {
+  day: string
+  active: boolean
 }
 
 export interface StrengthBreakdown {
