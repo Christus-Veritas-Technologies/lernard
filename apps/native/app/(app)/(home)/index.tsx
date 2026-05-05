@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { can } from '@lernard/auth-core';
 import { ROUTES } from '@lernard/routes';
 import type { HomeContent } from '@lernard/shared-types';
 
@@ -11,7 +10,7 @@ import { Text } from '@rnr/text';
 import { Button } from '@/components/Button';
 import { StateNotice } from '@/components/StateNotice';
 import { usePagePayload } from '@/hooks/usePagePayload';
-import { formatRelativeDate, formatSessionsLabel } from '@/lib/formatters';
+import { formatRelativeDate } from '@/lib/formatters';
 
 export default function HomeScreen() {
     const router = useRouter();
@@ -65,8 +64,8 @@ export default function HomeScreen() {
         );
     }
 
-    const { content, permissions } = data;
-    const showEmptyDashboard = !content.subjects.length && !content.recentSessions.length && !content.lastLesson;
+    const { content } = data;
+    const showEmptyDashboard = !content.subjects.length;
 
     if (showEmptyDashboard) {
         return (
@@ -97,11 +96,6 @@ export default function HomeScreen() {
                                 {content.streak}-day streak
                             </Text>
                         </View>
-                        <View className="rounded-full bg-indigo-100 px-3 py-1">
-                            <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">
-                                {formatSessionsLabel(content.recentSessions.length)} this week
-                            </Text>
-                        </View>
                         <View className="rounded-full bg-amber-100 px-3 py-1">
                             <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-800">
                                 Goal {content.dailyGoalProgress}/{content.dailyGoalTarget}
@@ -109,16 +103,7 @@ export default function HomeScreen() {
                         </View>
                     </View>
                     <View className="mt-6 flex-row flex-wrap gap-3">
-                        <Button
-                            disabled={!can(permissions, 'can_start_lesson') || !content.lastLesson}
-                            onPress={() => content.lastLesson ? router.push(`/learn/${content.lastLesson.id}`) : undefined}
-                            title={content.lastLesson ? 'Resume last lesson' : 'No lesson to resume'}
-                        />
-                        <Button
-                            onPress={() => router.push('/learn')}
-                            title="Open Learn"
-                            variant="secondary"
-                        />
+                        <Button onPress={() => router.push('/settings')} title="Settings" variant="secondary" />
                     </View>
                 </View>
 
@@ -171,48 +156,10 @@ export default function HomeScreen() {
                                 <Text className="mt-3 text-sm leading-6 text-slate-600">
                                     Priority in your queue: #{subject.priorityIndex + 1}
                                 </Text>
-                                <View className="mt-4 flex-row flex-wrap gap-3">
-                                    <Button onPress={() => router.push('/learn')} title="Continue" variant="secondary" />
-                                    <Button
-                                        disabled={!can(permissions, 'can_take_quiz')}
-                                        onPress={() => router.push('/quiz')}
-                                        title="Practice"
-                                    />
-                                </View>
                             </View>
                         )) : (
                             <Text className="text-base leading-7 text-slate-600">
                                 No subjects have been added yet. Once onboarding or topic selection is complete, they will appear here with real strength signals.
-                            </Text>
-                        )}
-                    </View>
-                </View>
-
-                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <Text className="text-2xl font-semibold text-slate-900">Recent sessions</Text>
-                    <Text className="mt-2 text-base leading-7 text-slate-600">
-                        The latest lessons and quizzes you can jump back into.
-                    </Text>
-                    <View className="mt-5 gap-4">
-                        {content.recentSessions.length ? content.recentSessions.map((session) => (
-                            <View className="rounded-[28px] bg-slate-50 p-4" key={session.id}>
-                                <View className="flex-row items-start justify-between gap-3">
-                                    <View className="flex-1">
-                                        <Text className="text-base font-semibold text-slate-900">
-                                            {session.subject} • {session.topic}
-                                        </Text>
-                                        <Text className="mt-1 text-sm leading-6 text-slate-600">
-                                            {session.type === 'lesson' ? 'Lesson completed with recap notes ready.' : 'Quiz finished and ready for review.'}
-                                        </Text>
-                                    </View>
-                                    <Text className="text-sm font-medium text-slate-500">
-                                        {formatRelativeDate(session.createdAt)}
-                                    </Text>
-                                </View>
-                            </View>
-                        )) : (
-                            <Text className="text-base leading-7 text-slate-600">
-                                Your latest lesson and quiz activity will appear here once you finish a session.
                             </Text>
                         )}
                     </View>

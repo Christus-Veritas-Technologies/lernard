@@ -354,7 +354,7 @@ export class OnboardingService {
     });
   }
 
-  private async getOnboardingSubjects(userId: string): Promise<UserSubjectRecord[]> {
+  private async getOnboardingState(userId: string): Promise<{ onboardingComplete: boolean; firstLookComplete: boolean }> {
     return this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
       select: {
@@ -383,7 +383,7 @@ export class OnboardingService {
   private generateFirstLookQuestions(
     subjects: UserSubjectRecord[],
     ageGroup: PrismaAgeGroupValue | null,
-  ): Promise<StoredFirstLookQuestion[]> {
+  ): StoredFirstLookQuestion[] {
     const difficulty = toQuizDifficulty(ageGroup);
     return subjects.map((subject, index) => {
       const q = getStaticFirstLookQuestion(subject.subject.name, difficulty);

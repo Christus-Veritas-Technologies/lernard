@@ -10,7 +10,7 @@ import { Text } from '@rnr/text';
 import { Button } from '@/components/Button';
 import { StateNotice } from '@/components/StateNotice';
 import { usePagePayload } from '@/hooks/usePagePayload';
-import { formatMinutes, formatPercent, formatRelativeDate } from '@/lib/formatters';
+import { formatPercent, formatRelativeDate } from '@/lib/formatters';
 
 export default function ProgressScreen() {
     const router = useRouter();
@@ -78,29 +78,22 @@ export default function ProgressScreen() {
                     <View className="mt-5 flex-row flex-wrap gap-2">
                         <Badge label={`${content.streak}-day streak`} tone="indigo" />
                         <Badge label={`Level ${content.xpLevel}`} tone="sky" />
-                        <Badge label={`${content.totalLessons} lessons`} tone="emerald" />
-                        <Badge label={`${content.totalQuizzes} quizzes`} tone="amber" />
                     </View>
                     <View className="mt-6 flex-row flex-wrap gap-3">
-                        <Button
-                            onPress={() => router.push('/progress/history')}
-                            title="Open session history"
-                            variant="secondary"
-                        />
-                        <Button onPress={() => router.push('/learn')} title="Start lesson" />
+                        <Button onPress={() => router.push('/settings')} title="Settings" variant="secondary" />
                     </View>
                 </View>
 
                 <View className="flex-row flex-wrap gap-4">
                     <MetricCard
-                        description="Average session length"
-                        title={formatMinutes(content.averageSessionLength)}
-                        tone="sky"
-                    />
-                    <MetricCard
                         description="Active subjects"
                         title={`${content.subjects.length}`}
                         tone="indigo"
+                    />
+                    <MetricCard
+                        description="Current level"
+                        title={`Level ${content.xpLevel}`}
+                        tone="sky"
                     />
                 </View>
 
@@ -112,19 +105,18 @@ export default function ProgressScreen() {
                                 Native progress bars replace web charts so this view stays smooth on mobile while keeping the same insight.
                             </Text>
                         </View>
-                        <Button onPress={() => router.push('/progress/history')} title="History" variant="ghost" />
                     </View>
 
                     <View className="mt-5 gap-4">
                         {content.subjects.length ? content.subjects.map((subject) => {
-                            const score = subject.averageScore ?? averageTopicScore(subject.topics);
+                            const score = averageTopicScore(subject.topics);
                             return (
                                 <View className="rounded-[28px] bg-slate-50 p-4" key={subject.subjectId}>
                                     <View className="flex-row items-start justify-between gap-3">
                                         <View className="flex-1">
                                             <Text className="text-lg font-semibold text-slate-900">{subject.subjectName}</Text>
                                             <Text className="mt-1 text-sm leading-6 text-slate-600">
-                                                {subject.totalLessons} lessons • {subject.totalQuizzes} quizzes • Last active {formatRelativeDate(subject.lastActiveAt)}
+                                                Last active {formatRelativeDate(subject.lastActiveAt)}
                                             </Text>
                                         </View>
                                         <View className={strengthBadge(subject.strengthLevel)}>
@@ -143,15 +135,6 @@ export default function ProgressScreen() {
                                                 style={{ width: `${clampPercent(score)}%` }}
                                             />
                                         </View>
-                                    </View>
-
-                                    <View className="mt-4 flex-row flex-wrap gap-2">
-                                        <Button
-                                            onPress={() => router.push(`/progress/${subject.subjectId}`)}
-                                            title="Open subject"
-                                            variant="secondary"
-                                        />
-                                        <Button onPress={() => router.push('/quiz')} title="Practice now" />
                                     </View>
                                 </View>
                             );

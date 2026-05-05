@@ -14,11 +14,8 @@ export default function AppLayout() {
             tabBar={(props) => <TabBar {...props} />}
         >
             <Tabs.Screen name="(home)" options={{ title: 'Home' }} />
-            <Tabs.Screen name="(learn)" options={{ title: 'Learn' }} />
-            <Tabs.Screen name="(chat)" options={{ title: 'Chat' }} />
             <Tabs.Screen name="(progress)" options={{ title: 'Progress' }} />
             <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
-            <Tabs.Screen name="(quiz)" options={{ href: null }} />
             <Tabs.Screen name="guardian" options={{ href: null }} />
         </Tabs>
     );
