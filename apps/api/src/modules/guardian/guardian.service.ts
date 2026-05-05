@@ -9,8 +9,6 @@ import type {
   PagePayload,
   PendingInvite,
   ScopedPermission,
-  SessionHistoryContent,
-  SessionRecord,
   SubjectProgress,
   TopicStrength,
 } from '@lernard/shared-types';
@@ -18,7 +16,6 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { buildPagePayload } from '../../common/utils/build-page-payload';
 import {
   listPendingInviteSnapshots,
-  listRecentSessions,
 } from '../../common/utils/page-payload-queries';
 import { toSharedStrengthLevel } from '../../common/utils/shared-model-mappers';
 import type {
@@ -182,37 +179,6 @@ export class GuardianService {
       strengthLevel: subjectProgress.strengthLevel,
     }));
   }
-
-  async getChildHistory(
-    userId: string,
-    childId: string,
-    cursor?: string,
-    limit = 20,
-  ): Promise<SessionHistoryContent> {
-    await this.getChildForGuardian(userId, childId);
-
-    const sessionRecords = await this.prisma.sessionRecord.findMany({
-      where: { userId: childId },
-      orderBy: { createdAt: 'desc' },
-      ...(cursor
-        ? {
-            cursor: { id: cursor },
-            skip: 1,
-          }
-        : {}),
-      take: limit + 1,
-    });
-
-    const hasMore = sessionRecords.length > limit;
-    const visibleSessionRecords = sessionRecords.slice(0, limit);
-
-    return {
-      sessions: visibleSessionRecords.map(mapSessionRecord),
-      cursor: hasMore ? visibleSessionRecords[visibleSessionRecords.length - 1]?.id ?? null : null,
-      hasMore,
-    };
-  }
-
   async getChildCompanionPayload(
     userId: string,
     childId: string,
@@ -289,10 +255,7 @@ export class GuardianService {
     childId: string,
   ): Promise<ChildProfileContent> {
     const child = await this.getChildForGuardian(userId, childId);
-    const [progress, recentSessions] = await Promise.all([
-      this.buildSubjectProgress(child.id),
-      listRecentSessions(this.prisma, child.id, 8),
-    ]);
+    const progress = await this.buildSubjectProgress(child.id);
 
     return {
       child: {
@@ -306,7 +269,6 @@ export class GuardianService {
         })),
       },
       progress,
-      recentSessions: recentSessions.map(mapSessionSnapshot),
     };
   }
 
@@ -388,59 +350,13 @@ export class GuardianService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return Promise.all(
-      progressRecords.map(async (progressRecord) => {
-        const [totalLessons, totalQuizzes, quizzes] = await Promise.all([
-          this.prisma.lesson.count({
-            where: {
-              userId: childId,
-              subjectId: progressRecord.subjectId,
-              deletedAt: null,
-            },
-          }),
-          this.prisma.quiz.count({
-            where: {
-              userId: childId,
-              subjectId: progressRecord.subjectId,
-              deletedAt: null,
-            },
-          }),
-          this.prisma.quiz.findMany({
-            where: {
-              userId: childId,
-              subjectId: progressRecord.subjectId,
-              deletedAt: null,
-              completed: true,
-              score: { not: null },
-            },
-            select: {
-              score: true,
-              length: true,
-            },
-          }),
-        ]);
-
-        const averageScore = quizzes.length
-          ? Math.round(
-              quizzes.reduce((total, quiz) => {
-                const score = quiz.score ?? 0;
-                return total + (score / quiz.length) * 100;
-              }, 0) / quizzes.length,
-            )
-          : null;
-
-        return {
-          subjectId: progressRecord.subjectId,
-          subjectName: progressRecord.subject.name,
-          strengthLevel: toSharedStrengthLevel(progressRecord.strengthLevel),
-          totalLessons,
-          totalQuizzes,
-          averageScore,
-          topics: mapTopicStrengths(progressRecord.topicScores, progressRecord.updatedAt),
-          lastActiveAt: progressRecord.updatedAt.toISOString(),
-        };
-      }),
-    );
+    return progressRecords.map((progressRecord) => ({
+      subjectId: progressRecord.subjectId,
+      subjectName: progressRecord.subject.name,
+      strengthLevel: toSharedStrengthLevel(progressRecord.strengthLevel),
+      topics: mapTopicStrengths(progressRecord.topicScores, progressRecord.updatedAt),
+      lastActiveAt: progressRecord.updatedAt.toISOString(),
+    }));
   }
 
   private async getGuardianByUserId(userId: string) {
@@ -593,54 +509,6 @@ function toTopicLevel(score: number): TopicStrength['level'] {
   }
 
   return 'needs_work';
-}
-
-function mapSessionSnapshot(sessionSnapshot: {
-  id: string;
-  userId: string;
-  type: 'lesson' | 'quiz';
-  subjectName: string;
-  topic: string;
-  durationMs: number;
-  createdAt: string;
-  resourceId: string;
-}): SessionRecord {
-  const durationMinutes = Math.max(1, Math.round(sessionSnapshot.durationMs / 60000));
-
-  return {
-    id: sessionSnapshot.id,
-    ownerId: sessionSnapshot.userId,
-    type: sessionSnapshot.type,
-    subject: sessionSnapshot.subjectName,
-    topic: sessionSnapshot.topic,
-    duration: durationMinutes,
-    xpEarned: durationMinutes,
-    createdAt: sessionSnapshot.createdAt,
-    resourceId: sessionSnapshot.resourceId,
-  };
-}
-
-function mapSessionRecord(sessionRecord: {
-  id: string;
-  userId: string;
-  type: 'LESSON' | 'QUIZ';
-  subjectName: string;
-  topic: string;
-  durationMs: number;
-  createdAt: Date;
-  lessonId: string | null;
-  quizId: string | null;
-}): SessionRecord {
-  return mapSessionSnapshot({
-    id: sessionRecord.id,
-    userId: sessionRecord.userId,
-    type: sessionRecord.type === 'LESSON' ? 'lesson' : 'quiz',
-    subjectName: sessionRecord.subjectName,
-    topic: sessionRecord.topic,
-    durationMs: sessionRecord.durationMs,
-    createdAt: sessionRecord.createdAt.toISOString(),
-    resourceId: sessionRecord.lessonId ?? sessionRecord.quizId ?? sessionRecord.id,
-  });
 }
 
 function ensureSettingLocked(existingSettings: string[], settingKey: string): string[] {

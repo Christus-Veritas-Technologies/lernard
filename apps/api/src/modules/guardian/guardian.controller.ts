@@ -6,9 +6,6 @@ import {
   Patch,
   Param,
   Body,
-  Query,
-  DefaultValuePipe,
-  ParseIntPipe,
 } from '@nestjs/common';
 import { GuardianService } from './guardian.service';
 import {
@@ -100,22 +97,6 @@ export class GuardianController {
   @Get('children/:childId/subjects')
   async getChildSubjects(@CurrentUser() user: User, @Param('childId') childId: string) {
     return this.guardianService.getChildSubjects(user.id, childId);
-  }
-
-  @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
-  @Get('children/:childId/history')
-  async getChildHistory(
-    @CurrentUser() user: User,
-    @Param('childId') childId: string,
-    @Query('cursor') cursor?: string,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
-  ) {
-    return this.guardianService.getChildHistory(
-      user.id,
-      childId,
-      cursor,
-      Math.min(limit!, 50),
-    );
   }
 
   @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })

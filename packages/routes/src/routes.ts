@@ -3,10 +3,6 @@ export const ROUTES = {
     PAYLOAD: '/v1/home/payload',
   },
 
-  LEARN: {
-    PAYLOAD: '/v1/learn/payload',
-  },
-
   AUTH: {
     REGISTER: '/v1/auth/register',
     LOGIN: '/v1/auth/login',
@@ -40,36 +36,10 @@ export const ROUTES = {
     REORDER: '/v1/subjects/mine/reorder',
   },
 
-  LESSONS: {
-    GENERATE: '/v1/lessons/generate',
-    GET: (id: string) => `/v1/lessons/${id}` as const,
-    SECTION_CHECK: (id: string) => `/v1/lessons/${id}/section-check` as const,
-    COMPLETE: (id: string) => `/v1/lessons/${id}/complete` as const,
-    HISTORY: '/v1/lessons/history',
-  },
-
-  QUIZZES: {
-    GENERATE: '/v1/quizzes/generate',
-    GET: (id: string) => `/v1/quizzes/${id}` as const,
-    ANSWER: (id: string) => `/v1/quizzes/${id}/answer` as const,
-    COMPLETE: (id: string) => `/v1/quizzes/${id}/complete` as const,
-    HISTORY: '/v1/quizzes/history',
-  },
-
-  CHAT: {
-    MESSAGE: '/v1/chat/message',
-    CONVERSATIONS: '/v1/chat/conversations',
-    CONVERSATION: (id: string) => `/v1/chat/conversations/${id}` as const,
-    DELETE_CONVERSATION: (id: string) => `/v1/chat/conversations/${id}` as const,
-    TO_LESSON: (id: string) => `/v1/chat/conversations/${id}/to-lesson` as const,
-    TO_QUIZ: (id: string) => `/v1/chat/conversations/${id}/to-quiz` as const,
-  },
-
   PROGRESS: {
     OVERVIEW: '/v1/progress/overview',
     SUBJECTS: '/v1/progress/subjects',
     SUBJECT: (subjectId: string) => `/v1/progress/subjects/${subjectId}` as const,
-    HISTORY: '/v1/progress/history',
     GROWTH_AREAS: '/v1/progress/growth-areas',
   },
 
@@ -94,7 +64,6 @@ export const ROUTES = {
     REMOVE_CHILD: (childId: string) => `/v1/guardian/children/${childId}` as const,
     CHILD_PROGRESS: (childId: string) => `/v1/guardian/children/${childId}/progress` as const,
     CHILD_SUBJECTS: (childId: string) => `/v1/guardian/children/${childId}/subjects` as const,
-    CHILD_HISTORY: (childId: string) => `/v1/guardian/children/${childId}/history` as const,
     CHILD_COMPANION_CONTROLS: (childId: string) => `/v1/guardian/children/${childId}/companion-controls` as const,
     CHILD_COMPANION_PAYLOAD: (childId: string) => `/v1/guardian/children/${childId}/companion-controls/payload` as const,
   },
