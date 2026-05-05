@@ -52,6 +52,30 @@ enum StrengthLevel {
   NEEDS_WORK
 }
 
+enum GenerationStatus {
+  GENERATING
+  READY
+  FAILED
+}
+
+enum SessionType {
+  LESSON
+  QUIZ
+}
+
+enum QuizQuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  FILL_BLANK
+  SHORT_ANSWER
+  ORDERING
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+}
+
 // ─── User ─────────────────────────────────────────────────────────────────────
 
 model User {
@@ -101,6 +125,11 @@ model User {
   refreshTokens     RefreshToken[]
   settingsAudit     SettingsAudit[]
   subjectProgress   SubjectProgress[]
+  lessons           Lesson[]
+  quizzes           Quiz[]
+  quizAnswers       QuizAnswer[]
+  sessions          Session[]
+  conversations     Conversation[]
 
   @@index([email])
   @@index([role])
@@ -199,6 +228,8 @@ model Subject {
 
   userSubjects    UserSubject[]
   subjectProgress SubjectProgress[]
+  lessons         Lesson[]
+  quizzes         Quiz[]
 }
 
 model UserSubject {
@@ -230,4 +261,136 @@ model SubjectProgress {
 
   @@unique([userId, subjectId])
   @@index([userId])
+}
+
+// ─── Lessons, Quizzes, Sessions ─────────────────────────────────────────────
+
+model Lesson {
+  id               String           @id @default(cuid())
+  userId           String
+  subjectId        String?
+  subjectName      String?
+  topic            String
+  depth            String           @default("standard") // quick | standard | deep
+  status           GenerationStatus @default(GENERATING)
+  estimatedMinutes Int              @default(10)
+  sections         Json             @default("[]")
+  sectionChecks    Json             @default("[]")
+  completedAt      DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject? @relation(fields: [subjectId], references: [id])
+  quizzes Quiz[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model Quiz {
+  id                String           @id @default(cuid())
+  userId            String
+  subjectId         String?
+  subjectName       String?
+  topic             String
+  mode              LearningMode     @default(GUIDE)
+  totalQuestions    Int              @default(10)
+  status            GenerationStatus @default(GENERATING)
+  fromLessonId      String?
+  fromConversationId String?
+  currentIndex      Int              @default(0)
+  score             Int              @default(0)
+  completedAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject    Subject?  @relation(fields: [subjectId], references: [id])
+  fromLesson Lesson?   @relation(fields: [fromLessonId], references: [id])
+  questions  QuizQuestion[]
+  answers    QuizAnswer[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+}
+
+model QuizQuestion {
+  id            String           @id @default(cuid())
+  quizId         String
+  questionIndex  Int
+  type           QuizQuestionType
+  text           String
+  options        Json?
+  correctAnswer  String
+  explanation    String
+  createdAt      DateTime         @default(now())
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, questionIndex])
+  @@index([quizId])
+}
+
+model QuizAnswer {
+  id            String   @id @default(cuid())
+  quizId         String
+  userId         String
+  questionIndex  Int
+  answer         String
+  isCorrect      Boolean
+  submittedAt    DateTime @default(now())
+
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([quizId, questionIndex])
+  @@index([quizId])
+  @@index([userId])
+}
+
+model Session {
+  id              String      @id @default(cuid())
+  userId          String
+  type            SessionType
+  lessonId        String?
+  quizId          String?
+  subjectName     String?
+  topic           String
+  durationMinutes Int         @default(0)
+  completedAt     DateTime    @default(now())
+  createdAt       DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, completedAt])
+  @@index([type])
+}
+
+// ─── Chat ───────────────────────────────────────────────────────────────────
+
+model Conversation {
+  id          String    @id @default(cuid())
+  userId      String
+  title       String
+  lastMessage String    @default("")
+  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime  @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId, updatedAt])
+}
+
+model Message {
+  id             String      @id @default(cuid())
+  conversationId String
+  role           MessageRole
+  blocks         Json
+  createdAt      DateTime    @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }
