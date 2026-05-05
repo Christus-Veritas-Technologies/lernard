@@ -4,9 +4,7 @@ import { RequestLoggingMiddleware } from './common/middleware/request-logging.mi
 import { AuthModule } from './modules/auth/auth.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { SubjectsModule } from './modules/subjects/subjects.module';
-import { ChatModule } from './modules/chat/chat.module';
 import { HomeModule } from './modules/home/home.module';
-import { LearnModule } from './modules/learn/learn.module';
 import { ProgressModule } from './modules/progress/progress.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { GuardianModule } from './modules/guardian/guardian.module';
@@ -19,9 +17,7 @@ import { PrismaModule } from './prisma/prisma.module';
     AuthModule,
     OnboardingModule,
     SubjectsModule,
-    ChatModule,
     HomeModule,
-    LearnModule,
     ProgressModule,
     SettingsModule,
     GuardianModule,
