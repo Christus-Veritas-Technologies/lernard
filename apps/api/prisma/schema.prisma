@@ -52,19 +52,6 @@ enum StrengthLevel {
   NEEDS_WORK
 }
 
-enum QuestionType {
-  MULTIPLE_CHOICE
-  TRUE_FALSE
-  FILL_IN_THE_BLANK
-  SHORT_ANSWER
-  ORDERING
-}
-
-enum SessionType {
-  LESSON
-  QUIZ
-}
-
 // ─── User ─────────────────────────────────────────────────────────────────────
 
 model User {
@@ -111,10 +98,6 @@ model User {
 
   // Relations
   subjects          UserSubject[]
-  lessons           Lesson[]
-  quizzes           Quiz[]
-  conversations     Conversation[]
-  sessions          SessionRecord[]
   refreshTokens     RefreshToken[]
   settingsAudit     SettingsAudit[]
   subjectProgress   SubjectProgress[]
@@ -216,8 +199,6 @@ model Subject {
 
   userSubjects    UserSubject[]
   subjectProgress SubjectProgress[]
-  lessons         Lesson[]
-  quizzes         Quiz[]
 }
 
 model UserSubject {
@@ -249,122 +230,4 @@ model SubjectProgress {
 
   @@unique([userId, subjectId])
   @@index([userId])
-}
-
-// ─── Lesson ───────────────────────────────────────────────────────────────────
-
-model Lesson {
-  id              String   @id @default(cuid())
-  userId          String
-  subjectId       String?
-  topic           String
-  depth           String   @default("standard") // quick | standard | deep
-  idempotencyKey  String   @unique
-  content         Json     // { hook, sections[], examples[], recap[] }
-  estimatedReadMs Int      @default(300000)
-  completed       Boolean  @default(false)
-  confidenceRating Int?    // 1-5 self-rating
-  createdAt       DateTime @default(now())
-  completedAt     DateTime?
-  deletedAt       DateTime?
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subject Subject? @relation(fields: [subjectId], references: [id])
-  sessions SessionRecord[]
-
-  @@index([userId])
-  @@index([userId, subjectId])
-  @@index([deletedAt])
-}
-
-// ─── Quiz ─────────────────────────────────────────────────────────────────────
-
-model Quiz {
-  id             String   @id @default(cuid())
-  userId         String
-  subjectId      String?
-  topic          String
-  length         Int      @default(10)
-  idempotencyKey String   @unique
-  questions      Json     // QuizQuestion[]
-  answers        Json     @default("{}") // { [questionIndex]: userAnswer }
-  score          Int?     // out of questions.length
-  completed      Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  completedAt    DateTime?
-  deletedAt      DateTime?
-
-  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subject Subject? @relation(fields: [subjectId], references: [id])
-  sessions SessionRecord[]
-
-  @@index([userId])
-  @@index([deletedAt])
-}
-
-// ─── Conversation ─────────────────────────────────────────────────────────────
-
-model Conversation {
-  id        String   @id @default(cuid())
-  userId    String
-  title     String?  // Haiku-generated 4–6 word title
-  summary   String?  // Haiku-compressed summary
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
-
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages ChatMessage[]
-
-  @@index([userId])
-  @@index([userId, updatedAt])
-  @@index([deletedAt])
-}
-
-model ChatMessage {
-  id             String   @id @default(cuid())
-  conversationId String
-  role           String   // user | assistant
-  content        Json     // plain text or structured slot blocks
-  createdAt      DateTime @default(now())
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  @@index([conversationId])
-  @@index([conversationId, createdAt])
-}
-
-// ─── Session Record ───────────────────────────────────────────────────────────
-
-model SessionRecord {
-  id          String      @id @default(cuid())
-  userId      String
-  type        SessionType
-  lessonId    String?
-  quizId      String?
-  subjectName String
-  topic       String
-  durationMs  Int
-  createdAt   DateTime    @default(now())
-
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lesson Lesson? @relation(fields: [lessonId], references: [id])
-  quiz   Quiz?   @relation(fields: [quizId], references: [id])
-
-  @@index([userId])
-  @@index([userId, createdAt])
-  @@index([userId, type])
-}
-
-// ─── Idempotency Cache ────────────────────────────────────────────────────────
-
-model IdempotencyRecord {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  response  Json
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([key])
-  @@index([expiresAt])
 }
