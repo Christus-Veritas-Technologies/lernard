@@ -51,7 +51,11 @@ export default function RegisterScreen() {
             { name: name.trim(), email: email.trim().toLowerCase(), password, accountType },
             {
                 onSuccess: () => {
-                    router.replace('/(auth)/account-type');
+                    if (accountType === 'guardian') {
+                        router.replace('/(app)/(home)');
+                    } else {
+                        router.replace('/(onboarding)/profile-setup');
+                    }
                 },
             },
         );

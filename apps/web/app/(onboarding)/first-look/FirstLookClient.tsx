@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { CheckmarkCircle02Icon, BookOpen01Icon } from "hugeicons-react";
 
@@ -11,10 +11,12 @@ import {
     useFirstLookSubmitMutation,
     useFirstLookSkipMutation,
 } from "@/hooks/useAuthMutations";
+import { useAuthMeQuery } from "@/hooks/useAuthMutations";
 import type { FirstLookQuestion } from "@lernard/shared-types";
 
 export function FirstLookClient() {
     const router = useRouter();
+    const { data: me } = useAuthMeQuery();
     const {
         data: firstLookData,
         isLoading,
@@ -32,6 +34,12 @@ export function FirstLookClient() {
     const current = questions[currentIndex];
     const isLast = currentIndex === questions.length - 1;
     const allAnswered = questions.every((_, i) => answers[i] !== undefined);
+
+    useEffect(() => {
+        if (me?.onboardingComplete) {
+            router.replace("/home");
+        }
+    }, [me?.onboardingComplete, router]);
 
     function selectAnswer(answer: string) {
         setAnswers((prev) => ({ ...prev, [currentIndex]: answer }));

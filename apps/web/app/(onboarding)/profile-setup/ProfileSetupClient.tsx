@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { AuthApiError } from "@/lib/auth-client";
 import { useProfileSetupMutation } from "@/hooks/useAuthMutations";
+import { useAuthMeQuery } from "@/hooks/useAuthMutations";
 import { AgeGroup, LearningGoal, SessionDepth } from "@lernard/shared-types";
 
 const AGE_GROUPS: { value: AgeGroup; label: string }[] = [
@@ -48,6 +49,7 @@ const COMMON_SUBJECTS = [
 export function ProfileSetupClient() {
     const router = useRouter();
     const { mutate, isPending, isError, error } = useProfileSetupMutation();
+    const { data: me } = useAuthMeQuery();
 
     const [displayName, setDisplayName] = useState("");
     const [ageGroup, setAgeGroup] = useState<AgeGroup>(AgeGroup.SECONDARY);
@@ -68,6 +70,12 @@ export function ProfileSetupClient() {
 
         return COMMON_SUBJECTS.filter((subject) => subject.toLowerCase().includes(query));
     }, [subjectSearch]);
+
+    useEffect(() => {
+        if (me?.onboardingComplete) {
+            router.replace("/home");
+        }
+    }, [me?.onboardingComplete, router]);
 
     function toggleSubject(subject: string) {
         setSubjects((prev) =>
