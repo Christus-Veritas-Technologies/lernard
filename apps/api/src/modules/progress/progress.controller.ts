@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Param,
+  Query,
 } from '@nestjs/common';
 import { ProgressService } from './progress.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -34,5 +35,16 @@ export class ProgressController {
   @Get('growth-areas')
   async getGrowthAreas(@CurrentUser() user: User) {
     return this.progressService.getGrowthAreas(user.id);
+  }
+
+  @ProtectedRoute()
+  @Get('history')
+  async getHistory(
+    @CurrentUser() user: User,
+    @Query('cursor') cursor?: string,
+    @Query('subjectName') subjectName?: string,
+    @Query('type') type?: 'lesson' | 'quiz',
+  ) {
+    return this.progressService.getHistory(user.id, cursor, subjectName, type);
   }
 }

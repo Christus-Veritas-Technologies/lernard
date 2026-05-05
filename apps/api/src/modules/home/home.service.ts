@@ -18,7 +18,7 @@ export class HomeService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getPayload(userId: string): Promise<PagePayload<HomeContent>> {
-    const [user, userSubjects, subjectProgress] = await Promise.all([
+    const [user, userSubjects, subjectProgress, recentSessions, sessionsToday] = await Promise.all([
       this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
         select: {
@@ -42,6 +42,19 @@ export class HomeService {
           updatedAt: true,
           topicScores: true,
           subject: { select: { name: true } },
+        },
+      }),
+      (this.prisma as any).session.findMany({
+        where: { userId },
+        orderBy: { completedAt: 'desc' },
+        take: 3,
+      }),
+      (this.prisma as any).session.count({
+        where: {
+          userId,
+          completedAt: {
+            gte: startOfTodayUtc(),
+          },
         },
       }),
     ]);
@@ -113,7 +126,7 @@ export class HomeService {
       greeting: buildGreeting(user.name),
       streak: user.streakDays,
       xpLevel: calculateXpLevel(user.sessionCount),
-      dailyGoalProgress: 0,
+      dailyGoalProgress: sessionsToday,
       dailyGoalTarget: user.dailyGoal,
       subjects: userSubjects.map((userSubject) => ({
         subjectId: userSubject.subjectId,
@@ -133,6 +146,13 @@ export class HomeService {
       topTopics,
       subjectTopics,
       recentActivity,
+      recentSessions: recentSessions.map((session: any) => ({
+        id: session.id,
+        type: session.type === 'QUIZ' ? 'quiz' : 'lesson',
+        topic: session.topic,
+        subjectName: session.subjectName ?? 'General',
+        completedAt: session.completedAt.toISOString(),
+      })),
     };
 
     return buildPagePayload(content, {
@@ -152,6 +172,11 @@ function buildGreeting(name: string): string {
 
 function calculateXpLevel(sessionCount: number): number {
   return Math.max(1, Math.ceil(Math.max(sessionCount, 1) / 5));
+}
+
+function startOfTodayUtc(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 }
 
 function buildHomePermissions(): ScopedPermission[] {

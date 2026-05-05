@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type {
+  PaginatedHistoryResponse,
   PagePayload,
   ProgressContent,
   SubjectDetailContent,
@@ -68,6 +69,47 @@ export class ProgressService {
 
   async getGrowthAreas(userId: string) {
     return listGrowthAreaSnapshots(this.prisma, userId, 8);
+  }
+
+  async getHistory(
+    userId: string,
+    cursor?: string,
+    subjectName?: string,
+    type?: 'lesson' | 'quiz',
+  ): Promise<PaginatedHistoryResponse> {
+    const take = 20;
+    const where: Record<string, unknown> = { userId };
+
+    if (subjectName) {
+      where.subjectName = subjectName;
+    }
+
+    if (type) {
+      where.type = type === 'lesson' ? 'LESSON' : 'QUIZ';
+    }
+
+    const sessions = await (this.prisma as any).session.findMany({
+      where,
+      orderBy: [{ completedAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    });
+
+    const hasMore = sessions.length > take;
+    const page = hasMore ? sessions.slice(0, take) : sessions;
+
+    return {
+      sessions: page.map((session: any) => ({
+        id: session.id,
+        type: session.type === 'QUIZ' ? 'quiz' : 'lesson',
+        subjectName: session.subjectName ?? 'General',
+        topic: session.topic,
+        durationMinutes: session.durationMinutes,
+        completedAt: session.completedAt.toISOString(),
+      })),
+      hasMore,
+      nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+    };
   }
 }
 
