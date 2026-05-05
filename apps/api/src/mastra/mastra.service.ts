@@ -142,7 +142,7 @@ export class MastraService {
       return;
     }
 
-    const messages = [...input.history, { role: 'user', content: input.message }];
+    const messages: ClaudeMessage[] = [...input.history, { role: 'user' as const, content: input.message }];
     const text = await completeWithRetry(() =>
       this.completeText({
         model: SONNET_MODEL,

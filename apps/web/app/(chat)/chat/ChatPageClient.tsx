@@ -133,10 +133,7 @@ export function ChatPageClient() {
                         <div className="space-y-3">
                             {messages.map((message) => (
                                 <div
-                                    className={`max-w-[85%] rounded-2xl p-3 ${message.role === "user"
-                                            ? "ml-auto bg-primary-500 text-white"
-                                            : "bg-surface text-text-primary"
-                                        }`}
+                                    className={`max-w-[85%] rounded-2xl p-3 ${message.role === "user" ? "ml-auto bg-primary-500 text-white" : "bg-surface text-text-primary"}`}
                                     key={message.id}
                                 >
                                     {message.blocks.map((block, index) => (
@@ -170,7 +167,7 @@ export function ChatPageClient() {
                             </Button>
                         </div>
                     </div>
-                </div>
+                </CardContent>
             </Card>
         </div>
     );
