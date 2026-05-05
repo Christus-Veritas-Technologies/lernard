@@ -2,9 +2,6 @@ import {
   Controller,
   Get,
   Param,
-  Query,
-  DefaultValuePipe,
-  ParseIntPipe,
 } from '@nestjs/common';
 import { ProgressService } from './progress.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -31,16 +28,6 @@ export class ProgressController {
   @Get('subjects/:subjectId')
   async getSubject(@CurrentUser() user: User, @Param('subjectId') subjectId: string) {
     return this.progressService.getSubject(user.id, subjectId);
-  }
-
-  @ProtectedRoute()
-  @Get('history')
-  async getHistory(
-    @CurrentUser() user: User,
-    @Query('cursor') cursor?: string,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
-  ) {
-    return this.progressService.getHistory(user.id, cursor, Math.min(limit!, 50));
   }
 
   @ProtectedRoute()

@@ -1,16 +1,5 @@
 import { PrismaService } from '../../prisma/prisma.service';
 
-export interface SessionSnapshot {
-  id: string;
-  userId: string;
-  type: 'lesson' | 'quiz';
-  subjectName: string;
-  topic: string;
-  durationMs: number;
-  createdAt: string;
-  resourceId: string;
-}
-
 export interface GrowthAreaSnapshot {
   subjectId: string;
   subjectName: string;
@@ -40,29 +29,6 @@ export interface CompanionAuditSnapshot {
   lastChangedAt: string;
   lastChangedBy: string;
   lockedByGuardian: boolean;
-}
-
-export async function listRecentSessions(
-  prisma: PrismaService,
-  userId: string,
-  limit = 5,
-): Promise<SessionSnapshot[]> {
-  const sessions = await prisma.sessionRecord.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    take: limit,
-  });
-
-  return sessions.map((session) => ({
-    id: session.id,
-    userId: session.userId,
-    type: session.type === 'LESSON' ? 'lesson' : 'quiz',
-    subjectName: session.subjectName,
-    topic: session.topic,
-    durationMs: session.durationMs,
-    createdAt: session.createdAt.toISOString(),
-    resourceId: session.lessonId ?? session.quizId ?? session.id,
-  }));
 }
 
 export async function listGrowthAreaSnapshots(

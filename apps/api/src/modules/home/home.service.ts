@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import type { HomeContent, PagePayload, ScopedPermission, SlotAssignments } from '@lernard/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildNullSlots, buildPagePayload } from '../../common/utils/build-page-payload';
-import { listRecentSessions } from '../../common/utils/page-payload-queries';
 import { toSharedStrengthLevel } from '../../common/utils/shared-model-mappers';
 
 @Injectable()
@@ -10,7 +9,7 @@ export class HomeService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getPayload(userId: string): Promise<PagePayload<HomeContent>> {
-    const [user, recentSessions, userSubjects, subjectProgress, lastLesson, sessionsToday] = await Promise.all([
+    const [user, userSubjects, subjectProgress] = await Promise.all([
       this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
         select: {
@@ -20,7 +19,6 @@ export class HomeService {
           sessionCount: true,
         },
       }),
-      listRecentSessions(this.prisma, userId, 5),
       this.prisma.userSubject.findMany({
         where: { userId },
         include: { subject: true },
@@ -34,23 +32,6 @@ export class HomeService {
           updatedAt: true,
         },
       }),
-      this.prisma.lesson.findFirst({
-        where: {
-          userId,
-          deletedAt: null,
-          completed: false,
-        },
-        include: { subject: true },
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.sessionRecord.count({
-        where: {
-          userId,
-          createdAt: {
-            gte: startOfToday(),
-          },
-        },
-      }),
     ]);
 
     const subjectProgressById = new Map(
@@ -61,14 +42,7 @@ export class HomeService {
       greeting: buildGreeting(user.name),
       streak: user.streakDays,
       xpLevel: calculateXpLevel(user.sessionCount),
-      lastLesson: lastLesson
-        ? {
-            id: lastLesson.id,
-            topic: lastLesson.topic,
-            subject: lastLesson.subject?.name ?? 'General',
-          }
-        : null,
-      dailyGoalProgress: sessionsToday,
+      dailyGoalProgress: 0,
       dailyGoalTarget: user.dailyGoal,
       subjects: userSubjects.map((userSubject) => ({
         subjectId: userSubject.subjectId,
@@ -79,13 +53,6 @@ export class HomeService {
         ),
         lastActiveAt:
           subjectProgressById.get(userSubject.subjectId)?.updatedAt.toISOString() ?? null,
-      })),
-      recentSessions: recentSessions.map((session) => ({
-        id: session.id,
-        type: session.type,
-        topic: session.topic,
-        subject: session.subjectName,
-        createdAt: session.createdAt,
       })),
     };
 
@@ -117,8 +84,6 @@ function calculateXpLevel(sessionCount: number): number {
 
 function buildHomePermissions(): ScopedPermission[] {
   return [
-    { action: 'can_start_lesson' },
-    { action: 'can_take_quiz' },
     { action: 'can_edit_mode' },
   ];
 }
@@ -138,10 +103,4 @@ function buildHomeSlots(sessionCount: number): SlotAssignments {
   }
 
   return buildNullSlots(['urgent_action', 'streak_nudge', 'primary_cta']);
-}
-
-function startOfToday(): Date {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  return start;
 }

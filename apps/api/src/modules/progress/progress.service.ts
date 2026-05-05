@@ -2,8 +2,6 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type {
   PagePayload,
   ProgressContent,
-  SessionHistoryContent,
-  SessionRecord,
   SubjectDetailContent,
   SubjectProgress,
   TopicStrength,
@@ -18,7 +16,7 @@ export class ProgressService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getOverview(userId: string): Promise<PagePayload<ProgressContent>> {
-    const [user, totalLessons, totalQuizzes, averageSessionLengthMinutes, subjects] = await Promise.all([
+    const [user, subjects] = await Promise.all([
       this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
         select: {
@@ -26,19 +24,6 @@ export class ProgressService {
           sessionCount: true,
         },
       }),
-      this.prisma.lesson.count({
-        where: {
-          userId,
-          deletedAt: null,
-        },
-      }),
-      this.prisma.quiz.count({
-        where: {
-          userId,
-          deletedAt: null,
-        },
-      }),
-      this.getAverageSessionLengthMinutes(userId),
       this.getSubjects(userId),
     ]);
 
@@ -46,16 +31,10 @@ export class ProgressService {
       {
         streak: user.streakDays,
         xpLevel: calculateXpLevel(user.sessionCount),
-        totalLessons,
-        totalQuizzes,
-        averageSessionLength: averageSessionLengthMinutes,
         subjects,
       },
       {
-        permissions: [
-          { action: 'can_start_lesson' },
-          { action: 'can_take_quiz' },
-        ],
+        permissions: [],
       },
     );
   }
@@ -67,59 +46,13 @@ export class ProgressService {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return Promise.all(
-      progressRecords.map(async (progressRecord) => {
-        const [totalLessons, totalQuizzes, quizzes] = await Promise.all([
-          this.prisma.lesson.count({
-            where: {
-              userId,
-              subjectId: progressRecord.subjectId,
-              deletedAt: null,
-            },
-          }),
-          this.prisma.quiz.count({
-            where: {
-              userId,
-              subjectId: progressRecord.subjectId,
-              deletedAt: null,
-            },
-          }),
-          this.prisma.quiz.findMany({
-            where: {
-              userId,
-              subjectId: progressRecord.subjectId,
-              deletedAt: null,
-              completed: true,
-              score: { not: null },
-            },
-            select: {
-              score: true,
-              length: true,
-            },
-          }),
-        ]);
-
-        const averageScore = quizzes.length
-          ? Math.round(
-              quizzes.reduce((total, quiz) => {
-                const score = quiz.score ?? 0;
-                return total + (score / quiz.length) * 100;
-              }, 0) / quizzes.length,
-            )
-          : null;
-
-        return {
-          subjectId: progressRecord.subjectId,
-          subjectName: progressRecord.subject.name,
-          strengthLevel: toSharedStrengthLevel(progressRecord.strengthLevel),
-          totalLessons,
-          totalQuizzes,
-          averageScore,
-          topics: mapTopicStrengths(progressRecord.topicScores, progressRecord.updatedAt),
-          lastActiveAt: progressRecord.updatedAt.toISOString(),
-        };
-      }),
-    );
+    return progressRecords.map((progressRecord) => ({
+      subjectId: progressRecord.subjectId,
+      subjectName: progressRecord.subject.name,
+      strengthLevel: toSharedStrengthLevel(progressRecord.strengthLevel),
+      topics: mapTopicStrengths(progressRecord.topicScores, progressRecord.updatedAt),
+      lastActiveAt: progressRecord.updatedAt.toISOString(),
+    }));
   }
 
   async getSubject(userId: string, subjectId: string): Promise<SubjectDetailContent> {
@@ -133,46 +66,8 @@ export class ProgressService {
     return { subject };
   }
 
-  async getHistory(userId: string, cursor?: string, limit = 20): Promise<SessionHistoryContent> {
-    const sessionRecords = await this.prisma.sessionRecord.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      ...(cursor
-        ? {
-            cursor: { id: cursor },
-            skip: 1,
-          }
-        : {}),
-      take: limit + 1,
-    });
-
-    const hasMore = sessionRecords.length > limit;
-    const visibleSessionRecords = sessionRecords.slice(0, limit);
-
-    return {
-      sessions: visibleSessionRecords.map(mapSessionRecord),
-      cursor: hasMore ? visibleSessionRecords[visibleSessionRecords.length - 1]?.id ?? null : null,
-      hasMore,
-    };
-  }
-
   async getGrowthAreas(userId: string) {
     return listGrowthAreaSnapshots(this.prisma, userId, 8);
-  }
-
-  private async getAverageSessionLengthMinutes(userId: string): Promise<number> {
-    const aggregate = await this.prisma.sessionRecord.aggregate({
-      where: { userId },
-      _avg: { durationMs: true },
-    });
-
-    const averageDurationMs = aggregate._avg.durationMs ?? 0;
-
-    if (averageDurationMs <= 0) {
-      return 0;
-    }
-
-    return Math.max(1, Math.round(averageDurationMs / 60000));
   }
 }
 
@@ -213,30 +108,4 @@ function toTopicLevel(score: number): TopicStrength['level'] {
   }
 
   return 'needs_work';
-}
-
-function mapSessionRecord(sessionRecord: {
-  id: string;
-  userId: string;
-  type: 'LESSON' | 'QUIZ';
-  subjectName: string;
-  topic: string;
-  durationMs: number;
-  createdAt: Date;
-  lessonId: string | null;
-  quizId: string | null;
-}): SessionRecord {
-  const durationMinutes = Math.max(1, Math.round(sessionRecord.durationMs / 60000));
-
-  return {
-    id: sessionRecord.id,
-    ownerId: sessionRecord.userId,
-    type: sessionRecord.type === 'LESSON' ? 'lesson' : 'quiz',
-    subject: sessionRecord.subjectName,
-    topic: sessionRecord.topic,
-    duration: durationMinutes,
-    xpEarned: durationMinutes,
-    createdAt: sessionRecord.createdAt.toISOString(),
-    resourceId: sessionRecord.lessonId ?? sessionRecord.quizId ?? sessionRecord.id,
-  };
 }
