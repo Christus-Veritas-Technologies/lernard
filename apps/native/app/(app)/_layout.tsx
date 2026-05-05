@@ -15,6 +15,7 @@ export default function AppLayout() {
         >
             <Tabs.Screen name="(home)" options={{ title: 'Home' }} />
             <Tabs.Screen name="(progress)" options={{ title: 'Progress' }} />
+            <Tabs.Screen name="(chat)" options={{ title: 'Chat' }} />
             <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
             <Tabs.Screen name="guardian" options={{ href: null }} />
         </Tabs>
