@@ -5,14 +5,15 @@ export const accountTypeSchema = z.object({
 })
 
 export const profileSetupSchema = z.object({
-  name: z.string().min(1).max(50),
+  name: z.string().trim().min(1).max(50).optional(),
   ageGroup: z.enum(['primary', 'secondary', 'university', 'professional']),
-  grade: z.string().max(20).nullable(),
+  grade: z.string().trim().max(20).nullable(),
   subjects: z.array(z.string().max(100)).min(1).max(10),
   learningGoal: z.enum(['exam_prep', 'keep_up', 'learn_new', 'fill_gaps']),
   preferredSessionLength: z.number().min(5).max(120),
   preferredDepth: z.enum(['quick', 'standard', 'deep']),
   dailyGoal: z.number().min(1).max(10),
+  timezone: z.string().trim().min(1).max(100).optional(),
 })
 
 export const firstLookSubmitSchema = z.object({

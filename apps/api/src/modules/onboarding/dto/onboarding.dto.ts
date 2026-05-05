@@ -10,6 +10,7 @@ import {
   IsArray,
   IsEnum,
   IsInt,
+  MinLength,
   IsOptional,
   IsString,
   Max,
@@ -26,9 +27,11 @@ export class AccountTypeDto {
 }
 
 export class ProfileSetupDto {
+  @IsOptional()
   @IsString()
+  @MinLength(1)
   @MaxLength(50)
-  name: string;
+  name?: string;
 
   @IsEnum(AgeGroup)
   ageGroup: AgeGroup;
@@ -67,6 +70,7 @@ export class ProfileSetupDto {
 
   @IsString()
   @IsOptional()
+  @MaxLength(100)
   timezone?: string;
 }
 

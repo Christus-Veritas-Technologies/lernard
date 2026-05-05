@@ -5,7 +5,7 @@ export interface AccountTypePayload {
 }
 
 export interface ProfileSetupPayload {
-  name: string
+  name?: string
   ageGroup: AgeGroup
   grade: string | null
   subjects: string[]
@@ -13,6 +13,7 @@ export interface ProfileSetupPayload {
   preferredSessionLength: number
   preferredDepth: SessionDepth
   dailyGoal: number
+  timezone?: string
 }
 
 export interface FirstLookQuestion {
