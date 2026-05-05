@@ -12,7 +12,7 @@ import {
     useNativeFirstLookStart,
     useNativeFirstLookSubmit,
 } from '@/hooks/useAuthMutations';
-import type { FirstLookQuestion } from '@lernard/shared-types';
+import type { FirstLookQuestion, FirstLookResult } from '@lernard/shared-types';
 
 export default function FirstLookScreen() {
     const router = useRouter();
@@ -23,7 +23,7 @@ export default function FirstLookScreen() {
     const [questions, setQuestions] = useState<FirstLookQuestion[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<number, string>>({});
-    const [result, setResult] = useState<{ score: number; total: number } | null>(null);
+    const [result, setResult] = useState<FirstLookResult | null>(null);
 
     useEffect(() => {
         void startHook.fetch().then((data) => {
@@ -49,7 +49,7 @@ export default function FirstLookScreen() {
         };
         await submitHook.mutate(payload, {
             onSuccess: (data) => {
-                setResult({ score: data.score, total: data.totalQuestions });
+                setResult(data);
             },
         });
     }
@@ -82,16 +82,29 @@ export default function FirstLookScreen() {
                     <Text className="text-center text-base leading-7 text-slate-500">
                         We couldn&apos;t generate your questions right now.
                     </Text>
-                    <TouchableOpacity
-                        onPress={handleSkip}
-                        disabled={skipHook.isLoading}
-                        className="h-14 w-full items-center justify-center rounded-[24px] bg-primary-500"
-                        activeOpacity={0.8}
-                    >
-                        <Text className="text-base font-bold text-white">
-                            {skipHook.isLoading ? 'Skippingâ€¦' : 'Skip and go to Lernard'}
-                        </Text>
-                    </TouchableOpacity>
+                    <View className="w-full gap-3">
+                        <TouchableOpacity
+                            onPress={() => {
+                                void startHook.fetch().then((data) => {
+                                    if (data) setQuestions(data.questions);
+                                });
+                            }}
+                            className="h-14 w-full items-center justify-center rounded-[24px] border border-slate-200 bg-white"
+                            activeOpacity={0.8}
+                        >
+                            <Text className="text-base font-semibold text-slate-700">Retry</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={handleSkip}
+                            disabled={skipHook.isLoading}
+                            className="h-14 w-full items-center justify-center rounded-[24px] bg-primary-500"
+                            activeOpacity={0.8}
+                        >
+                            <Text className="text-base font-bold text-white">
+                                {skipHook.isLoading ? 'Skipping...' : 'Skip and go to Lernard'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </SafeAreaView>
         );
@@ -110,8 +123,21 @@ export default function FirstLookScreen() {
                             First Look complete!
                         </Text>
                         <Text className="text-center text-base leading-7 text-slate-500">
-                            You scored {result.score}/{result.total}. Lernard knows where to start.
+                            You scored {result.score}/{result.totalQuestions}. Lernard now knows where to start.
                         </Text>
+                    </View>
+                    <View className="w-full rounded-2xl bg-white p-4">
+                        {result.subjectResults.map((subject) => (
+                            <View
+                                key={subject.subjectId}
+                                className="flex-row items-center justify-between border-b border-slate-100 py-2"
+                            >
+                                <Text className="text-sm font-semibold text-slate-900">{subject.subject}</Text>
+                                <Text className="text-xs text-slate-600">
+                                    {Math.round((subject.score / Math.max(subject.totalQuestions, 1)) * 100)}% - {subject.strengthLevel.replace('_', ' ')}
+                                </Text>
+                            </View>
+                        ))}
                     </View>
                     <TouchableOpacity
                         onPress={() => router.replace('/(app)/(home)')}
@@ -227,7 +253,7 @@ export default function FirstLookScreen() {
                             activeOpacity={0.8}
                         >
                             <Text className="text-sm font-bold text-white">
-                                {submitHook.isLoading ? 'Submittingâ€¦' : 'Submit answers'}
+                                {submitHook.isLoading ? 'Submitting...' : 'Submit answers'}
                             </Text>
                         </TouchableOpacity>
                     ) : (
@@ -245,7 +271,7 @@ export default function FirstLookScreen() {
 
                 <TouchableOpacity onPress={handleSkip} disabled={skipHook.isLoading}>
                     <Text className="text-center text-sm text-slate-400">
-                        {skipHook.isLoading ? 'Skippingâ€¦' : 'Skip First Look'}
+                        {skipHook.isLoading ? 'Skipping...' : 'Skip First Look'}
                     </Text>
                 </TouchableOpacity>
 
