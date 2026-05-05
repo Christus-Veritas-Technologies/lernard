@@ -1,8 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useMemo, useState } from "react";
 
 import { AuthApiError } from "@/lib/auth-client";
 import { useProfileSetupMutation } from "@/hooks/useAuthMutations";
@@ -46,36 +45,29 @@ const COMMON_SUBJECTS = [
     "Business Studies",
 ];
 
-const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-        opacity: 1,
-        transition: {
-            staggerChildren: 0.08,
-            delayChildren: 0.1,
-        },
-    },
-};
-
-const itemVariants = {
-    hidden: { opacity: 0, y: 12 },
-    visible: {
-        opacity: 1,
-        y: 0,
-        transition: { duration: 0.4, ease: "easeOut" },
-    },
-};
-
 export function ProfileSetupClient() {
     const router = useRouter();
     const { mutate, isPending, isError, error } = useProfileSetupMutation();
 
+    const [displayName, setDisplayName] = useState("");
     const [ageGroup, setAgeGroup] = useState<AgeGroup>(AgeGroup.SECONDARY);
+    const [grade, setGrade] = useState("");
     const [learningGoal, setLearningGoal] = useState<LearningGoal>(LearningGoal.KEEP_UP);
     const [depth, setDepth] = useState<SessionDepth>(SessionDepth.STANDARD);
     const [subjects, setSubjects] = useState<string[]>([]);
+    const [subjectSearch, setSubjectSearch] = useState("");
     const [dailyGoal, setDailyGoal] = useState(3);
     const [formError, setFormError] = useState<string | null>(null);
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    const filteredSubjects = useMemo(() => {
+        const query = subjectSearch.trim().toLowerCase();
+        if (!query) {
+            return COMMON_SUBJECTS;
+        }
+
+        return COMMON_SUBJECTS.filter((subject) => subject.toLowerCase().includes(query));
+    }, [subjectSearch]);
 
     function toggleSubject(subject: string) {
         setSubjects((prev) =>
@@ -93,14 +85,15 @@ export function ProfileSetupClient() {
 
         mutate(
             {
-                name: "", // name already set at register
+                ...(displayName.trim() ? { name: displayName.trim() } : {}),
                 ageGroup,
-                grade: null,
+                grade: grade.trim() || null,
                 subjects,
                 learningGoal,
                 preferredSessionLength: dailyGoal * 10,
                 preferredDepth: depth,
                 dailyGoal,
+                timezone,
             },
             {
                 onSuccess: () => {
@@ -140,6 +133,29 @@ export function ProfileSetupClient() {
                 </div>
             )}
 
+            <div className="grid gap-3 sm:grid-cols-2">
+                <label className="flex flex-col gap-2">
+                    <span className="text-sm font-semibold text-text-primary">Display name (optional)</span>
+                    <input
+                        className="h-11 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none ring-primary-300 placeholder:text-text-tertiary focus:ring-2"
+                        maxLength={50}
+                        onChange={(event) => setDisplayName(event.target.value)}
+                        placeholder="How Lernard should address you"
+                        value={displayName}
+                    />
+                </label>
+                <label className="flex flex-col gap-2">
+                    <span className="text-sm font-semibold text-text-primary">Grade / level (optional)</span>
+                    <input
+                        className="h-11 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none ring-primary-300 placeholder:text-text-tertiary focus:ring-2"
+                        maxLength={20}
+                        onChange={(event) => setGrade(event.target.value)}
+                        placeholder="e.g. Year 10"
+                        value={grade}
+                    />
+                </label>
+            </div>
+
             {/* Age group */}
             <div className="flex flex-col gap-3">
                 <p className="text-sm font-semibold text-text-primary">What stage are you at?</p>
@@ -163,10 +179,17 @@ export function ProfileSetupClient() {
             {/* Subjects */}
             <div className="flex flex-col gap-3">
                 <p className="text-sm font-semibold text-text-primary">
-                    Which subjects? <span className="font-normal text-text-tertiary">(pick any)</span>
+                    Which subjects?
+                    <span className="font-normal text-text-tertiary"> (pick at least 1, up to 10)</span>
                 </p>
+                <input
+                    className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text-primary outline-none ring-primary-300 placeholder:text-text-tertiary focus:ring-2"
+                    onChange={(event) => setSubjectSearch(event.target.value)}
+                    placeholder="Search subjects"
+                    value={subjectSearch}
+                />
                 <div className="flex flex-wrap gap-2">
-                    {COMMON_SUBJECTS.map((subject) => (
+                    {filteredSubjects.map((subject) => (
                         <button
                             key={subject}
                             type="button"
@@ -180,6 +203,7 @@ export function ProfileSetupClient() {
                         </button>
                     ))}
                 </div>
+                <p className="text-xs text-text-tertiary">{subjects.length} selected</p>
             </div>
 
             {/* Learning goal */}
@@ -254,7 +278,7 @@ export function ProfileSetupClient() {
 
             <button
                 type="submit"
-                disabled={isPending}
+                disabled={isPending || subjects.length === 0}
                 className="flex h-12 items-center justify-center rounded-2xl bg-primary-500 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-600 disabled:opacity-60"
             >
                 {isPending ? "Saving…" : "Continue to First Look →"}
