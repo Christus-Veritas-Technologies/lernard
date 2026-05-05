@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-import { BookOpen01Icon, ArrowRight01Icon } from "hugeicons-react";
+import { ArrowRight01Icon } from "hugeicons-react";
 import { Button } from "@/components/ui/button";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 const containerVariants = {
     hidden: { opacity: 0 },
@@ -88,6 +89,14 @@ export function WelcomeClient() {
                         </Link>
                     </Button>
                 </motion.div>
+
+                <div className="flex items-center gap-3 py-1">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-text-tertiary">or</span>
+                    <div className="h-px flex-1 bg-border" />
+                </div>
+
+                <GoogleSignInButton />
             </motion.div>
 
             <motion.p

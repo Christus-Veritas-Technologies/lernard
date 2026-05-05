@@ -10,11 +10,13 @@ import { Text } from '@rnr/text';
 
 import { AuthField } from '@/components/auth/AuthField';
 import { AuthShell } from '@/components/auth/AuthShell';
-import { useNativeRegister } from '@/hooks/useAuthMutations';
+import { GoogleIcon } from '@/components/auth/GoogleIcon';
+import { useNativeRegister, useNativeGoogleAuth } from '@/hooks/useAuthMutations';
 
 export default function RegisterScreen() {
     const router = useRouter();
     const { mutate, isLoading, error } = useNativeRegister();
+    const { signIn: googleSignIn, isLoading: isGoogleLoading, error: googleError } = useNativeGoogleAuth();
 
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -133,6 +135,31 @@ export default function RegisterScreen() {
                     >
                         <Text className="text-base font-bold text-white">
                             {isLoading ? 'Creating account…' : 'Create account'}
+                        </Text>
+                    </TouchableOpacity>
+
+                    <View className="flex-row items-center gap-3 py-1">
+                        <View className="h-px flex-1 bg-slate-200" />
+                        <Text className="text-xs text-slate-400">or</Text>
+                        <View className="h-px flex-1 bg-slate-200" />
+                    </View>
+
+                    {googleError ? (
+                        <View className="rounded-xl bg-red-50 px-4 py-2">
+                            <Text className="text-sm text-red-600">{googleError}</Text>
+                        </View>
+                    ) : null}
+
+                    <TouchableOpacity
+                        onPress={googleSignIn}
+                        disabled={isGoogleLoading}
+                        className="h-14 flex-row items-center justify-center gap-3 rounded-[24px] border border-slate-200 bg-white active:opacity-80"
+                        style={{ opacity: isGoogleLoading ? 0.6 : 1 }}
+                        activeOpacity={0.8}
+                    >
+                        <GoogleIcon size={18} />
+                        <Text className="text-base font-semibold text-slate-700">
+                            {isGoogleLoading ? 'Signing in…' : 'Continue with Google'}
                         </Text>
                     </TouchableOpacity>
                 </AuthShell>

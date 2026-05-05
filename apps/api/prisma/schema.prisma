@@ -72,6 +72,7 @@ model User {
   email        String   @unique
   name         String
   passwordHash String?  // null for social-only accounts
+  googleId     String?  @unique
   role         Role     @default(STUDENT)
   plan         Plan     @default(EXPLORER)
   createdAt    DateTime @default(now())

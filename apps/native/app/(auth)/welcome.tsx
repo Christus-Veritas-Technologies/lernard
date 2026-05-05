@@ -5,9 +5,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BookOpen01Icon, StarsIcon } from 'hugeicons-react-native';
 
 import { Text } from '@rnr/text';
+import { GoogleIcon } from '@/components/auth/GoogleIcon';
+import { useNativeGoogleAuth } from '@/hooks/useAuthMutations';
 
 export default function WelcomeScreen() {
     const router = useRouter();
+    const { signIn, isLoading: isGoogleLoading, error: googleError } = useNativeGoogleAuth();
 
     return (
         <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'bottom']}>
@@ -54,6 +57,32 @@ export default function WelcomeScreen() {
                     >
                         <Text className="text-base font-semibold text-slate-700">I already have an account</Text>
                     </TouchableOpacity>
+
+                    <View className="flex-row items-center gap-3 py-1">
+                        <View className="h-px flex-1 bg-slate-200" />
+                        <Text className="text-xs text-slate-400">or</Text>
+                        <View className="h-px flex-1 bg-slate-200" />
+                    </View>
+
+                    {googleError ? (
+                        <View className="rounded-xl bg-red-50 px-4 py-2">
+                            <Text className="text-center text-sm text-red-600">{googleError}</Text>
+                        </View>
+                    ) : null}
+
+                    <TouchableOpacity
+                        onPress={signIn}
+                        disabled={isGoogleLoading}
+                        className="h-14 flex-row items-center justify-center gap-3 rounded-[24px] border border-slate-200 bg-white active:opacity-80"
+                        style={{ opacity: isGoogleLoading ? 0.6 : 1 }}
+                        activeOpacity={0.8}
+                    >
+                        <GoogleIcon size={18} />
+                        <Text className="text-base font-semibold text-slate-700">
+                            {isGoogleLoading ? 'Signing in…' : 'Continue with Google'}
+                        </Text>
+                    </TouchableOpacity>
+
                     <Text className="text-center text-xs text-slate-400">
                         By continuing, you agree to our Terms and Privacy Policy.
                     </Text>

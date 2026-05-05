@@ -16,6 +16,12 @@ import { LoginDto } from './dto/login.dto';
 const SALT_ROUNDS = 12;
 const REFRESH_TOKEN_DAYS = 30;
 
+interface GoogleProfile {
+  googleId: string;
+  name: string;
+  email: string | null;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -74,6 +80,39 @@ export class AuthService {
     }
 
     return this.issueTokens(user);
+  }
+
+  async findOrCreateGoogleUser(profile: GoogleProfile) {
+    const { googleId, name, email } = profile;
+
+    // 1. Existing user with this googleId
+    const byGoogleId = await this.prisma.user.findUnique({ where: { googleId } });
+    if (byGoogleId) {
+      return this.issueTokens(byGoogleId);
+    }
+
+    // 2. Existing user with same email — link the account
+    if (email) {
+      const byEmail = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+      if (byEmail) {
+        const linked = await this.prisma.user.update({
+          where: { id: byEmail.id },
+          data: { googleId },
+        });
+        return this.issueTokens(linked);
+      }
+    }
+
+    // 3. Brand-new user
+    const created = await this.prisma.user.create({
+      data: {
+        name,
+        email: email ? email.toLowerCase() : `google-${googleId}@placeholder.lernard`,
+        googleId,
+        role: 'STUDENT',
+      },
+    });
+    return this.issueTokens(created);
   }
 
   async refresh(refreshTokenRaw: string) {

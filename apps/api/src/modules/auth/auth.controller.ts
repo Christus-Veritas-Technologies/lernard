@@ -1,4 +1,6 @@
-import { Controller, Post, Get, Body } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, Req, Res } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { ConfigService } from '@nestjs/config';
 import { Role } from '@lernard/shared-types';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -8,10 +10,14 @@ import { GuardianVerifyPasswordDto } from './dto/guardian-verify-password.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
 import type { User } from '@prisma/client';
+import type { Request, Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Post('register')
   async register(@Body() dto: RegisterDto) {
@@ -44,10 +50,33 @@ export class AuthController {
     return this.authService.getMe(user);
   }
 
-  @Post('google')
-  async google() {
-    // TODO: Implement Google OAuth
-    return { message: 'Not implemented' };
+  @UseGuards(AuthGuard('google'))
+  @Get('google')
+  googleAuth() {
+    // Passport redirects to Google — no body needed
+  }
+
+  @UseGuards(AuthGuard('google'))
+  @Get('google/callback')
+  async googleCallback(@Req() req: Request, @Res() res: Response) {
+    const tokens = req.user as {
+      accessToken: string;
+      refreshToken: string;
+      user: { onboardingComplete: boolean };
+    };
+
+    const state = typeof req.query.state === 'string' ? req.query.state : '';
+    const params = new URLSearchParams(state);
+    const client = params.get('client');
+
+    const hash = `#accessToken=${encodeURIComponent(tokens.accessToken)}&refreshToken=${encodeURIComponent(tokens.refreshToken)}&onboardingComplete=${tokens.user.onboardingComplete ? '1' : '0'}`;
+
+    if (client === 'native') {
+      return res.redirect(`lernard://auth/callback${hash}`);
+    }
+
+    const webAppUrl = this.configService.getOrThrow<string>('WEB_APP_URL');
+    return res.redirect(`${webAppUrl}/google/callback${hash}`);
   }
 
   @Post('apple')

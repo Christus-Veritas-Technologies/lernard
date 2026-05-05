@@ -9,6 +9,7 @@ import { Mail01Icon, LockPasswordIcon } from "hugeicons-react";
 
 import { Button } from "@/components/ui/button";
 import { AuthField } from "@/components/auth/AuthField";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { AuthApiError } from "@/lib/auth-client";
 import { useLoginMutation } from "@/hooks/useAuthMutations";
 
@@ -138,6 +139,14 @@ export function LoginClient() {
                         </Link>
                     </Button>
                 </motion.div>
+
+                <div className="flex items-center gap-3 py-1">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs text-text-tertiary">or</span>
+                    <div className="h-px flex-1 bg-border" />
+                </div>
+
+                <GoogleSignInButton />
             </motion.div>
         </motion.div>
     );

@@ -1,4 +1,10 @@
 import { useCallback, useState } from 'react';
+import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import Constants from 'expo-constants';
 
 import { ROUTES } from '@lernard/routes';
 import type {
@@ -254,4 +260,51 @@ export function useNativeFirstLookSkip() {
     );
 
     return { mutate, isLoading, error };
+}
+
+export function useNativeGoogleAuth() {
+    const router = useRouter();
+    const setTokens = useAuthStore((s) => s.setTokens);
+    const setOnboardingComplete = useAuthStore((s) => s.setOnboardingComplete);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const signIn = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const configuredApiUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
+            const baseUrl = (configuredApiUrl ?? 'http://localhost:3001').replace(/\/$/, '');
+
+            const result = await WebBrowser.openAuthSessionAsync(
+                `${baseUrl}/v1/auth/google?state=${encodeURIComponent('client=native')}`,
+                'lernard://',
+            );
+
+            if (result.type !== 'success' || !result.url) return;
+
+            const hashIndex = result.url.indexOf('#');
+            if (hashIndex === -1) return;
+
+            const params = new URLSearchParams(result.url.slice(hashIndex + 1));
+            const accessToken = params.get('accessToken');
+            const refreshToken = params.get('refreshToken');
+            const onboardingComplete = params.get('onboardingComplete') === '1';
+
+            if (!accessToken || !refreshToken) {
+                setError('Sign-in failed. Please try again.');
+                return;
+            }
+
+            setTokens({ accessToken, refreshToken });
+            setOnboardingComplete(onboardingComplete);
+            router.replace(onboardingComplete ? '/(app)/(home)' : '/(auth)/account-type');
+        } catch (e) {
+            setError(extractMessage(e));
+        } finally {
+            setIsLoading(false);
+        }
+    }, [router, setTokens, setOnboardingComplete]);
+
+    return { signIn, isLoading, error };
 }
