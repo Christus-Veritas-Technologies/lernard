@@ -1,76 +1,212 @@
 "use client";
 
-import { BookOpen01Icon, BulbIcon, Message01Icon } from "hugeicons-react";
+import { Message01Icon, SentIcon } from "hugeicons-react";
+import { useEffect, useState } from "react";
 
-const suggestions = [
-    {
-        icon: BookOpen01Icon,
-        label: "Explain a topic",
-        detail: "Ask Lernard to break down anything from your subjects.",
-    },
-    {
-        icon: BulbIcon,
-        label: "Help me understand",
-        detail: "Stuck on a concept? Lernard will guide you through it step by step.",
-    },
-    {
-        icon: Message01Icon,
-        label: "Quiz me",
-        detail: "Ask for a quick quiz on anything you are studying right now.",
-    },
-];
+import { ROUTES } from "@lernard/routes";
+import type { ChatMessageBlock, ConversationListItem } from "@lernard/shared-types";
+
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
+import { browserApiFetch } from "@/lib/browser-api";
+
+interface ChatMessage {
+    id: string;
+    role: "user" | "assistant";
+    blocks: ChatMessageBlock[];
+}
 
 export function ChatPageClient() {
+    const [conversationId, setConversationId] = useState<string | null>(null);
+    const [conversations, setConversations] = useState<ConversationListItem[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [input, setInput] = useState("");
+    const [sending, setSending] = useState(false);
+
+    useEffect(() => {
+        void browserApiFetch<ConversationListItem[]>(ROUTES.CHAT.CONVERSATIONS)
+            .then(setConversations)
+            .catch(() => setConversations([]));
+    }, []);
+
+    async function onSend() {
+        if (!input.trim() || sending) return;
+
+        const nextUserMessage: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: "user",
+            blocks: [{ type: "text", content: input.trim() }],
+        };
+
+        setMessages((current) => [...current, nextUserMessage]);
+        setSending(true);
+
+        try {
+            const response = await browserApiFetch<{ conversationId: string; blocks: ChatMessageBlock[] }>(
+                ROUTES.CHAT.MESSAGE,
+                {
+                    method: "POST",
+                    body: JSON.stringify({
+                        conversationId,
+                        message: input.trim(),
+                    }),
+                },
+            );
+
+            setConversationId(response.conversationId);
+            setMessages((current) => [
+                ...current,
+                {
+                    id: crypto.randomUUID(),
+                    role: "assistant",
+                    blocks: response.blocks,
+                },
+            ]);
+
+            const refreshed = await browserApiFetch<ConversationListItem[]>(ROUTES.CHAT.CONVERSATIONS);
+            setConversations(refreshed);
+            setInput("");
+        } finally {
+            setSending(false);
+        }
+    }
+
     return (
-        <div className="flex flex-1 flex-col">
-            {/* Empty state */}
-            <div className="flex flex-1 flex-col items-center justify-center gap-8 px-6 py-12">
-                {/* Logo mark */}
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-500 shadow-lg shadow-primary-500/25">
-                    <Message01Icon className="text-white" size={32} />
-                </div>
+        <div className="grid h-full min-h-[70vh] gap-4 lg:grid-cols-[280px_1fr]">
+            <Card className="p-0">
+                <CardHeader>
+                    <CardTitle>Conversations</CardTitle>
+                    <Button
+                        onClick={() => {
+                            setConversationId(null);
+                            setMessages([]);
+                        }}
+                        variant="secondary"
+                    >
+                        New Chat
+                    </Button>
+                </CardHeader>
+                <CardContent>
+                    <ScrollArea className="max-h-[58vh] pr-2">
+                        <div className="space-y-2">
+                            {conversations.map((conversation) => (
+                                <button
+                                    className="w-full rounded-xl border border-border p-3 text-left transition hover:bg-background-subtle"
+                                    key={conversation.id}
+                                    onClick={() => {
+                                        setConversationId(conversation.id);
+                                        setMessages([]);
+                                    }}
+                                    type="button"
+                                >
+                                    <p className="truncate text-sm font-medium text-text-primary">
+                                        {conversation.title}
+                                    </p>
+                                    <p className="truncate text-xs text-text-secondary">
+                                        {conversation.lastMessage || "No messages yet"}
+                                    </p>
+                                </button>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                </CardContent>
+            </Card>
 
-                <div className="text-center">
-                    <h1 className="text-2xl font-semibold text-text-primary">
-                        Ask Lernard anything
-                    </h1>
-                    <p className="mt-2 max-w-sm text-sm leading-6 text-text-secondary">
-                        Your personal tutor is almost here. Chat is in development — you will be able
-                        to have full conversations with Lernard about your subjects.
-                    </p>
-                </div>
+            <Card className="flex min-h-0 flex-col p-0">
+                <CardHeader>
+                    <div className="flex items-center gap-2">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary-500 text-white">
+                            <Message01Icon size={18} />
+                        </div>
+                        <div>
+                            <CardTitle>Ask Lernard anything</CardTitle>
+                            <CardDescription>Learning help, examples, and quizzes on demand.</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
 
-                {/* Suggestion cards */}
-                <div className="grid w-full max-w-lg gap-3 sm:grid-cols-3">
-                    {suggestions.map(({ detail, icon: Icon, label }) => (
-                        <button
-                            className="flex flex-col gap-1.5 rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-primary-200 hover:bg-primary-50/50 disabled:cursor-not-allowed disabled:opacity-60"
-                            disabled
-                            key={label}
-                            type="button"
-                        >
-                            <Icon className="text-primary-500" size={18} />
-                            <p className="text-sm font-medium text-text-primary">{label}</p>
-                            <p className="text-xs leading-4 text-text-tertiary">{detail}</p>
-                        </button>
-                    ))}
-                </div>
-            </div>
+                <CardContent className="flex min-h-0 flex-1 flex-col gap-4">
+                    <ScrollArea className="min-h-0 flex-1 rounded-2xl border border-border bg-background p-3">
+                        <div className="space-y-3">
+                            {messages.map((message) => (
+                                <div
+                                    className={`max-w-[85%] rounded-2xl p-3 ${message.role === "user"
+                                            ? "ml-auto bg-primary-500 text-white"
+                                            : "bg-surface text-text-primary"
+                                        }`}
+                                    key={message.id}
+                                >
+                                    {message.blocks.map((block, index) => (
+                                        <MessageBlock key={`${message.id}-${index}`} block={block} />
+                                    ))}
+                                </div>
+                            ))}
 
-            {/* Disabled input bar */}
-            <div className="border-t border-border bg-surface px-4 py-4">
-                <div className="mx-auto flex max-w-2xl items-center gap-3 rounded-xl border border-border bg-background px-4 py-3 opacity-60">
-                    <input
-                        className="flex-1 bg-transparent text-sm text-text-primary placeholder:text-text-tertiary outline-none"
-                        disabled
-                        placeholder="Chat is coming soon…"
-                        type="text"
-                    />
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary-500/30">
-                        <Message01Icon className="text-primary-400" size={16} />
+                            {sending ? (
+                                <div className="w-fit rounded-2xl bg-surface px-3 py-2 text-sm text-text-secondary">
+                                    <span className="animate-pulse">Lernard is thinking...</span>
+                                </div>
+                            ) : null}
+                        </div>
+                    </ScrollArea>
+
+                    <div className="space-y-3">
+                        <Textarea
+                            onChange={(event) => setInput(event.target.value)}
+                            placeholder="Ask a question, request an explanation, or ask for a quiz"
+                            value={input}
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex gap-2">
+                                <Badge tone="cool">Build a lesson on this</Badge>
+                                <Badge tone="warm">Quiz me on this</Badge>
+                            </div>
+                            <Button disabled={!input.trim() || sending} onClick={onSend}>
+                                <SentIcon size={16} strokeWidth={1.8} />
+                                Send
+                            </Button>
+                        </div>
                     </div>
                 </div>
+            </Card>
+        </div>
+    );
+}
+
+function MessageBlock({ block }: { block: ChatMessageBlock }) {
+    if (block.type === "text") {
+        return <p className="whitespace-pre-wrap text-sm leading-6">{block.content}</p>;
+    }
+
+    if (block.type === "QuizCard") {
+        return (
+            <div className="rounded-xl border border-border/70 bg-background p-3 text-sm text-text-primary">
+                <p className="font-medium">{block.props.title}</p>
+                <p className="text-xs text-text-secondary">{block.props.summary}</p>
             </div>
+        );
+    }
+
+    if (block.type === "ConceptBreakdown") {
+        return (
+            <div className="rounded-xl border border-border/70 bg-background p-3 text-sm text-text-primary">
+                <p className="font-medium">{block.props.heading}</p>
+                <ul className="mt-1 list-disc pl-4 text-xs text-text-secondary">
+                    {block.props.bullets.map((item) => (
+                        <li key={item}>{item}</li>
+                    ))}
+                </ul>
+            </div>
+        );
+    }
+
+    return (
+        <div className="rounded-xl border border-border/70 bg-background p-3 text-xs text-text-secondary">
+            <p className="font-medium text-text-primary">{block.props.title}</p>
+            <p>{block.props.description}</p>
         </div>
     );
 }
