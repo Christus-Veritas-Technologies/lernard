@@ -10,7 +10,7 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
-    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? "";
 
     const [queryClient] = useState(
         () =>
@@ -27,11 +27,9 @@ export function Providers({ children }: ProvidersProps) {
             }),
     );
 
-    const content = <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
-
-    if (!googleClientId) {
-        return content;
-    }
-
-    return <GoogleOAuthProvider clientId={googleClientId}>{content}</GoogleOAuthProvider>;
+    return (
+        <GoogleOAuthProvider clientId={googleClientId}>
+            <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        </GoogleOAuthProvider>
+    );
 }
