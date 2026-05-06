@@ -141,7 +141,7 @@ model User {
 model Guardian {
   id           String   @id @default(cuid())
   userId       String   @unique
-  passwordHash String   // required for all guardians
+  passwordHash String?  // optional — only set if guardian configures a parental-controls PIN
   createdAt    DateTime @default(now())
 
   children     User[]          @relation("GuardianStudents")
@@ -198,6 +198,23 @@ model ChildInvite {
   guardian Guardian @relation(fields: [guardianId], references: [id])
 
   @@index([code])
+  @@index([expiresAt])
+}
+
+// ─── Magic Link Token ─────────────────────────────────────────────────────────
+
+model MagicLinkToken {
+  id        String    @id @default(cuid())
+  email     String
+  tokenHash String    @unique
+  otpHash   String?
+  platform  String    @default("web") // 'web' | 'native'
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@index([tokenHash])
   @@index([expiresAt])
 }
 
