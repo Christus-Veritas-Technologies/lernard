@@ -93,6 +93,7 @@ export class OnboardingService {
 
   async setupProfile(userId: string, dto: ProfileSetupDto): Promise<ProfileSetupResponse> {
     const subjectNames = normalizeSubjectNames(dto.subjects);
+    const subjects = await this.ensureSubjects(subjectNames);
     const normalizedName = normalizeOptionalText(dto.name);
     const normalizedGrade = normalizeOptionalText(dto.grade ?? undefined);
     const normalizedTimezone = normalizeOptionalText(dto.timezone);
@@ -117,7 +118,7 @@ export class OnboardingService {
         },
       });
 
-      await this.replaceUserSubjects(transaction, userId, subjectNames);
+      await this.replaceUserSubjects(transaction, userId, subjects);
     });
 
     const state = await this.getOnboardingState(userId);
@@ -129,12 +130,13 @@ export class OnboardingService {
 
   async setSubjects(userId: string, subjects: string[]): Promise<SubjectSelectionResponse> {
     const subjectNames = normalizeSubjectNames(subjects);
+    const resolvedSubjects = await this.ensureSubjects(subjectNames);
     if (!subjectNames.length) {
       throw new BadRequestException('Select at least one subject to continue onboarding.');
     }
 
     await this.prisma.$transaction(async (transaction) => {
-      await this.replaceUserSubjects(transaction, userId, subjectNames);
+      await this.replaceUserSubjects(transaction, userId, resolvedSubjects);
     });
 
     const state = await this.getOnboardingState(userId);
@@ -329,24 +331,14 @@ export class OnboardingService {
   private async replaceUserSubjects(
     transaction: Prisma.TransactionClient,
     userId: string,
-    subjectNames: string[],
+    subjects: Array<{ id: string; name: string }>,
   ): Promise<void> {
-    const subjects = [] as Array<{ id: string; name: string }>;
+    await transaction.userSubject.deleteMany({ where: { userId } });
 
-    for (const subjectName of subjectNames) {
-      const subject = await transaction.subject.upsert({
-        where: { name: subjectName },
-        update: {},
-        create: { name: subjectName },
-        select: {
-          id: true,
-          name: true,
-        },
-      });
-      subjects.push(subject);
+    if (!subjects.length) {
+      return;
     }
 
-    await transaction.userSubject.deleteMany({ where: { userId } });
     await transaction.userSubject.createMany({
       data: subjects.map((subject, index) => ({
         userId,
@@ -354,6 +346,42 @@ export class OnboardingService {
         priorityIndex: index,
       })),
     });
+  }
+
+  private async ensureSubjects(
+    subjectNames: string[],
+  ): Promise<Array<{ id: string; name: string }>> {
+    if (!subjectNames.length) {
+      return [];
+    }
+
+    await this.prisma.subject.createMany({
+      data: subjectNames.map((name) => ({ name })),
+      skipDuplicates: true,
+    });
+
+    const subjects = await this.prisma.subject.findMany({
+      where: {
+        name: {
+          in: subjectNames,
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    const subjectByName = new Map(subjects.map((subject) => [subject.name, subject]));
+    const orderedSubjects = subjectNames
+      .map((subjectName) => subjectByName.get(subjectName))
+      .filter((subject): subject is { id: string; name: string } => Boolean(subject));
+
+    if (orderedSubjects.length !== subjectNames.length) {
+      throw new BadRequestException('Unable to load one or more selected subjects.');
+    }
+
+    return orderedSubjects;
   }
 
   private async getOnboardingState(userId: string): Promise<{ onboardingComplete: boolean; firstLookComplete: boolean }> {
