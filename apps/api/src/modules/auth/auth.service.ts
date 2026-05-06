@@ -4,6 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
@@ -22,11 +23,22 @@ interface GoogleProfile {
   email: string | null;
 }
 
+interface GoogleTokenResponse {
+  access_token?: string;
+}
+
+interface GoogleUserInfoResponse {
+  sub?: string;
+  name?: string;
+  email?: string;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -113,6 +125,12 @@ export class AuthService {
       },
     });
     return this.issueTokens(created);
+  }
+
+  async loginWithGoogleCode(code: string) {
+    const accessToken = await this.exchangeGoogleCodeForAccessToken(code);
+    const profile = await this.fetchGoogleProfile(accessToken);
+    return this.findOrCreateGoogleUser(profile);
   }
 
   async refresh(refreshTokenRaw: string) {
@@ -218,5 +236,61 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  private async exchangeGoogleCodeForAccessToken(code: string): Promise<string> {
+    const clientId = this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID');
+    const clientSecret = this.configService.getOrThrow<string>('GOOGLE_CLIENT_SECRET');
+
+    const params = new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      grant_type: 'authorization_code',
+      redirect_uri: 'postmessage',
+    });
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: params,
+    });
+
+    if (!response.ok) {
+      throw new UnauthorizedException('Google sign-in failed. Please try again.');
+    }
+
+    const json = (await response.json()) as GoogleTokenResponse;
+    if (!json.access_token) {
+      throw new UnauthorizedException('Google sign-in failed. Please try again.');
+    }
+
+    return json.access_token;
+  }
+
+  private async fetchGoogleProfile(accessToken: string): Promise<GoogleProfile> {
+    const response = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new UnauthorizedException('Unable to read Google profile.');
+    }
+
+    const json = (await response.json()) as GoogleUserInfoResponse;
+
+    if (!json.sub || !json.name) {
+      throw new UnauthorizedException('Google profile was incomplete.');
+    }
+
+    return {
+      googleId: json.sub,
+      name: json.name,
+      email: json.email ?? null,
+    };
   }
 }

@@ -134,6 +134,15 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
     return response.data;
 }
 
+export async function loginWithGoogleCode(code: string): Promise<AuthResponse> {
+    const response = await authApi.post<AuthResponse>(
+        ROUTES.AUTH.GOOGLE_CODE,
+        { code },
+        { skipAuth: true } satisfies AxiosRequestConfig,
+    );
+    return response.data;
+}
+
 export async function logout(): Promise<void> {
     const refreshToken = getRefreshToken();
     if (!refreshToken) {

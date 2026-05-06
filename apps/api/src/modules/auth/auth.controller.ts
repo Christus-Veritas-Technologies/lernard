@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { GoogleCodeDto } from './dto/google-code.dto';
 import { GuardianVerifyPasswordDto } from './dto/guardian-verify-password.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
@@ -32,6 +33,11 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Body() dto: RefreshDto) {
     return this.authService.refresh(dto.refreshToken);
+  }
+
+  @Post('google/code')
+  async loginWithGoogleCode(@Body() dto: GoogleCodeDto) {
+    return this.authService.loginWithGoogleCode(dto.code);
   }
 
   @ProtectedRoute()

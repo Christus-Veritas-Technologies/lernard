@@ -7,6 +7,7 @@ export const ROUTES = {
     REGISTER: '/v1/auth/register',
     LOGIN: '/v1/auth/login',
     GOOGLE: '/v1/auth/google',
+    GOOGLE_CODE: '/v1/auth/google/code',
     GOOGLE_CALLBACK: '/v1/auth/google/callback',
     APPLE: '/v1/auth/apple',
     LOGOUT: '/v1/auth/logout',
