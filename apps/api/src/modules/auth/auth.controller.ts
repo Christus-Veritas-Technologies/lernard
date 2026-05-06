@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Role } from '@lernard/shared-types';
 import { AuthService } from './auth.service';
 import { GoogleSessionStore } from './google-session.store';
+import type { GoogleSessionData } from './google-session.store';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
@@ -105,7 +106,7 @@ export class AuthController {
   }
 
   @Get('google/session')
-  exchangeGoogleSession(@Query('code') code: string) {
+  exchangeGoogleSession(@Query('code') code: string): GoogleSessionData {
     if (!code) throw new NotFoundException();
     const session = this.googleSessionStore.consume(code);
     if (!session) throw new NotFoundException('Session expired or invalid');

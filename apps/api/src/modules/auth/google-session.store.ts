@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
-interface GoogleSession {
+export interface GoogleSessionData {
   accessToken: string;
   refreshToken: string;
   onboardingComplete: boolean;
+}
+
+interface StoredSession extends GoogleSessionData {
   expiresAt: number;
 }
 
@@ -12,16 +15,16 @@ const SESSION_TTL_MS = 60_000; // 60 seconds — one-time use only
 
 @Injectable()
 export class GoogleSessionStore {
-  private readonly store = new Map<string, GoogleSession>();
+  private readonly store = new Map<string, StoredSession>();
 
-  create(data: Omit<GoogleSession, 'expiresAt'>): string {
+  create(data: GoogleSessionData): string {
     const code = randomUUID();
     this.store.set(code, { ...data, expiresAt: Date.now() + SESSION_TTL_MS });
     return code;
   }
 
   /** Returns session and deletes it (one-time use). Returns null if missing or expired. */
-  consume(code: string): Omit<GoogleSession, 'expiresAt'> | null {
+  consume(code: string): GoogleSessionData | null {
     const session = this.store.get(code);
     this.store.delete(code);
 
