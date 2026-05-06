@@ -11,10 +11,10 @@ import type {
     FirstLookSkipResponse,
     FirstLookStartResponse,
     FirstLookSubmission,
-    LoginPayload,
+    MagicLinkRequestPayload,
+    MagicLinkRequestResponse,
     ProfileSetupPayload,
     ProfileSetupResponse,
-    RegisterPayload,
 } from '@lernard/shared-types';
 
 import { nativeApiFetch } from '@/lib/native-api';
@@ -32,28 +32,66 @@ function extractMessage(e: unknown): string {
 }
 
 // ---------------------------------------------------------------------------
-// Auth hooks
+// Magic link — request
 // ---------------------------------------------------------------------------
 
-export function useNativeLogin() {
-    const setTokens = useAuthStore((s) => s.setTokens);
+export function useNativeRequestMagicLink() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const mutate = useCallback(
         async (
-            payload: LoginPayload,
+            payload: MagicLinkRequestPayload,
+            callbacks?: { onSuccess?: () => void; onError?: (msg: string) => void },
+        ) => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                await nativeApiFetch<MagicLinkRequestResponse>(ROUTES.AUTH.MAGIC_LINK_REQUEST, {
+                    method: 'POST',
+                    body: JSON.stringify({ ...payload, platform: 'native' }),
+                    skipAuth: true,
+                });
+                callbacks?.onSuccess?.();
+            } catch (e) {
+                const msg = extractMessage(e);
+                setError(msg);
+                callbacks?.onError?.(msg);
+            } finally {
+                setIsLoading(false);
+            }
+        },
+        [],
+    );
+
+    return { mutate, isLoading, error, reset: () => setError(null) };
+}
+
+// ---------------------------------------------------------------------------
+// Magic link — verify OTP
+// ---------------------------------------------------------------------------
+
+export function useNativeVerifyMagicLink() {
+    const setTokens = useAuthStore((s) => s.setTokens);
+    const setOnboardingComplete = useAuthStore((s) => s.setOnboardingComplete);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const mutate = useCallback(
+        async (
+            payload: { email: string; otp: string },
             callbacks?: { onSuccess?: (data: AuthResponse) => void; onError?: (msg: string) => void },
         ) => {
             setIsLoading(true);
             setError(null);
             try {
-                const result = await nativeApiFetch<AuthResponse>(ROUTES.AUTH.LOGIN, {
+                const result = await nativeApiFetch<AuthResponse>(ROUTES.AUTH.MAGIC_LINK_VERIFY, {
                     method: 'POST',
                     body: JSON.stringify(payload),
                     skipAuth: true,
                 });
                 setTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
+                setOnboardingComplete(result.user.onboardingComplete);
                 callbacks?.onSuccess?.(result);
                 return result;
             } catch (e) {
@@ -64,46 +102,78 @@ export function useNativeLogin() {
                 setIsLoading(false);
             }
         },
-        [setTokens],
+        [setTokens, setOnboardingComplete],
     );
 
     return { mutate, isLoading, error, reset: () => setError(null) };
 }
 
-export function useNativeRegister() {
+// ---------------------------------------------------------------------------
+// Google OAuth
+// ---------------------------------------------------------------------------
+
+export function useNativeGoogleAuth() {
+    const router = useRouter();
     const setTokens = useAuthStore((s) => s.setTokens);
+    const setOnboardingComplete = useAuthStore((s) => s.setOnboardingComplete);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const mutate = useCallback(
-        async (
-            payload: RegisterPayload,
-            callbacks?: { onSuccess?: (data: AuthResponse) => void; onError?: (msg: string) => void },
-        ) => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                const result = await nativeApiFetch<AuthResponse>(ROUTES.AUTH.REGISTER, {
-                    method: 'POST',
-                    body: JSON.stringify(payload),
-                    skipAuth: true,
-                });
-                setTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
-                callbacks?.onSuccess?.(result);
-                return result;
-            } catch (e) {
-                const msg = extractMessage(e);
-                setError(msg);
-                callbacks?.onError?.(msg);
-            } finally {
-                setIsLoading(false);
-            }
-        },
-        [setTokens],
-    );
+    const signIn = useCallback(async () => {
+        if (isLoading) return;
 
-    return { mutate, isLoading, error, reset: () => setError(null) };
+        setIsLoading(true);
+        setError(null);
+        try {
+            const configuredApiUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
+            const baseUrl = (configuredApiUrl ?? 'http://localhost:3001').replace(/\/$/, '');
+
+            const result = await WebBrowser.openAuthSessionAsync(
+                `${baseUrl}/v1/auth/google?state=${encodeURIComponent('client=native')}`,
+                'lernard://',
+            );
+
+            if (result.type === 'cancel' || result.type === 'dismiss') return;
+
+            if (result.type !== 'success' || !result.url) {
+                setError('Google sign-in did not complete. Please try again.');
+                return;
+            }
+
+            const callbackUrl = new URL(result.url);
+            const hash = callbackUrl.hash.startsWith('#') ? callbackUrl.hash.slice(1) : callbackUrl.hash;
+
+            if (!hash) {
+                setError('Google sign-in returned an invalid response.');
+                return;
+            }
+
+            const params = new URLSearchParams(hash);
+            const accessToken = params.get('accessToken');
+            const refreshToken = params.get('refreshToken');
+            const onboardingComplete = params.get('onboardingComplete') === '1';
+
+            if (!accessToken || !refreshToken) {
+                setError('Sign-in failed. Please try again.');
+                return;
+            }
+
+            setTokens({ accessToken, refreshToken });
+            setOnboardingComplete(onboardingComplete);
+            router.replace(onboardingComplete ? '/(app)/(home)' : '/(auth)/account-type');
+        } catch (e) {
+            setError(extractMessage(e));
+        } finally {
+            setIsLoading(false);
+        }
+    }, [isLoading, router, setTokens, setOnboardingComplete]);
+
+    return { signIn, isLoading, error };
 }
+
+// ---------------------------------------------------------------------------
+// Account type
+// ---------------------------------------------------------------------------
 
 export function useNativeAccountType() {
     const setOnboardingComplete = useAuthStore((s) => s.setOnboardingComplete);
@@ -122,7 +192,6 @@ export function useNativeAccountType() {
                     method: 'POST',
                     body: JSON.stringify(payload),
                 });
-                // Guardians complete onboarding at this step
                 if (payload.accountType === 'guardian') {
                     setOnboardingComplete(true);
                 }
@@ -140,6 +209,10 @@ export function useNativeAccountType() {
 
     return { mutate, isLoading, error, reset: () => setError(null) };
 }
+
+// ---------------------------------------------------------------------------
+// Profile setup
+// ---------------------------------------------------------------------------
 
 export function useNativeProfileSetup() {
     const [isLoading, setIsLoading] = useState(false);
@@ -172,6 +245,10 @@ export function useNativeProfileSetup() {
 
     return { mutate, isLoading, error, reset: () => setError(null) };
 }
+
+// ---------------------------------------------------------------------------
+// First look
+// ---------------------------------------------------------------------------
 
 export function useNativeFirstLookStart() {
     const [isLoading, setIsLoading] = useState(false);
@@ -259,67 +336,4 @@ export function useNativeFirstLookSkip() {
     );
 
     return { mutate, isLoading, error };
-}
-
-export function useNativeGoogleAuth() {
-    const router = useRouter();
-    const setTokens = useAuthStore((s) => s.setTokens);
-    const setOnboardingComplete = useAuthStore((s) => s.setOnboardingComplete);
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const signIn = useCallback(async () => {
-        if (isLoading) {
-            return;
-        }
-
-        setIsLoading(true);
-        setError(null);
-        try {
-            const configuredApiUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
-            const baseUrl = (configuredApiUrl ?? 'http://localhost:3001').replace(/\/$/, '');
-
-            const result = await WebBrowser.openAuthSessionAsync(
-                `${baseUrl}/v1/auth/google?state=${encodeURIComponent('client=native')}`,
-                'lernard://',
-            );
-
-            if (result.type === 'cancel' || result.type === 'dismiss') {
-                return;
-            }
-
-            if (result.type !== 'success' || !result.url) {
-                setError('Google sign-in did not complete. Please try again.');
-                return;
-            }
-
-            const callbackUrl = new URL(result.url);
-            const hash = callbackUrl.hash.startsWith('#') ? callbackUrl.hash.slice(1) : callbackUrl.hash;
-
-            if (!hash) {
-                setError('Google sign-in returned an invalid response.');
-                return;
-            }
-
-            const params = new URLSearchParams(hash);
-            const accessToken = params.get('accessToken');
-            const refreshToken = params.get('refreshToken');
-            const onboardingComplete = params.get('onboardingComplete') === '1';
-
-            if (!accessToken || !refreshToken) {
-                setError('Sign-in failed. Please try again.');
-                return;
-            }
-
-            setTokens({ accessToken, refreshToken });
-            setOnboardingComplete(onboardingComplete);
-            router.replace(onboardingComplete ? '/(app)/(home)' : '/(auth)/account-type');
-        } catch (e) {
-            setError(extractMessage(e));
-        } finally {
-            setIsLoading(false);
-        }
-    }, [isLoading, router, setTokens, setOnboardingComplete]);
-
-    return { signIn, isLoading, error };
 }

@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BookOpen01Icon, StarsIcon } from 'hugeicons-react-native';
+import { BookOpen01Icon, StarsIcon, ShieldKeyIcon } from 'hugeicons-react-native';
 
 import { Text } from '@rnr/text';
 import { GoogleIcon } from '@/components/auth/GoogleIcon';
@@ -32,11 +32,19 @@ export default function WelcomeScreen() {
                                 Your personal tutor.{`\n`}Always ready.
                             </Text>
                         </View>
-                        <View className="flex-row items-center gap-3 rounded-2xl bg-white/15 px-4 py-3">
-                            <BookOpen01Icon size={20} color="#E0E9FF" />
-                            <Text className="flex-1 text-sm leading-6 text-blue-100">
-                                Every lesson is generated fresh, just for you.
-                            </Text>
+                        <View className="gap-2">
+                            <View className="flex-row items-center gap-3 rounded-2xl bg-white/15 px-4 py-3">
+                                <BookOpen01Icon size={20} color="#E0E9FF" />
+                                <Text className="flex-1 text-sm leading-6 text-blue-100">
+                                    Every lesson is generated fresh, just for you.
+                                </Text>
+                            </View>
+                            <View className="flex-row items-center gap-3 rounded-2xl bg-white/15 px-4 py-3">
+                                <ShieldKeyIcon size={20} color="#E0E9FF" />
+                                <Text className="flex-1 text-sm leading-6 text-blue-100">
+                                    No password needed — we'll email you a sign-in link.
+                                </Text>
+                            </View>
                         </View>
                     </View>
                 </View>
@@ -44,18 +52,11 @@ export default function WelcomeScreen() {
                 {/* CTAs */}
                 <View className="gap-3">
                     <TouchableOpacity
-                        onPress={() => router.push('/(auth)/register')}
+                        onPress={() => router.push('/(auth)/login')}
                         className="h-14 items-center justify-center rounded-[24px] bg-primary shadow-sm active:opacity-80"
                         activeOpacity={0.8}
                     >
-                        <Text className="text-base font-bold text-white">Get started — it&apos;s free</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => router.push('/(auth)/login')}
-                        className="h-14 items-center justify-center rounded-[24px] border border-slate-200 bg-white active:opacity-80"
-                        activeOpacity={0.8}
-                    >
-                        <Text className="text-base font-semibold text-slate-700">I already have an account</Text>
+                        <Text className="text-base font-bold text-white">Get started with email</Text>
                     </TouchableOpacity>
 
                     <View className="flex-row items-center gap-3 py-1">
