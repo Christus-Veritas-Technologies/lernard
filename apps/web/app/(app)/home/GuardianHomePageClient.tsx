@@ -37,7 +37,7 @@ const itemVariants = {
     visible: {
         opacity: 1,
         y: 0,
-        transition: { duration: 0.35, ease: "easeOut" },
+        transition: { duration: 0.35, ease: "easeOut" as const },
     },
 };
 
@@ -377,7 +377,7 @@ function SummaryCard({
             icon: "bg-warning text-white",
             glyph: <Settings02Icon size={18} strokeWidth={1.8} />,
         },
-    } satisfies Record<typeof tone, { card: string; icon: string; glyph: JSX.Element }>;
+    } satisfies Record<typeof tone, { card: string; icon: string; glyph: React.ReactNode }>;
 
     return (
         <Card className={styles[tone].card}>

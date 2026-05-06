@@ -60,16 +60,14 @@ export function StudentHomePageClient() {
     const { content, slots } = data;
     const subjectRows = content.subjects.map((subject) => {
         const breakdown = content.subjectTopics.find((entry) => entry.subjectId === subject.subjectId);
-        const total =
-            (breakdown?.strongCount ?? 0)
-            + (breakdown?.developingCount ?? 0)
-            + (breakdown?.needsWorkCount ?? 0);
-        const score = Math.round(((breakdown?.strongCount ?? 0) / Math.max(total, 1)) * 100);
+        const score = breakdown?.readinessPercent ?? null;
+        const hasReadiness = typeof score === "number";
 
         return {
             ...subject,
             score,
-            topicCount: total,
+            readinessLabel: hasReadiness ? `${score}% ready` : "Not enough activity yet",
+            activityCount: breakdown?.activityCount ?? 0,
         };
     });
 
@@ -98,7 +96,7 @@ export function StudentHomePageClient() {
                         </div>
                         <div className="flex flex-wrap gap-2 pt-2">
                             <Link href="/learn">
-                                <Button className="bg-white text-primary-700 hover:bg-white/92">
+                                <Button className="bg-white text-sky-900 hover:bg-white/92">
                                     Continue learning
                                     <ArrowRight02Icon size={15} strokeWidth={1.8} />
                                 </Button>
@@ -153,6 +151,27 @@ export function StudentHomePageClient() {
                 <MetricCard description="Progress toward your daily target" icon={<Message01Icon size={18} strokeWidth={1.8} />} label="Daily goal" tone="warm" value={`${content.dailyGoalProgress}/${content.dailyGoalTarget}`} />
             </section>
 
+            <section className="grid gap-3 rounded-3xl border border-border bg-[linear-gradient(160deg,#eef2ff_0%,#ffffff_100%)] p-4 sm:grid-cols-3">
+                <Link href="/learn">
+                    <Button className="w-full" variant="secondary">
+                        <BookOpen01Icon size={16} strokeWidth={1.8} />
+                        Start a new lesson
+                    </Button>
+                </Link>
+                <Link href="/quiz">
+                    <Button className="w-full" variant="secondary">
+                        <SchoolBell01Icon size={16} strokeWidth={1.8} />
+                        New quiz
+                    </Button>
+                </Link>
+                <Link href="/chat">
+                    <Button className="w-full" variant="secondary">
+                        <Message01Icon size={16} strokeWidth={1.8} />
+                        Ask Lernard
+                    </Button>
+                </Link>
+            </section>
+
             <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">
                 <Card>
                     <CardHeader>
@@ -179,7 +198,7 @@ export function StudentHomePageClient() {
                                     <TableRow>
                                         <TableHead>Subject</TableHead>
                                         <TableHead>Readiness</TableHead>
-                                        <TableHead>Topics</TableHead>
+                                        <TableHead>Activity</TableHead>
                                         <TableHead>Last active</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -189,11 +208,11 @@ export function StudentHomePageClient() {
                                             <TableCell className="font-semibold">{row.name}</TableCell>
                                             <TableCell>
                                                 <div className="space-y-2">
-                                                    <span className="text-xs text-text-secondary">{row.score}% strong</span>
-                                                    <Progress value={row.score} />
+                                                    <span className="text-xs text-text-secondary">{row.readinessLabel}</span>
+                                                    {typeof row.score === "number" ? <Progress value={row.score} /> : null}
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{row.topicCount}</TableCell>
+                                            <TableCell>{row.activityCount}</TableCell>
                                             <TableCell>{formatRelativeTime(row.lastActiveAt)}</TableCell>
                                         </TableRow>
                                     ))}
@@ -224,17 +243,21 @@ export function StudentHomePageClient() {
                             <CardDescription>Your strongest areas right now.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {content.topTopics.slice(0, 4).map((topic) => (
-                                <div className="rounded-2xl border border-amber-100 bg-white/80 p-3" key={`${topic.subjectName}-${topic.topic}`}>
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div>
-                                            <p className="text-sm font-semibold text-text-primary">{topic.topic}</p>
-                                            <p className="text-xs text-text-secondary">{topic.subjectName}</p>
+                            {content.topTopics.slice(0, 4).length ? (
+                                content.topTopics.slice(0, 4).map((topic) => (
+                                    <div className="rounded-2xl border border-amber-100 bg-white/80 p-3" key={`${topic.subjectName}-${topic.topic}`}>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p className="text-sm font-semibold text-text-primary">{topic.topic}</p>
+                                                <p className="text-xs text-text-secondary">{topic.subjectName}</p>
+                                            </div>
+                                            <Badge tone="cool">{topic.score}%</Badge>
                                         </div>
-                                        <Badge tone="cool">{topic.score}%</Badge>
                                     </div>
-                                </div>
-                            ))}
+                                ))
+                            ) : (
+                                <p className="text-sm text-text-secondary">Finish one lesson or quiz to unlock topic-level readiness.</p>
+                            )}
                         </CardContent>
                     </Card>
 
