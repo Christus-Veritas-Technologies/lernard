@@ -1,4 +1,10 @@
-import { IsString, MaxLength, IsOptional, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  MaxLength,
+  IsOptional,
+  IsBoolean,
+  MinLength,
+} from 'class-validator';
 
 export class InviteChildDto {
   @IsString()
@@ -22,4 +28,11 @@ export class UpdateChildCompanionControlsDto {
 
   @IsBoolean()
   allowSkip: boolean;
+}
+
+export class UpdateChildSettingsDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(50)
+  name: string;
 }

@@ -2,6 +2,7 @@ export type Permission =
   | 'can_start_lesson'
   | 'can_take_quiz'
   | 'can_edit_mode'
+  | 'can_edit_child_settings'
   | 'can_view_child_progress'
   | 'can_change_companion_controls'
   | 'can_assign_topics'

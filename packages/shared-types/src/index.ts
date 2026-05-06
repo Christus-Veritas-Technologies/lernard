@@ -39,7 +39,13 @@ export type {
   HistorySessionItem,
   PaginatedHistoryResponse,
 } from './payloads/progress'
-export type { SettingsContent } from './payloads/settings'
+export type {
+  SettingsContent,
+  SettingsViewerSummary,
+  GuardianManagedChildSettings,
+  StudentSettingsContent,
+  GuardianSettingsContent,
+} from './payloads/settings'
 export type { LessonContent, LessonSection, LessonTermDefinition, PostLessonResult } from './payloads/lessons'
 export type { QuizQuestionType, QuizQuestion, QuizContent, QuizQuestionReview, QuizCompletionResult } from './payloads/quizzes'
 export type {
