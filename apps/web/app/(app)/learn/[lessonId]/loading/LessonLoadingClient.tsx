@@ -6,7 +6,7 @@ import { useEffect } from "react";
 
 import { ROUTES } from "@lernard/routes";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { browserApiFetch } from "@/lib/browser-api";
 
 interface LessonLoadingClientProps {

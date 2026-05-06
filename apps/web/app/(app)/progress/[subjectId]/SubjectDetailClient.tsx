@@ -6,9 +6,9 @@ import Link from "next/link";
 import { ROUTES } from "@lernard/routes";
 import type { SubjectDetailContent, TopicStrength } from "@lernard/shared-types";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/Badge";
+import { Button } from "@/components/ui/Button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/progress";
 import { usePagePayload } from "@/hooks/usePagePayload";
 
