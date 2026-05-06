@@ -12,9 +12,20 @@ import { completeWithRetry } from '../common/utils/complete-with-retry';
 const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 
+type ClaudeContentBlock =
+  | { type: 'text'; text: string }
+  | {
+      type: 'image';
+      source: { type: 'base64'; media_type: string; data: string };
+    }
+  | {
+      type: 'document';
+      source: { type: 'base64'; media_type: string; data: string };
+    };
+
 interface ClaudeMessage {
   role: 'user' | 'assistant';
-  content: string;
+  content: string | ClaudeContentBlock[];
 }
 
 @Injectable()
@@ -133,16 +144,21 @@ export class MastraService {
   async *streamChat(input: {
     message: string;
     history: ClaudeMessage[];
+    attachments?: Array<{ kind: 'image' | 'pdf'; mimeType: string; data: string; fileName: string }>;
   }): AsyncGenerator<ChatMessageBlock> {
     if (!this.apiKey) {
+      const attachmentNudge = input.attachments?.length
+        ? ` I can also see ${input.attachments.length} attachment${input.attachments.length === 1 ? '' : 's'} on this turn.`
+        : '';
+
       yield {
         type: 'text',
-        content: `I heard you: ${input.message}. I can help break this down step by step.`,
+        content: `I heard you: ${input.message}.${attachmentNudge} I can help break this down step by step.`,
       };
       return;
     }
 
-    const messages: ClaudeMessage[] = [...input.history, { role: 'user' as const, content: input.message }];
+    const messages: ClaudeMessage[] = [...input.history, buildChatUserMessage(input.message, input.attachments ?? [])];
     const text = await completeWithRetry(() =>
       this.completeText({
         model: SONNET_MODEL,
@@ -224,6 +240,46 @@ export class MastraService {
 
     return text;
   }
+}
+
+function buildChatUserMessage(
+  message: string,
+  attachments: Array<{ kind: 'image' | 'pdf'; mimeType: string; data: string; fileName: string }>,
+): ClaudeMessage {
+  if (attachments.length === 0) {
+    return {
+      role: 'user',
+      content: message,
+    };
+  }
+
+  return {
+    role: 'user',
+    content: [
+      { type: 'text', text: message },
+      ...attachments.map((attachment) => {
+        if (attachment.kind === 'pdf') {
+          return {
+            type: 'document' as const,
+            source: {
+              type: 'base64' as const,
+              media_type: attachment.mimeType,
+              data: attachment.data,
+            },
+          };
+        }
+
+        return {
+          type: 'image' as const,
+          source: {
+            type: 'base64' as const,
+            media_type: attachment.mimeType,
+            data: attachment.data,
+          },
+        };
+      }),
+    ],
+  };
 }
 
 function buildFallbackLesson(
