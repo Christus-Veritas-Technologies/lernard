@@ -124,5 +124,5 @@ async function refreshSession(refreshToken: string): Promise<string> {
 }
 
 function getBaseUrl(): string {
-    return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
+    return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4002";
 }

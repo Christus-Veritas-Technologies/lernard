@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 
 import { GoogleIcon } from "./GoogleIcon";
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
+const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4002";
 
 export function GoogleSignInButton() {
     return (

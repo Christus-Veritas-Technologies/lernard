@@ -1,12 +1,10 @@
-import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios";
-
-import {
-    clearTokens,
-    getAccessToken,
-    getRefreshToken,
-    setAccessToken,
-    setRefreshToken,
-} from "@lernard/auth-core";
+/**
+ * Auth-specific API calls.
+ *
+ * All requests are made through `browserApiFetch` — the single canonical
+ * HTTP client for the web app (handles token storage, refresh, 401 retry).
+ */
+import { setAccessToken, setRefreshToken } from "@lernard/auth-core";
 import { ROUTES } from "@lernard/routes";
 import type {
     AccountTypePayload,
@@ -23,118 +21,32 @@ import type {
     SubjectSelectionResponse,
 } from "@lernard/shared-types";
 
-declare module "axios" {
-    interface AxiosRequestConfig {
-        skipAuth?: boolean;
-        _retry?: boolean;
-    }
+import { browserApiFetch } from "./browser-api";
 
-    interface InternalAxiosRequestConfig {
-        skipAuth?: boolean;
-        _retry?: boolean;
-    }
-}
-
-interface RefreshResponse {
-    accessToken: string;
-    refreshToken: string;
-}
-
-export class AuthApiError extends Error {
-    readonly status: number;
-    readonly body: string;
-
-    constructor(status: number, body: string) {
-        super(getErrorMessage(body, status));
-        this.name = "AuthApiError";
-        this.status = status;
-        this.body = body;
-    }
-}
-
-const authApi = axios.create({
-    baseURL: getBaseUrl(),
-    headers: {
-        "Content-Type": "application/json",
-    },
-});
-
-const refreshApi = axios.create({
-    baseURL: getBaseUrl(),
-    headers: {
-        "Content-Type": "application/json",
-    },
-});
-
-authApi.interceptors.request.use((config) => {
-    const nextConfig = config;
-    const accessToken = getAccessToken();
-
-    if (!nextConfig.skipAuth && accessToken) {
-        nextConfig.headers.set("Authorization", `Bearer ${accessToken}`);
-    }
-
-    return nextConfig;
-});
-
-authApi.interceptors.response.use(
-    (response) => response,
-    async (error: AxiosError) => {
-        const response = error.response;
-        const config = error.config as InternalAxiosRequestConfig | undefined;
-
-        if (!response || !config) {
-            throw normalizeAxiosError(error);
-        }
-
-        if (config.skipAuth || response.status !== 401 || config._retry) {
-            if (response.status === 401 && !config.skipAuth) {
-                clearTokens();
-            }
-            throw normalizeAxiosError(error);
-        }
-
-        const refreshToken = getRefreshToken();
-        if (!refreshToken) {
-            clearTokens();
-            throw normalizeAxiosError(error);
-        }
-
-        try {
-            const refreshed = await refreshSession(refreshToken);
-            config._retry = true;
-            config.headers.set("Authorization", `Bearer ${refreshed}`);
-            return authApi(config);
-        } catch {
-            clearTokens();
-            throw normalizeAxiosError(error);
-        }
-    },
-);
+// Re-export so components that import AuthApiError don't need to change.
+export { BrowserApiError as AuthApiError } from "./browser-api";
 
 export function persistAuthResponse(response: AuthResponse) {
     setAccessToken(response.accessToken);
     setRefreshToken(response.refreshToken);
 }
 
-// ─── Magic Link ──────────────────────────────────────────────────────────────
+// ─── Magic Link ───────────────────────────────────────────────────────────────
 
 export async function requestMagicLink(payload: MagicLinkRequestPayload): Promise<MagicLinkRequestResponse> {
-    const response = await authApi.post<MagicLinkRequestResponse>(
-        ROUTES.AUTH.MAGIC_LINK_REQUEST,
-        payload,
-        { skipAuth: true } satisfies AxiosRequestConfig,
-    );
-    return response.data;
+    return browserApiFetch<MagicLinkRequestResponse>(ROUTES.AUTH.MAGIC_LINK_REQUEST, {
+        method: "POST",
+        body: JSON.stringify(payload),
+        skipAuth: true,
+    });
 }
 
 export async function verifyMagicLink(payload: MagicLinkVerifyPayload): Promise<AuthResponse> {
-    const response = await authApi.post<AuthResponse>(
-        ROUTES.AUTH.MAGIC_LINK_VERIFY,
-        payload,
-        { skipAuth: true } satisfies AxiosRequestConfig,
-    );
-    return response.data;
+    return browserApiFetch<AuthResponse>(ROUTES.AUTH.MAGIC_LINK_VERIFY, {
+        method: "POST",
+        body: JSON.stringify(payload),
+        skipAuth: true,
+    });
 }
 
 // ─── Google OAuth ─────────────────────────────────────────────────────────────
@@ -146,96 +58,63 @@ interface GoogleSessionResponse {
 }
 
 export async function exchangeGoogleSession(code: string): Promise<GoogleSessionResponse> {
-    const response = await authApi.get<GoogleSessionResponse>(
-        `${ROUTES.AUTH.GOOGLE}/session?code=${encodeURIComponent(code)}`,
-        { skipAuth: true } satisfies AxiosRequestConfig,
+    return browserApiFetch<GoogleSessionResponse>(
+        `${ROUTES.AUTH.GOOGLE_SESSION}?code=${encodeURIComponent(code)}`,
+        { skipAuth: true },
     );
-    return response.data;
 }
 
-// ─── Session Management ───────────────────────────────────────────────────────
+// ─── Session ──────────────────────────────────────────────────────────────────
 
 export async function logout(): Promise<void> {
+    const { getRefreshToken, clearTokens } = await import("@lernard/auth-core");
     const refreshToken = getRefreshToken();
-    if (!refreshToken) {
-        clearTokens();
-        return;
-    }
-
-    await authApi.post(ROUTES.AUTH.LOGOUT, { refreshToken });
+    if (!refreshToken) { clearTokens(); return; }
+    await browserApiFetch(ROUTES.AUTH.LOGOUT, {
+        method: "POST",
+        body: JSON.stringify({ refreshToken }),
+    });
     clearTokens();
 }
 
-export async function getMe() {
-    const response = await authApi.get<AuthResponse["user"]>(ROUTES.AUTH.ME);
-    return response.data;
+export async function getMe(): Promise<AuthResponse["user"]> {
+    return browserApiFetch<AuthResponse["user"]>(ROUTES.AUTH.ME);
 }
 
 // ─── Onboarding ───────────────────────────────────────────────────────────────
 
 export async function setAccountType(payload: AccountTypePayload): Promise<AccountTypePayload> {
-    const response = await authApi.post<AccountTypePayload>(ROUTES.ONBOARDING.ACCOUNT_TYPE, payload);
-    return response.data;
+    return browserApiFetch<AccountTypePayload>(ROUTES.ONBOARDING.ACCOUNT_TYPE, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
 }
 
 export async function saveProfileSetup(payload: ProfileSetupPayload): Promise<ProfileSetupResponse> {
-    const response = await authApi.post<ProfileSetupResponse>(ROUTES.ONBOARDING.PROFILE, payload);
-    return response.data;
+    return browserApiFetch<ProfileSetupResponse>(ROUTES.ONBOARDING.PROFILE, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
 }
 
 export async function saveSubjects(subjects: string[]): Promise<SubjectSelectionResponse> {
-    const response = await authApi.post<SubjectSelectionResponse>(ROUTES.ONBOARDING.SUBJECTS, { subjects });
-    return response.data;
+    return browserApiFetch<SubjectSelectionResponse>(ROUTES.ONBOARDING.SUBJECTS, {
+        method: "POST",
+        body: JSON.stringify({ subjects }),
+    });
 }
 
 export async function startFirstLook(): Promise<FirstLookStartResponse> {
-    const response = await authApi.post<FirstLookStartResponse>(ROUTES.ONBOARDING.FIRST_LOOK.START);
-    return response.data;
+    return browserApiFetch<FirstLookStartResponse>(ROUTES.ONBOARDING.FIRST_LOOK.START, { method: "POST" });
 }
 
 export async function submitFirstLook(payload: FirstLookSubmission): Promise<FirstLookResult> {
-    const response = await authApi.post<FirstLookResult>(ROUTES.ONBOARDING.FIRST_LOOK.SUBMIT, payload);
-    return response.data;
+    return browserApiFetch<FirstLookResult>(ROUTES.ONBOARDING.FIRST_LOOK.SUBMIT, {
+        method: "POST",
+        body: JSON.stringify(payload),
+    });
 }
 
 export async function skipFirstLook(): Promise<FirstLookSkipResponse> {
-    const response = await authApi.post<FirstLookSkipResponse>(ROUTES.ONBOARDING.FIRST_LOOK.SKIP);
-    return response.data;
-}
-
-// ─── Internal ─────────────────────────────────────────────────────────────────
-
-async function refreshSession(refreshToken: string): Promise<string> {
-    const response = await refreshApi.post<RefreshResponse>(ROUTES.AUTH.REFRESH, { refreshToken });
-    setAccessToken(response.data.accessToken);
-    setRefreshToken(response.data.refreshToken);
-    return response.data.accessToken;
-}
-
-function normalizeAxiosError(error: AxiosError): AuthApiError {
-    const status = error.response?.status ?? 500;
-    const body = stringifyErrorBody(error.response?.data);
-    return new AuthApiError(status, body);
-}
-
-function stringifyErrorBody(value: unknown): string {
-    if (typeof value === "string") return value;
-
-    if (value && typeof value === "object" && "message" in value) {
-        const message = (value as { message?: unknown }).message;
-        if (Array.isArray(message)) return message.join(" ");
-        if (typeof message === "string") return message;
-    }
-
-    return "Something went wrong. Please try again.";
-}
-
-function getErrorMessage(body: string, status: number): string {
-    if (body.trim().length > 0) return body;
-    if (status === 401) return "Your session has expired. Sign in again to continue.";
-    return `Request failed with status ${status}.`;
-}
-
-function getBaseUrl(): string {
-    return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4001";
+    return browserApiFetch<FirstLookSkipResponse>(ROUTES.ONBOARDING.FIRST_LOOK.SKIP, { method: "POST" });
 }
