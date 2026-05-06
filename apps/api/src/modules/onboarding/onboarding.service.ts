@@ -60,10 +60,6 @@ export class OnboardingService {
       },
     });
 
-    if (accountType === 'guardian' && !user.passwordHash) {
-      throw new BadRequestException('Guardian accounts require a password-backed sign in.');
-    }
-
     await this.prisma.$transaction(async (transaction) => {
       await transaction.user.update({
         where: { id: userId },
@@ -77,10 +73,12 @@ export class OnboardingService {
       if (accountType === 'guardian') {
         await transaction.guardian.upsert({
           where: { userId },
-          update: {},
+          update: {
+            passwordHash: user.passwordHash ?? null,
+          },
           create: {
             userId,
-            passwordHash: user.passwordHash!,
+            passwordHash: user.passwordHash ?? null,
           },
         });
 

@@ -11,7 +11,7 @@ export function GoogleSignInButton() {
             className="flex w-full items-center justify-center gap-3 rounded-2xl text-sm font-semibold transition-colors"
             variant="secondary"
         >
-            <a href={`${apiUrl}/v1/auth/google`}>
+            <a className="flex gap-2" href={`${apiUrl}/v1/auth/google`}>
                 <GoogleIcon size={18} />
                 Continue with Google
             </a>

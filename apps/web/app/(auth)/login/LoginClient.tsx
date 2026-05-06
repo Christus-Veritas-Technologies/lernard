@@ -50,6 +50,7 @@ export function LoginClient() {
 
     return (
         <AuthShell
+            className="mx-auto w-full max-w-3xl"
             badge="Lernard"
             title="Your personal AI tutor"
             description="Every lesson is built around you — your pace, your gaps, your goals."

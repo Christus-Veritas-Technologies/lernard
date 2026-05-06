@@ -74,7 +74,7 @@ export function AccountTypeClient() {
 
     return (
         <motion.div
-            className="flex flex-col gap-8"
+            className="mx-auto flex w-full max-w-lg flex-col gap-8"
             variants={containerVariants}
             initial="hidden"
             animate="visible"
