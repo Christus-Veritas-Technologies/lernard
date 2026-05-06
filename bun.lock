@@ -5,6 +5,7 @@
     "": {
       "name": "lernard",
       "devDependencies": {
+        "@babel/plugin-transform-react-jsx": "^7.28.6",
         "babel-preset-expo": "~13.0.0",
         "prettier": "^3.7.4",
         "turbo": "^2.8.20",
@@ -106,6 +107,7 @@
       },
       "devDependencies": {
         "@babel/core": "^7.20.0",
+        "@babel/plugin-transform-react-jsx": "^7.28.6",
         "@types/react": "~19.1.10",
         "babel-preset-expo": "~13.0.0",
         "eslint": "^9.25.1",

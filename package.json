@@ -9,6 +9,7 @@
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
+    "@babel/plugin-transform-react-jsx": "^7.28.6",
     "babel-preset-expo": "~13.0.0",
     "prettier": "^3.7.4",
     "turbo": "^2.8.20",
