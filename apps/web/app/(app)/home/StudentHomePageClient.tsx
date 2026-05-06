@@ -1,8 +1,15 @@
 "use client";
 
-import { ArrowRight02Icon, Message01Icon, Settings02Icon } from "hugeicons-react";
+import {
+    ArrowRight02Icon,
+    BookOpen01Icon,
+    ChartBarLineIcon,
+    Message01Icon,
+    SchoolBell01Icon,
+    Settings02Icon,
+} from "hugeicons-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
 import type { HomeContent, SlotContent } from "@lernard/shared-types";
@@ -13,17 +20,13 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePagePayload } from "@/hooks/usePagePayload";
 
 export function StudentHomePageClient() {
-    const { data, error, isAuthenticated, loading, refetch } =
-        usePagePayload<HomeContent>(ROUTES.HOME.PAYLOAD);
+    const { data, error, isAuthenticated, loading, refetch } = usePagePayload<HomeContent>(ROUTES.HOME.PAYLOAD);
     const [chatPrompt, setChatPrompt] = useState("");
-    const initials = useMemo(
-        () => (data ? getInitialsFromGreeting(data.content.greeting) : ""),
-        [data],
-    );
+    const initials = useMemo(() => (data ? getInitialsFromGreeting(data.content.greeting) : ""), [data]);
 
     if (!isAuthenticated) {
         return (
@@ -53,151 +56,253 @@ export function StudentHomePageClient() {
     }
 
     const { content, slots } = data;
+    const subjectRows = content.subjects.map((subject) => {
+        const breakdown = content.subjectTopics.find((entry) => entry.subjectId === subject.subjectId);
+        const total =
+            (breakdown?.strongCount ?? 0)
+            + (breakdown?.developingCount ?? 0)
+            + (breakdown?.needsWorkCount ?? 0);
+        const score = Math.round(((breakdown?.strongCount ?? 0) / Math.max(total, 1)) * 100);
+
+        return {
+            ...subject,
+            score,
+            topicCount: total,
+        };
+    });
 
     return (
-        <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Avatar>
-                        <AvatarFallback>{initials}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <p className="text-sm text-text-secondary">Your dashboard</p>
-                        <h1 className="text-2xl font-semibold text-text-primary">{content.greeting}</h1>
-                    </div>
-                </div>
-                <Link href="/settings">
-                    <Button className="h-10 w-10 rounded-full p-0" variant="secondary">
-                        <Settings02Icon size={18} strokeWidth={1.8} />
-                    </Button>
-                </Link>
-            </div>
-
-            <Card>
-                <CardContent className="mt-0 flex flex-wrap items-center gap-6">
-                    <DailyGoalRing completed={content.dailyGoalProgress} target={content.dailyGoalTarget} />
-                    <div className="space-y-2">
-                        <p className="text-base font-semibold text-text-primary">Daily goal</p>
-                        <p className="text-sm text-text-secondary">
-                            {content.dailyGoalProgress} of {content.dailyGoalTarget} sessions done
+        <div className="flex flex-col gap-5">
+            <Card className="overflow-hidden bg-[linear-gradient(135deg,#f9fbff_0%,#ffffff_50%,#fff7f2_100%)]">
+                <CardContent className="mt-0 flex flex-wrap items-start justify-between gap-5">
+                    <div className="space-y-3">
+                        <Badge className="w-fit" tone="cool">Student Home</Badge>
+                        <div className="flex items-center gap-3">
+                            <Avatar>
+                                <AvatarFallback>{initials}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <p className="text-sm text-text-secondary">Good to see you</p>
+                                <h1 className="text-2xl font-semibold text-text-primary">{content.greeting}</h1>
+                            </div>
+                        </div>
+                        <p className="max-w-2xl text-sm leading-6 text-text-secondary">
+                            Your dashboard is built around momentum first: quick progress reads, subject health, and fast actions into lessons, quizzes, and chat.
                         </p>
-                        <Badge tone="success">
-                            {content.streak} day{content.streak === 1 ? "" : "s"} streak
-                        </Badge>
+                        <div className="flex flex-wrap gap-2">
+                            <Badge tone="success">{content.streak}-day streak</Badge>
+                            <Badge tone="primary">XP level {content.xpLevel}</Badge>
+                            <Badge tone="warm">Pass rate {content.passRate}%</Badge>
+                        </div>
                     </div>
-                </CardContent>
-            </Card>
 
-            <UrgentActionCard slot={slots.urgent_action ?? null} />
-
-            {slots.primary_cta ? (
-                <Button className="w-full">{readSlotText(slots.primary_cta, "title", "Continue learning")}</Button>
-            ) : null}
-
-            <section className="space-y-3">
-                <h2 className="text-lg font-semibold text-text-primary">My Subjects</h2>
-                <ScrollArea orientation="horizontal">
-                    <div className="flex min-w-max gap-3 pb-2">
-                        {content.subjects.map((subject) => {
-                            const breakdown = content.subjectTopics.find(
-                                (entry) => entry.subjectId === subject.subjectId,
-                            );
-                            const total =
-                                (breakdown?.strongCount ?? 0)
-                                + (breakdown?.developingCount ?? 0)
-                                + (breakdown?.needsWorkCount ?? 0);
-                            const score = Math.round(((breakdown?.strongCount ?? 0) / Math.max(total, 1)) * 100);
-
-                            return (
-                                <Link href={`/progress/${subject.subjectId}`} key={subject.subjectId}>
-                                    <Card className="w-64 p-4 sm:w-72">
-                                        <CardHeader className="gap-1 p-0">
-                                            <CardTitle className="text-base">{subject.name}</CardTitle>
-                                            <CardDescription>
-                                                Last active {formatRelativeTime(subject.lastActiveAt)}
-                                            </CardDescription>
-                                        </CardHeader>
-                                        <CardContent className="mt-3 p-0">
-                                            <Progress value={score} />
-                                        </CardContent>
-                                    </Card>
-                                </Link>
-                            );
-                        })}
-                    </div>
-                </ScrollArea>
-            </section>
-
-            {slots.streak_nudge ? (
-                <Card className="border-primary-200 bg-primary-50">
-                    <CardContent className="mt-0 flex items-center justify-between gap-3">
-                        <p className="text-sm text-primary-700">
-                            {readSlotText(
-                                slots.streak_nudge,
-                                "description",
-                                "Stay consistent today to protect your streak.",
-                            )}
-                        </p>
-                        <Button variant="ghost">Dismiss</Button>
-                    </CardContent>
-                </Card>
-            ) : null}
-
-            <section className="space-y-3">
-                <h2 className="text-lg font-semibold text-text-primary">Recent Sessions</h2>
-                <div className="grid gap-3 md:grid-cols-3">
-                    {content.recentSessions.map((session) => (
-                        <Card key={session.id}>
-                            <CardHeader className="p-0">
-                                <div className="flex items-center justify-between gap-2">
-                                    <Badge tone={session.type === "quiz" ? "warm" : "cool"}>
-                                        {session.type === "quiz" ? "Quiz" : "Lesson"}
-                                    </Badge>
-                                    <span className="text-xs text-text-tertiary">
-                                        {formatRelativeTime(session.completedAt)}
-                                    </span>
-                                </div>
-                                <CardTitle className="mt-2 text-base">{session.topic}</CardTitle>
-                                <CardDescription>{session.subjectName}</CardDescription>
-                            </CardHeader>
-                        </Card>
-                    ))}
-
-                    {content.recentSessions.length === 0 ? (
-                        <Card className="md:col-span-3">
-                            <CardContent className="mt-0 text-sm text-text-secondary">
-                                No sessions yet. Start your first lesson to build momentum.
-                            </CardContent>
-                        </Card>
-                    ) : null}
-                </div>
-            </section>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Ask Lernard Anything</CardTitle>
-                    <CardDescription>Get help instantly, then jump into chat.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-col gap-3 sm:flex-row">
-                        <Input
-                            onChange={(event) => setChatPrompt(event.target.value)}
-                            placeholder="Ask a question about your current topic"
-                            value={chatPrompt}
-                        />
-                        <Link
-                            className="sm:w-auto"
-                            href={chatPrompt.trim() ? `/chat?q=${encodeURIComponent(chatPrompt.trim())}` : "/chat"}
-                        >
-                            <Button className="w-full sm:w-auto">
-                                <Message01Icon size={16} strokeWidth={1.8} />
-                                Open chat
+                    <div className="flex flex-wrap gap-2">
+                        <Link href="/settings">
+                            <Button className="h-10 w-10 rounded-full p-0" variant="secondary">
+                                <Settings02Icon size={18} strokeWidth={1.8} />
+                            </Button>
+                        </Link>
+                        <Link href="/learn">
+                            <Button>
+                                Continue learning
+                                <ArrowRight02Icon size={15} strokeWidth={1.8} />
                             </Button>
                         </Link>
                     </div>
                 </CardContent>
             </Card>
+
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <MetricCard description="Completed lessons and quizzes" icon={<BookOpen01Icon size={18} strokeWidth={1.8} />} label="Total sessions" tone="cool" value={`${content.totalSessions}`} />
+                <MetricCard description="Accuracy across tracked topics" icon={<SchoolBell01Icon size={18} strokeWidth={1.8} />} label="Pass rate" tone="primary" value={`${content.passRate}%`} />
+                <MetricCard description="Strong topics out of all tracked" icon={<ChartBarLineIcon size={18} strokeWidth={1.8} />} label="Mastered topics" tone="success" value={`${content.masteredTopicCount}/${content.totalTopicCount}`} />
+                <MetricCard description="Progress toward your daily target" icon={<Message01Icon size={18} strokeWidth={1.8} />} label="Daily goal" tone="warm" value={`${content.dailyGoalProgress}/${content.dailyGoalTarget}`} />
+            </section>
+
+            <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Weekly momentum</CardTitle>
+                        <CardDescription>A quick visual pulse of your recent activity.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                        <div className="rounded-2xl border border-border bg-background/60 p-4">
+                            <div className="flex items-end gap-3">
+                                {content.recentActivity.map((day) => (
+                                    <div className="flex flex-1 flex-col items-center gap-2" key={day.day}>
+                                        <div className="flex h-28 w-full items-end rounded-xl bg-background-subtle px-1.5 py-1.5">
+                                            <div className={`w-full rounded-md ${day.active ? "h-20 bg-primary-500" : "h-7 bg-primary-100"}`} />
+                                        </div>
+                                        <span className="text-xs text-text-tertiary">{day.day}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Subject</TableHead>
+                                        <TableHead>Readiness</TableHead>
+                                        <TableHead>Topics</TableHead>
+                                        <TableHead>Last active</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {subjectRows.map((row) => (
+                                        <TableRow key={row.subjectId}>
+                                            <TableCell className="font-semibold">{row.name}</TableCell>
+                                            <TableCell>
+                                                <div className="space-y-2">
+                                                    <span className="text-xs text-text-secondary">{row.score}% strong</span>
+                                                    <Progress value={row.score} />
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>{row.topicCount}</TableCell>
+                                            <TableCell>{formatRelativeTime(row.lastActiveAt)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <div className="grid gap-5">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Daily target ring</CardTitle>
+                            <CardDescription>Stay on pace with your session goal.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="mt-0 flex items-center gap-4">
+                            <DailyGoalRing completed={content.dailyGoalProgress} target={content.dailyGoalTarget} />
+                            <div className="space-y-2">
+                                <p className="text-sm text-text-secondary">{content.dailyGoalProgress} of {content.dailyGoalTarget} sessions done.</p>
+                                <Badge tone="success">Momentum is building</Badge>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Top topics</CardTitle>
+                            <CardDescription>Your strongest areas right now.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {content.topTopics.slice(0, 4).map((topic) => (
+                                <div className="rounded-2xl border border-border bg-background/70 p-3" key={`${topic.subjectName}-${topic.topic}`}>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div>
+                                            <p className="text-sm font-semibold text-text-primary">{topic.topic}</p>
+                                            <p className="text-xs text-text-secondary">{topic.subjectName}</p>
+                                        </div>
+                                        <Badge tone="cool">{topic.score}%</Badge>
+                                    </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+
+                    <UrgentActionCard slot={slots.urgent_action ?? null} />
+                </div>
+            </section>
+
+            {slots.streak_nudge ? (
+                <Card className="border-primary-200 bg-primary-50">
+                    <CardContent className="mt-0 flex items-center justify-between gap-3">
+                        <p className="text-sm text-primary-700">{readSlotText(slots.streak_nudge, "description", "Stay consistent today to protect your streak.")}</p>
+                        <Button variant="ghost">Dismiss</Button>
+                    </CardContent>
+                </Card>
+            ) : null}
+
+            <section className="grid gap-5 xl:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.9fr)]">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Recent sessions</CardTitle>
+                        <CardDescription>Last lessons and quizzes from your activity stream.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {content.recentSessions.length ? (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Topic</TableHead>
+                                        <TableHead>Subject</TableHead>
+                                        <TableHead>When</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {content.recentSessions.map((session) => (
+                                        <TableRow key={session.id}>
+                                            <TableCell><Badge tone={session.type === "quiz" ? "warm" : "cool"}>{session.type === "quiz" ? "Quiz" : "Lesson"}</Badge></TableCell>
+                                            <TableCell className="font-medium">{session.topic}</TableCell>
+                                            <TableCell>{session.subjectName}</TableCell>
+                                            <TableCell>{formatRelativeTime(session.completedAt)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <p className="text-sm text-text-secondary">No sessions yet. Start your first lesson to build momentum.</p>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Ask Lernard anything</CardTitle>
+                        <CardDescription>Turn your next question into focused learning fast.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex flex-col gap-3">
+                            <Input onChange={(event) => setChatPrompt(event.target.value)} placeholder="Ask a question about your current topic" value={chatPrompt} />
+                            <Link className="w-full" href={chatPrompt.trim() ? `/chat?q=${encodeURIComponent(chatPrompt.trim())}` : "/chat"}>
+                                <Button className="w-full">
+                                    <Message01Icon size={16} strokeWidth={1.8} />
+                                    Open chat
+                                </Button>
+                            </Link>
+
+                            {slots.primary_cta ? (
+                                <Button className="w-full" variant="secondary">
+                                    {readSlotText(slots.primary_cta, "title", "Continue learning")}
+                                </Button>
+                            ) : null}
+                        </div>
+                    </CardContent>
+                </Card>
+            </section>
         </div>
+    );
+}
+
+function MetricCard({
+    label,
+    value,
+    description,
+    icon,
+    tone,
+}: {
+    label: string;
+    value: string;
+    description: string;
+    icon: ReactNode;
+    tone: "primary" | "cool" | "success" | "warm";
+}) {
+    return (
+        <Card>
+            <CardContent className="mt-0 space-y-3">
+                <div className="flex items-center justify-between">
+                    <Badge className="w-fit" tone={tone}>{label}</Badge>
+                    <span className="text-primary-500">{icon}</span>
+                </div>
+                <p className="text-2xl font-semibold text-text-primary">{value}</p>
+                <p className="text-xs text-text-secondary">{description}</p>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -212,14 +317,7 @@ function DailyGoalRing({ completed, target }: { completed: number; target: numbe
     return (
         <div className="relative flex h-28 w-28 items-center justify-center">
             <svg className="-rotate-90" height={size} viewBox={`0 0 ${size} ${size}`} width={size}>
-                <circle
-                    cx={size / 2}
-                    cy={size / 2}
-                    fill="none"
-                    r={radius}
-                    stroke="#E6EBFA"
-                    strokeWidth={strokeWidth}
-                />
+                <circle cx={size / 2} cy={size / 2} fill="none" r={radius} stroke="#E6EBFA" strokeWidth={strokeWidth} />
                 <circle
                     cx={size / 2}
                     cy={size / 2}
@@ -248,9 +346,7 @@ function UrgentActionCard({ slot }: { slot: SlotContent | null }) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <CardTitle>{readSlotText(slot, "title", "Action needed")}</CardTitle>
-                        <CardDescription>
-                            {readSlotText(slot, "description", "You have a quick action waiting.")}
-                        </CardDescription>
+                        <CardDescription>{readSlotText(slot, "description", "You have a quick action waiting.")}</CardDescription>
                     </div>
                     <Badge tone="warm">Urgent</Badge>
                 </div>
