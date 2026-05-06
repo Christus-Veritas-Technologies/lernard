@@ -27,6 +27,7 @@ export class HomeService {
           lastActiveAt: true,
           dailyGoal: true,
           sessionCount: true,
+          firstLookComplete: true,
         },
       }),
       this.prisma.userSubject.findMany({
@@ -157,7 +158,7 @@ export class HomeService {
 
     return buildPagePayload(content, {
       permissions: buildHomePermissions(),
-      slots: buildHomeSlots(user.sessionCount),
+      slots: buildHomeSlots(user.firstLookComplete),
     });
   }
 }
@@ -183,8 +184,8 @@ function buildHomePermissions(): ScopedPermission[] {
   return [{ action: 'can_edit_mode' }];
 }
 
-function buildHomeSlots(sessionCount: number): SlotAssignments {
-  if (sessionCount === 0) {
+function buildHomeSlots(firstLookComplete: boolean): SlotAssignments {
+  if (!firstLookComplete) {
     return {
       ...buildNullSlots(['streak_nudge', 'primary_cta']),
       urgent_action: {

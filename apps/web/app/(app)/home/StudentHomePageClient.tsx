@@ -15,6 +15,7 @@ import { ROUTES } from "@lernard/routes";
 import type { HomeContent, SlotContent } from "@lernard/shared-types";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -26,6 +27,7 @@ import { usePagePayload } from "@/hooks/usePagePayload";
 export function StudentHomePageClient() {
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<HomeContent>(ROUTES.HOME.PAYLOAD);
     const [chatPrompt, setChatPrompt] = useState("");
+    const [dismissedUrgentAction, setDismissedUrgentAction] = useState(false);
     const initials = useMemo(() => (data ? getInitialsFromGreeting(data.content.greeting) : ""), [data]);
 
     if (!isAuthenticated) {
@@ -236,7 +238,12 @@ export function StudentHomePageClient() {
                         </CardContent>
                     </Card>
 
-                    <UrgentActionCard slot={slots.urgent_action ?? null} />
+                    {dismissedUrgentAction ? null : (
+                        <UrgentActionCard
+                            onClose={() => setDismissedUrgentAction(true)}
+                            slot={slots.urgent_action ?? null}
+                        />
+                    )}
                 </div>
             </section>
 
@@ -393,27 +400,40 @@ function DailyGoalRing({ completed, target }: { completed: number; target: numbe
     );
 }
 
-function UrgentActionCard({ slot }: { slot: SlotContent | null }) {
+function UrgentActionCard({
+    slot,
+    onClose,
+}: {
+    slot: SlotContent | null;
+    onClose: () => void;
+}) {
     if (!slot) return null;
 
+    const isFirstLookPrompt = slot.type === "first_lesson_nudge";
+    const actionHref = isFirstLookPrompt ? "/first-look" : "/learn";
+    const actionLabel = isFirstLookPrompt ? "Open First Look" : "Open";
+
     return (
-        <Card className="border-accent-warm-300 bg-accent-warm-100/45">
-            <CardHeader>
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <CardTitle>{readSlotText(slot, "title", "Action needed")}</CardTitle>
-                        <CardDescription>{readSlotText(slot, "description", "You have a quick action waiting.")}</CardDescription>
-                    </div>
-                    <Badge tone="warm">Urgent</Badge>
+        <Alert className="rounded-2xl border-amber-300 bg-amber-50/80" variant="warning">
+            <div className="flex items-start justify-between gap-3">
+                <div>
+                    <AlertTitle>{readSlotText(slot, "title", "Action needed")}</AlertTitle>
+                    <AlertDescription>{readSlotText(slot, "description", "You have a quick action waiting.")}</AlertDescription>
                 </div>
-            </CardHeader>
-            <CardContent>
-                <Button>
-                    Open
-                    <ArrowRight02Icon size={15} strokeWidth={1.8} />
-                </Button>
-            </CardContent>
-        </Card>
+                <div className="flex items-center gap-2">
+                    <Badge tone="warm">Urgent</Badge>
+                    <Button className="h-8 px-3" onClick={onClose} type="button" variant="ghost">Close</Button>
+                </div>
+            </div>
+            <div className="mt-3">
+                <Link href={actionHref}>
+                    <Button>
+                        {actionLabel}
+                        <ArrowRight02Icon size={15} strokeWidth={1.8} />
+                    </Button>
+                </Link>
+            </div>
+        </Alert>
     );
 }
 
