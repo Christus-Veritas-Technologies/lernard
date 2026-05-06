@@ -129,7 +129,7 @@ export function AppShellNav() {
                         return (
                             <Link
                                 className={cn(
-                                    "flex min-h-14 flex-col items-center justify-center rounded-2xl px-2 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                    "flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-4 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                                     isActive
                                         ? "bg-primary-500 text-text-inverse"
                                         : "text-text-secondary hover:bg-background-subtle",
@@ -140,9 +140,6 @@ export function AppShellNav() {
                                 <Icon className={isActive ? "text-text-inverse" : "text-primary-500"} size={20} strokeWidth={1.9} />
                                 <span className={cn("text-xs font-semibold", isActive ? "text-text-inverse" : "text-text-primary")}>
                                     {item.label}
-                                </span>
-                                <span className={cn("mt-1 text-[11px]", isActive ? "text-primary-100" : "text-text-tertiary")}>
-                                    {item.description}
                                 </span>
                             </Link>
                         );
