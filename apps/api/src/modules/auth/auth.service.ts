@@ -14,7 +14,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
 const SALT_ROUNDS = 12;
-const REFRESH_TOKEN_DAYS = 30;
+const REFRESH_TOKEN_DAYS = 90;
 
 interface GoogleProfile {
   googleId: string;
