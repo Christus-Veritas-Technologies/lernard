@@ -51,18 +51,18 @@ export function LoginClient() {
     return (
         <AuthShell
             badge="Lernard"
-            title="Sign in — no password needed"
-            description="Enter your email and we'll send a one-click link straight to your inbox."
+            title="Your personal AI tutor"
+            description="Every lesson is built around you — your pace, your gaps, your goals."
             highlights={[
                 {
-                    title: "No password to remember",
-                    description: "We'll email you a fresh one-click link every time you want to sign in.",
+                    title: "Learning that actually sticks",
+                    description: "Lernard adapts to what you know and fills the gaps before they become problems.",
                     icon: ShieldKeyIcon,
                     tone: "primary",
                 },
                 {
-                    title: "New here? You're covered",
-                    description: "If you don't have an account yet, we'll create one automatically.",
+                    title: "Pick up exactly where you left off",
+                    description: "Your progress, subjects, and next steps are always waiting for you.",
                     icon: SparklesIcon,
                     tone: "secondary",
                 },
