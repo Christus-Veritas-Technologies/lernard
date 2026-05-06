@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,10 +10,122 @@ import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
 import { StateNotice } from '@/components/StateNotice';
+import GuardianDashboardScreen from '@/app/(app)/guardian';
 import { usePagePayload } from '@/hooks/usePagePayload';
 import { formatRelativeDate } from '@/lib/formatters';
+import { nativeApiFetch } from '@/lib/native-api';
+import { useAuthStore } from '@/store/store';
 
 export default function HomeScreen() {
+    const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+    const [role, setRole] = useState<string | null>(null);
+    const [roleError, setRoleError] = useState<Error | null>(null);
+    const [roleLoading, setRoleLoading] = useState(isAuthenticated);
+    const [requestVersion, setRequestVersion] = useState(0);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        if (!isAuthenticated) {
+            setRole(null);
+            setRoleError(null);
+            setRoleLoading(false);
+            return () => {
+                cancelled = true;
+            };
+        }
+
+        async function loadRole() {
+            setRoleLoading(true);
+            setRoleError(null);
+
+            try {
+                const user = await nativeApiFetch<AuthUser>(ROUTES.AUTH.ME);
+
+                if (cancelled) {
+                    return;
+                }
+
+                setRole(user.role);
+            } catch (error) {
+                if (cancelled) {
+                    return;
+                }
+
+                setRole(null);
+                setRoleError(error instanceof Error ? error : new Error('Could not confirm your account role.'));
+            } finally {
+                if (!cancelled) {
+                    setRoleLoading(false);
+                }
+            }
+        }
+
+        void loadRole();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [isAuthenticated, requestVersion]);
+
+    if (!isAuthenticated) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        badge="Sign in required"
+                        description="Lernard needs your session token before it can load your real Home payload on mobile."
+                        title="Your dashboard is ready when you are"
+                        tone="warm"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (roleLoading) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        badge="Loading"
+                        description="Confirming your account role before loading the correct live dashboard."
+                        title="Preparing Home"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (roleError) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        actionTitle="Try again"
+                        badge="Role check failed"
+                        description={roleError.message}
+                        onActionPress={() => setRequestVersion((current) => current + 1)}
+                        title="Home could not confirm your account"
+                        tone="warning"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (role === 'guardian') {
+        return <GuardianDashboardScreen />;
+    }
+
+    return <StudentHomeDashboardScreen />;
+}
+
+interface AuthUser {
+    role: string;
+}
+
+function StudentHomeDashboardScreen() {
     const router = useRouter();
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<HomeContent>(
         ROUTES.HOME.PAYLOAD,

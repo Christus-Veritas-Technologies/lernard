@@ -73,41 +73,73 @@ export function StudentHomePageClient() {
 
     return (
         <div className="flex flex-col gap-5">
-            <Card className="overflow-hidden bg-[linear-gradient(135deg,#f9fbff_0%,#ffffff_50%,#fff7f2_100%)]">
-                <CardContent className="mt-0 flex flex-wrap items-start justify-between gap-5">
-                    <div className="space-y-3">
-                        <Badge className="w-fit" tone="cool">Student Home</Badge>
+            <Card className="overflow-hidden border-0 bg-[linear-gradient(135deg,#1f3a8a_0%,#2d4ec8_45%,#7c3aed_100%)] text-white shadow-[0_24px_80px_-32px_rgba(30,64,175,0.65)]">
+                <CardContent className="mt-0 grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_320px] xl:items-start">
+                    <div className="space-y-4">
+                        <Badge className="w-fit bg-white/14 text-white" tone="muted">Student Home</Badge>
                         <div className="flex items-center gap-3">
-                            <Avatar>
-                                <AvatarFallback>{initials}</AvatarFallback>
+                            <Avatar className="border border-white/20 bg-white/10">
+                                <AvatarFallback className="bg-white/10 text-white">{initials}</AvatarFallback>
                             </Avatar>
                             <div>
-                                <p className="text-sm text-text-secondary">Good to see you</p>
-                                <h1 className="text-2xl font-semibold text-text-primary">{content.greeting}</h1>
+                                <p className="text-sm text-white/72">Good to see you</p>
+                                <h1 className="text-2xl font-semibold text-white">{content.greeting}</h1>
                             </div>
                         </div>
-                        <p className="max-w-2xl text-sm leading-6 text-text-secondary">
+                        <p className="max-w-2xl text-sm leading-6 text-white/82">
                             Your dashboard is built around momentum first: quick progress reads, subject health, and fast actions into lessons, quizzes, and chat.
                         </p>
                         <div className="flex flex-wrap gap-2">
-                            <Badge tone="success">{content.streak}-day streak</Badge>
-                            <Badge tone="primary">XP level {content.xpLevel}</Badge>
-                            <Badge tone="warm">Pass rate {content.passRate}%</Badge>
+                            <Badge className="bg-emerald-300/16 text-white" tone="muted">{content.streak}-day streak</Badge>
+                            <Badge className="bg-white/14 text-white" tone="muted">XP level {content.xpLevel}</Badge>
+                            <Badge className="bg-amber-300/18 text-white" tone="muted">Pass rate {content.passRate}%</Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-2 pt-2">
+                            <Link href="/learn">
+                                <Button className="bg-white text-primary-700 hover:bg-white/92">
+                                    Continue learning
+                                    <ArrowRight02Icon size={15} strokeWidth={1.8} />
+                                </Button>
+                            </Link>
+                            <Link href="/chat">
+                                <Button className="border-white/20 bg-white/10 text-white hover:bg-white/16" variant="ghost">
+                                    <Message01Icon size={16} strokeWidth={1.8} />
+                                    Ask Lernard
+                                </Button>
+                            </Link>
+                            <Link href="/settings">
+                                <Button className="border-white/20 bg-transparent text-white hover:bg-white/10" variant="ghost">
+                                    <Settings02Icon size={16} strokeWidth={1.8} />
+                                    Settings
+                                </Button>
+                            </Link>
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
-                        <Link href="/settings">
-                            <Button className="h-10 w-10 rounded-full p-0" variant="secondary">
-                                <Settings02Icon size={18} strokeWidth={1.8} />
-                            </Button>
-                        </Link>
-                        <Link href="/learn">
-                            <Button>
-                                Continue learning
-                                <ArrowRight02Icon size={15} strokeWidth={1.8} />
-                            </Button>
-                        </Link>
+                    <div className="grid gap-3 rounded-[28px] border border-white/16 bg-white/10 p-4 backdrop-blur-sm">
+                        <div className="flex items-center justify-between gap-3 rounded-2xl bg-white/12 p-4">
+                            <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/72">Today</p>
+                                <p className="mt-2 text-3xl font-semibold text-white">{content.dailyGoalProgress}/{content.dailyGoalTarget}</p>
+                            </div>
+                            <div className="rounded-2xl bg-white/14 p-3 text-white">
+                                <ChartBarLineIcon size={20} strokeWidth={1.8} />
+                            </div>
+                        </div>
+                        <div className="rounded-2xl bg-white px-4 py-4 text-text-primary">
+                            <div className="flex items-center justify-between gap-3">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary-600">Strength map</p>
+                                    <p className="mt-2 text-base font-semibold">{content.masteredTopicCount} strong topics</p>
+                                </div>
+                                <div className="rounded-2xl bg-primary-50 p-3 text-primary-600">
+                                    <SchoolBell01Icon size={20} strokeWidth={1.8} />
+                                </div>
+                            </div>
+                            <p className="mt-2 text-sm leading-6 text-text-secondary">
+                                {content.totalTopicCount - content.masteredTopicCount} topics are still open for growth.
+                            </p>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -170,7 +202,7 @@ export function StudentHomePageClient() {
                 </Card>
 
                 <div className="grid gap-5">
-                    <Card>
+                    <Card className="border-0 bg-[linear-gradient(160deg,#eef2ff_0%,#ffffff_100%)] shadow-sm">
                         <CardHeader>
                             <CardTitle>Daily target ring</CardTitle>
                             <CardDescription>Stay on pace with your session goal.</CardDescription>
@@ -184,14 +216,14 @@ export function StudentHomePageClient() {
                         </CardContent>
                     </Card>
 
-                    <Card>
+                    <Card className="border-0 bg-[linear-gradient(160deg,#fff7ed_0%,#ffffff_100%)] shadow-sm">
                         <CardHeader>
                             <CardTitle>Top topics</CardTitle>
                             <CardDescription>Your strongest areas right now.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
                             {content.topTopics.slice(0, 4).map((topic) => (
-                                <div className="rounded-2xl border border-border bg-background/70 p-3" key={`${topic.subjectName}-${topic.topic}`}>
+                                <div className="rounded-2xl border border-amber-100 bg-white/80 p-3" key={`${topic.subjectName}-${topic.topic}`}>
                                     <div className="flex items-center justify-between gap-3">
                                         <div>
                                             <p className="text-sm font-semibold text-text-primary">{topic.topic}</p>
@@ -209,10 +241,15 @@ export function StudentHomePageClient() {
             </section>
 
             {slots.streak_nudge ? (
-                <Card className="border-primary-200 bg-primary-50">
+                <Card className="border-0 bg-[linear-gradient(135deg,#f59e0b_0%,#f97316_100%)] text-white shadow-[0_22px_60px_-34px_rgba(249,115,22,0.7)]">
                     <CardContent className="mt-0 flex items-center justify-between gap-3">
-                        <p className="text-sm text-primary-700">{readSlotText(slots.streak_nudge, "description", "Stay consistent today to protect your streak.")}</p>
-                        <Button variant="ghost">Dismiss</Button>
+                        <div className="flex items-center gap-3">
+                            <div className="rounded-2xl bg-white/16 p-3">
+                                <SchoolBell01Icon size={18} strokeWidth={1.8} />
+                            </div>
+                            <p className="text-sm text-white">{readSlotText(slots.streak_nudge, "description", "Stay consistent today to protect your streak.")}</p>
+                        </div>
+                        <Button className="bg-white text-amber-700 hover:bg-white/92">Dismiss</Button>
                     </CardContent>
                 </Card>
             ) : null}
@@ -251,7 +288,7 @@ export function StudentHomePageClient() {
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className="border-0 bg-[linear-gradient(160deg,#eff6ff_0%,#ffffff_100%)] shadow-sm">
                     <CardHeader>
                         <CardTitle>Ask Lernard anything</CardTitle>
                         <CardDescription>Turn your next question into focused learning fast.</CardDescription>
@@ -267,7 +304,7 @@ export function StudentHomePageClient() {
                             </Link>
 
                             {slots.primary_cta ? (
-                                <Button className="w-full" variant="secondary">
+                                <Button className="w-full" variant="ghost">
                                     {readSlotText(slots.primary_cta, "title", "Continue learning")}
                                 </Button>
                             ) : null}
@@ -292,12 +329,31 @@ function MetricCard({
     icon: ReactNode;
     tone: "primary" | "cool" | "success" | "warm";
 }) {
+    const styles = {
+        primary: {
+            card: "border-0 bg-[linear-gradient(180deg,#e8eeff_0%,#ffffff_100%)]",
+            iconWrap: "bg-primary-500 text-white",
+        },
+        cool: {
+            card: "border-0 bg-[linear-gradient(180deg,#edf7ff_0%,#ffffff_100%)]",
+            iconWrap: "bg-accent-cool-100 text-primary-700",
+        },
+        success: {
+            card: "border-0 bg-[linear-gradient(180deg,#ecfdf3_0%,#ffffff_100%)]",
+            iconWrap: "bg-success text-white",
+        },
+        warm: {
+            card: "border-0 bg-[linear-gradient(180deg,#fff4e6_0%,#ffffff_100%)]",
+            iconWrap: "bg-warning text-white",
+        },
+    } satisfies Record<typeof tone, { card: string; iconWrap: string }>;
+
     return (
-        <Card>
+        <Card className={styles[tone].card}>
             <CardContent className="mt-0 space-y-3">
                 <div className="flex items-center justify-between">
                     <Badge className="w-fit" tone={tone}>{label}</Badge>
-                    <span className="text-primary-500">{icon}</span>
+                    <span className={`rounded-2xl p-3 ${styles[tone].iconWrap}`}>{icon}</span>
                 </div>
                 <p className="text-2xl font-semibold text-text-primary">{value}</p>
                 <p className="text-xs text-text-secondary">{description}</p>
