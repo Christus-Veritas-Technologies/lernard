@@ -4,35 +4,34 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
     AccountTypePayload,
     FirstLookSubmission,
-    LoginPayload,
+    MagicLinkRequestPayload,
+    MagicLinkVerifyPayload,
     ProfileSetupPayload,
-    RegisterPayload,
 } from "@lernard/shared-types";
 
 import {
     getMe,
-    login,
     logout,
     persistAuthResponse,
-    register,
+    requestMagicLink,
     saveProfileSetup,
     saveSubjects,
     setAccountType,
     skipFirstLook,
     startFirstLook,
     submitFirstLook,
+    verifyMagicLink,
 } from "@/lib/auth-client";
 
-export function useLoginMutation() {
+export function useRequestMagicLinkMutation() {
     return useMutation({
-        mutationFn: (payload: LoginPayload) => login(payload),
-        onSuccess: persistAuthResponse,
+        mutationFn: (payload: MagicLinkRequestPayload) => requestMagicLink(payload),
     });
 }
 
-export function useRegisterMutation() {
+export function useVerifyMagicLinkMutation() {
     return useMutation({
-        mutationFn: (payload: RegisterPayload) => register(payload),
+        mutationFn: (payload: MagicLinkVerifyPayload) => verifyMagicLink(payload),
         onSuccess: persistAuthResponse,
     });
 }

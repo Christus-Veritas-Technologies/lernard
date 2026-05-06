@@ -1,26 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { motion } from "framer-motion";
 
-import { Mail01Icon, LockPasswordIcon } from "hugeicons-react";
+import { Mail01Icon, SparklesIcon, ShieldKeyIcon } from "hugeicons-react";
 
-import { Button } from "@/components/ui/button";
+import { AuthShell } from "@/components/auth/AuthShell";
 import { AuthField } from "@/components/auth/AuthField";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 import { AuthApiError } from "@/lib/auth-client";
-import { useLoginMutation } from "@/hooks/useAuthMutations";
+import { useRequestMagicLinkMutation } from "@/hooks/useAuthMutations";
 
 const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
         opacity: 1,
-        transition: {
-            staggerChildren: 0.08,
-            delayChildren: 0.1,
-        },
+        transition: { staggerChildren: 0.08, delayChildren: 0.1 },
     },
 };
 
@@ -35,38 +31,31 @@ const itemVariants = {
 
 export function LoginClient() {
     const router = useRouter();
-    const { mutate, isPending, isError, error } = useLoginMutation();
+    const { mutate, isPending, isError, error } = useRequestMagicLinkMutation();
 
     const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+    const [emailError, setEmailError] = useState<string | undefined>();
 
     function validate() {
-        const errors: typeof fieldErrors = {};
-        if (!email) errors.email = "Email is required";
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = "Enter a valid email";
-        if (!password) errors.password = "Password is required";
-        return errors;
+        if (!email.trim()) return "Email is required";
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email address";
+        return null;
     }
 
     async function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        const errors = validate();
-        if (Object.keys(errors).length) {
-            setFieldErrors(errors);
+        const err = validate();
+        if (err) {
+            setEmailError(err);
             return;
         }
-        setFieldErrors({});
+        setEmailError(undefined);
 
         mutate(
-            { email: email.trim().toLowerCase(), password },
+            { email: email.trim().toLowerCase(), platform: "web" },
             {
-                onSuccess: (data) => {
-                    if (!data.user.onboardingComplete) {
-                        router.push("/account-type");
-                    } else {
-                        router.push("/home");
-                    }
+                onSuccess: () => {
+                    router.push(`/auth/check-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
                 },
             },
         );
@@ -80,74 +69,70 @@ export function LoginClient() {
                 : null;
 
     return (
-        <motion.div
-            className="flex flex-col gap-8"
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
+        <AuthShell
+            badge="Welcome"
+            title="Sign in to Lernard"
+            description="Enter your email and we'll send you a sign-in link — no password needed."
+            highlights={[
+                {
+                    title: "No password to remember",
+                    description: "We'll email you a one-click link every time you want to sign in.",
+                    icon: ShieldKeyIcon,
+                    tone: "primary",
+                },
+                {
+                    title: "New? We'll set you up",
+                    description: "If you don't have an account yet, we'll create one automatically.",
+                    icon: SparklesIcon,
+                    tone: "secondary",
+                },
+            ]}
         >
-            <motion.div variants={itemVariants}>
-                <h1 className="text-3xl font-bold text-text-primary">Welcome back</h1>
-                <p className="mt-1 text-text-secondary">Log in to continue with Lernard.</p>
-            </motion.div>
+            <motion.div
+                className="flex flex-col gap-6"
+                variants={containerVariants}
+                initial="hidden"
+                animate="visible"
+            >
+                <motion.form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4" variants={itemVariants}>
+                    {apiError && (
+                        <div className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error">
+                            {apiError}
+                        </div>
+                    )}
 
-            <motion.form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4" variants={itemVariants}>
-                {apiError && (
-                    <div className="rounded-xl bg-error-bg px-4 py-3 text-sm text-error">
-                        {apiError}
+                    <AuthField
+                        label="Email address"
+                        type="email"
+                        autoComplete="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="you@example.com"
+                        error={emailError}
+                        icon={<Mail01Icon size={18} />}
+                    />
+
+                    <motion.button
+                        type="submit"
+                        disabled={isPending}
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="mt-1 flex h-12 items-center justify-center rounded-2xl bg-primary-500 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-600 disabled:opacity-60"
+                    >
+                        {isPending ? "Sending link…" : "Send sign-in link"}
+                    </motion.button>
+                </motion.form>
+
+                <motion.div className="flex flex-col gap-2.5" variants={itemVariants}>
+                    <div className="flex items-center gap-3 py-1">
+                        <div className="h-px flex-1 bg-border" />
+                        <span className="text-xs text-text-tertiary">or</span>
+                        <div className="h-px flex-1 bg-border" />
                     </div>
-                )}
 
-                <AuthField
-                    label="Email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    error={fieldErrors.email}
-                    icon={<Mail01Icon size={18} />}
-                />
-
-                <AuthField
-                    label="Password"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Your password"
-                    error={fieldErrors.password}
-                    icon={<LockPasswordIcon size={18} />}
-                />
-
-                <motion.button
-                    type="submit"
-                    disabled={isPending}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="mt-2 flex h-12 items-center justify-center rounded-2xl bg-primary-500 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-600 disabled:opacity-60"
-                >
-                    {isPending ? "Logging in…" : "Log in"}
-                </motion.button>
-            </motion.form>
-
-            <motion.div className="flex flex-col gap-2.5" variants={itemVariants}>
-                <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                    <Button asChild variant="secondary" className="w-full h-12 text-sm font-semibold">
-                        <Link href="/register">
-                            Don&apos;t have an account? Sign up
-                        </Link>
-                    </Button>
+                    <GoogleSignInButton />
                 </motion.div>
-
-                <div className="flex items-center gap-3 py-1">
-                    <div className="h-px flex-1 bg-border" />
-                    <span className="text-xs text-text-tertiary">or</span>
-                    <div className="h-px flex-1 bg-border" />
-                </div>
-
-                <GoogleSignInButton />
             </motion.div>
-        </motion.div>
+        </AuthShell>
     );
 }

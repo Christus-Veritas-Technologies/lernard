@@ -15,10 +15,11 @@ import type {
     FirstLookSkipResponse,
     FirstLookStartResponse,
     FirstLookSubmission,
-    LoginPayload,
+    MagicLinkRequestPayload,
+    MagicLinkRequestResponse,
+    MagicLinkVerifyPayload,
     ProfileSetupPayload,
     ProfileSetupResponse,
-    RegisterPayload,
     SubjectSelectionResponse,
 } from "@lernard/shared-types";
 
@@ -116,23 +117,27 @@ export function persistAuthResponse(response: AuthResponse) {
     setRefreshToken(response.refreshToken);
 }
 
-export async function register(payload: RegisterPayload): Promise<AuthResponse> {
-    const response = await authApi.post<AuthResponse>(
-        ROUTES.AUTH.REGISTER,
+// ─── Magic Link ──────────────────────────────────────────────────────────────
+
+export async function requestMagicLink(payload: MagicLinkRequestPayload): Promise<MagicLinkRequestResponse> {
+    const response = await authApi.post<MagicLinkRequestResponse>(
+        ROUTES.AUTH.MAGIC_LINK_REQUEST,
         payload,
         { skipAuth: true } satisfies AxiosRequestConfig,
     );
     return response.data;
 }
 
-export async function login(payload: LoginPayload): Promise<AuthResponse> {
+export async function verifyMagicLink(payload: MagicLinkVerifyPayload): Promise<AuthResponse> {
     const response = await authApi.post<AuthResponse>(
-        ROUTES.AUTH.LOGIN,
+        ROUTES.AUTH.MAGIC_LINK_VERIFY,
         payload,
         { skipAuth: true } satisfies AxiosRequestConfig,
     );
     return response.data;
 }
+
+// ─── Google OAuth ─────────────────────────────────────────────────────────────
 
 interface GoogleSessionResponse {
     accessToken: string;
@@ -148,6 +153,8 @@ export async function exchangeGoogleSession(code: string): Promise<GoogleSession
     return response.data;
 }
 
+// ─── Session Management ───────────────────────────────────────────────────────
+
 export async function logout(): Promise<void> {
     const refreshToken = getRefreshToken();
     if (!refreshToken) {
@@ -155,10 +162,7 @@ export async function logout(): Promise<void> {
         return;
     }
 
-    await authApi.post(
-        ROUTES.AUTH.LOGOUT,
-        { refreshToken },
-    );
+    await authApi.post(ROUTES.AUTH.LOGOUT, { refreshToken });
     clearTokens();
 }
 
@@ -166,6 +170,8 @@ export async function getMe() {
     const response = await authApi.get<AuthResponse["user"]>(ROUTES.AUTH.ME);
     return response.data;
 }
+
+// ─── Onboarding ───────────────────────────────────────────────────────────────
 
 export async function setAccountType(payload: AccountTypePayload): Promise<AccountTypePayload> {
     const response = await authApi.post<AccountTypePayload>(ROUTES.ONBOARDING.ACCOUNT_TYPE, payload);
@@ -197,6 +203,8 @@ export async function skipFirstLook(): Promise<FirstLookSkipResponse> {
     return response.data;
 }
 
+// ─── Internal ─────────────────────────────────────────────────────────────────
+
 async function refreshSession(refreshToken: string): Promise<string> {
     const response = await refreshApi.post<RefreshResponse>(ROUTES.AUTH.REFRESH, { refreshToken });
     setAccessToken(response.data.accessToken);
@@ -211,32 +219,20 @@ function normalizeAxiosError(error: AxiosError): AuthApiError {
 }
 
 function stringifyErrorBody(value: unknown): string {
-    if (typeof value === "string") {
-        return value;
-    }
+    if (typeof value === "string") return value;
 
     if (value && typeof value === "object" && "message" in value) {
         const message = (value as { message?: unknown }).message;
-        if (Array.isArray(message)) {
-            return message.join(" ");
-        }
-        if (typeof message === "string") {
-            return message;
-        }
+        if (Array.isArray(message)) return message.join(" ");
+        if (typeof message === "string") return message;
     }
 
     return "Something went wrong. Please try again.";
 }
 
 function getErrorMessage(body: string, status: number): string {
-    if (body.trim().length > 0) {
-        return body;
-    }
-
-    if (status === 401) {
-        return "Your session has expired. Sign in again to continue.";
-    }
-
+    if (body.trim().length > 0) return body;
+    if (status === 401) return "Your session has expired. Sign in again to continue.";
     return `Request failed with status ${status}.`;
 }
 
