@@ -142,7 +142,7 @@ interface GoogleSessionResponse {
 
 export async function exchangeGoogleSession(code: string): Promise<GoogleSessionResponse> {
     const response = await authApi.get<GoogleSessionResponse>(
-        `${ROUTES.AUTH.GOOGLE_SESSION}?code=${encodeURIComponent(code)}`,
+        `${ROUTES.AUTH.GOOGLE}/session?code=${encodeURIComponent(code)}`,
         { skipAuth: true } satisfies AxiosRequestConfig,
     );
     return response.data;
