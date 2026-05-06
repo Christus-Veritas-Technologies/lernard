@@ -20,6 +20,8 @@ import type {
 import { nativeApiFetch } from '@/lib/native-api';
 import { useAuthStore } from '@/store/store';
 
+WebBrowser.maybeCompleteAuthSession();
+
 // ---------------------------------------------------------------------------
 // Shared helpers
 // ---------------------------------------------------------------------------
@@ -267,6 +269,10 @@ export function useNativeGoogleAuth() {
     const [error, setError] = useState<string | null>(null);
 
     const signIn = useCallback(async () => {
+        if (isLoading) {
+            return;
+        }
+
         setIsLoading(true);
         setError(null);
         try {
@@ -278,12 +284,24 @@ export function useNativeGoogleAuth() {
                 'lernard://',
             );
 
-            if (result.type !== 'success' || !result.url) return;
+            if (result.type === 'cancel' || result.type === 'dismiss') {
+                return;
+            }
 
-            const hashIndex = result.url.indexOf('#');
-            if (hashIndex === -1) return;
+            if (result.type !== 'success' || !result.url) {
+                setError('Google sign-in did not complete. Please try again.');
+                return;
+            }
 
-            const params = new URLSearchParams(result.url.slice(hashIndex + 1));
+            const callbackUrl = new URL(result.url);
+            const hash = callbackUrl.hash.startsWith('#') ? callbackUrl.hash.slice(1) : callbackUrl.hash;
+
+            if (!hash) {
+                setError('Google sign-in returned an invalid response.');
+                return;
+            }
+
+            const params = new URLSearchParams(hash);
             const accessToken = params.get('accessToken');
             const refreshToken = params.get('refreshToken');
             const onboardingComplete = params.get('onboardingComplete') === '1';
@@ -301,7 +319,7 @@ export function useNativeGoogleAuth() {
         } finally {
             setIsLoading(false);
         }
-    }, [router, setTokens, setOnboardingComplete]);
+    }, [isLoading, router, setTokens, setOnboardingComplete]);
 
     return { signIn, isLoading, error };
 }
