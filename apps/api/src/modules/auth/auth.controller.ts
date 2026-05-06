@@ -1,8 +1,9 @@
-import { Controller, Post, Get, Body, UseGuards, Req, Res } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, UseGuards, Req, Res, NotFoundException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@lernard/shared-types';
 import { AuthService } from './auth.service';
+import { GoogleSessionStore } from './google-session.store';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
@@ -17,6 +18,7 @@ import type { Request, Response } from 'express';
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
+    private readonly googleSessionStore: GoogleSessionStore,
     private readonly configService: ConfigService,
   ) {}
 
@@ -82,18 +84,32 @@ export class AuthController {
       const params = new URLSearchParams(state);
       const client = params.get('client');
 
-      const hash = `#accessToken=${encodeURIComponent(tokens.accessToken)}&refreshToken=${encodeURIComponent(tokens.refreshToken)}&onboardingComplete=${tokens.user.onboardingComplete ? '1' : '0'}`;
+      const sessionCode = this.googleSessionStore.create({
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        onboardingComplete: tokens.user.onboardingComplete,
+      });
 
       if (client === 'native') {
+        // Native still uses hash for deep link compatibility
+        const hash = `#accessToken=${encodeURIComponent(tokens.accessToken)}&refreshToken=${encodeURIComponent(tokens.refreshToken)}&onboardingComplete=${tokens.user.onboardingComplete ? '1' : '0'}`;
         return res.redirect(`lernard://auth/callback${hash}`);
       }
 
       const webAppUrl = this.configService.getOrThrow<string>('WEB_APP_URL');
-      return res.redirect(`${webAppUrl}/google/callback${hash}`);
+      return res.redirect(`${webAppUrl}/google/callback?code=${sessionCode}`);
     } catch (error) {
       console.error('Google callback error:', error);
       return res.redirect(`${this.configService.get('WEB_APP_URL')}/login?error=server_error`);
     }
+  }
+
+  @Get('google/session')
+  exchangeGoogleSession(@Query('code') code: string) {
+    if (!code) throw new NotFoundException();
+    const session = this.googleSessionStore.consume(code);
+    if (!session) throw new NotFoundException('Session expired or invalid');
+    return session;
   }
 
   @Post('apple')

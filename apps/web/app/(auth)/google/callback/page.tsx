@@ -4,13 +4,9 @@ import { Orbit01Icon, SparklesIcon } from "hugeicons-react";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
-import {
-    getAccessToken,
-    getRefreshToken,
-    setAccessToken,
-    setRefreshToken,
-} from "@lernard/auth-core";
+import { setAccessToken, setRefreshToken } from "@lernard/auth-core";
 
+import { exchangeGoogleSession } from "@/lib/auth-client";
 import { getPostCallbackRoute } from "@/lib/auth-routes";
 
 export default function GoogleCallbackPage() {
@@ -18,41 +14,38 @@ export default function GoogleCallbackPage() {
 
     useEffect(() => {
         const timeoutId = window.setTimeout(() => {
-            setStatus("This is taking longer than expected...");
             window.location.replace("/login?error=oauth_timeout");
-        }, 8000);
+        }, 10_000);
 
-        try {
-            const params = readCallbackParams();
-            const accessToken = params.get("accessToken");
-            const refreshToken = params.get("refreshToken");
-            const onboardingComplete = params.get("onboardingComplete") === "1";
+        async function run() {
+            try {
+                const params = new URLSearchParams(window.location.search);
+                const code = params.get("code");
 
-            if (!accessToken || !refreshToken) {
+                if (!code) {
+                    window.clearTimeout(timeoutId);
+                    window.location.replace("/login?error=oauth_missing_code");
+                    return;
+                }
+
+                setStatus("Verifying your Google sign-in...");
+                const session = await exchangeGoogleSession(code);
+
+                setStatus("Saving your secure session...");
+                setAccessToken(session.accessToken);
+                setRefreshToken(session.refreshToken);
+
+                setStatus("Opening your Lernard space...");
+                window.history.replaceState(null, "", window.location.pathname);
                 window.clearTimeout(timeoutId);
-                window.location.replace("/login?error=oauth_missing_tokens");
-                return;
-            }
-
-            setStatus("Saving your secure session...");
-            setAccessToken(accessToken);
-            setRefreshToken(refreshToken);
-
-            if (getAccessToken() !== accessToken || getRefreshToken() !== refreshToken) {
+                window.location.replace(getPostCallbackRoute(session.onboardingComplete));
+            } catch {
                 window.clearTimeout(timeoutId);
-                window.location.replace("/login?error=oauth_storage_failed");
-                return;
+                window.location.replace("/login?error=oauth_failed");
             }
-
-            setStatus("Opening your Lernard space...");
-
-            window.history.replaceState(null, "", window.location.pathname);
-            window.clearTimeout(timeoutId);
-            window.location.replace(getPostCallbackRoute(onboardingComplete));
-        } catch {
-            window.clearTimeout(timeoutId);
-            window.location.replace("/login?error=oauth_failed");
         }
+
+        void run();
 
         return () => {
             window.clearTimeout(timeoutId);
@@ -126,20 +119,4 @@ function LoadingDot({ delay }: { delay: number }) {
             transition={{ delay, duration: 1.2, repeat: Number.POSITIVE_INFINITY }}
         />
     );
-}
-
-function readCallbackParams(): URLSearchParams {
-    const hash = window.location.hash.startsWith("#")
-        ? window.location.hash.slice(1)
-        : window.location.hash;
-
-    if (hash.trim().length > 0) {
-        return new URLSearchParams(hash);
-    }
-
-    const search = window.location.search.startsWith("?")
-        ? window.location.search.slice(1)
-        : window.location.search;
-
-    return new URLSearchParams(search);
 }

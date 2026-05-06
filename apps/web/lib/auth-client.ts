@@ -134,6 +134,20 @@ export async function login(payload: LoginPayload): Promise<AuthResponse> {
     return response.data;
 }
 
+interface GoogleSessionResponse {
+    accessToken: string;
+    refreshToken: string;
+    onboardingComplete: boolean;
+}
+
+export async function exchangeGoogleSession(code: string): Promise<GoogleSessionResponse> {
+    const response = await authApi.get<GoogleSessionResponse>(
+        `${ROUTES.AUTH.GOOGLE_SESSION}?code=${encodeURIComponent(code)}`,
+        { skipAuth: true } satisfies AxiosRequestConfig,
+    );
+    return response.data;
+}
+
 export async function logout(): Promise<void> {
     const refreshToken = getRefreshToken();
     if (!refreshToken) {

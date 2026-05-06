@@ -9,6 +9,7 @@ export const ROUTES = {
     GOOGLE: '/v1/auth/google',
     GOOGLE_CODE: '/v1/auth/google/code',
     GOOGLE_CALLBACK: '/v1/auth/google/callback',
+    GOOGLE_SESSION: '/v1/auth/google/session',
     APPLE: '/v1/auth/apple',
     LOGOUT: '/v1/auth/logout',
     REFRESH: '/v1/auth/refresh',
