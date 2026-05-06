@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 
 import { ArrowRight01Icon } from "hugeicons-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/Button";
 import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 
 const containerVariants = {
