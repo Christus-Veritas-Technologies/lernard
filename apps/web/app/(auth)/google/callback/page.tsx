@@ -4,7 +4,14 @@ import { Orbit01Icon, SparklesIcon } from "hugeicons-react";
 import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
-import { setAccessToken, setRefreshToken } from "@lernard/auth-core";
+import {
+    getAccessToken,
+    getRefreshToken,
+    setAccessToken,
+    setRefreshToken,
+} from "@lernard/auth-core";
+
+import { getPostCallbackRoute } from "@/lib/auth-routes";
 
 export default function GoogleCallbackPage() {
     const [status, setStatus] = useState("Signing you in...");
@@ -27,13 +34,21 @@ export default function GoogleCallbackPage() {
                 return;
             }
 
+            setStatus("Saving your secure session...");
             setAccessToken(accessToken);
             setRefreshToken(refreshToken);
-            setStatus("Finalizing your Lernard session...");
+
+            if (getAccessToken() !== accessToken || getRefreshToken() !== refreshToken) {
+                window.clearTimeout(timeoutId);
+                window.location.replace("/login?error=oauth_storage_failed");
+                return;
+            }
+
+            setStatus("Opening your Lernard space...");
 
             window.history.replaceState(null, "", window.location.pathname);
             window.clearTimeout(timeoutId);
-            window.location.replace(onboardingComplete ? "/home" : "/profile-setup");
+            window.location.replace(getPostCallbackRoute(onboardingComplete));
         } catch {
             window.clearTimeout(timeoutId);
             window.location.replace("/login?error=oauth_failed");
