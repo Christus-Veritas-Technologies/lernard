@@ -44,7 +44,13 @@ export type { LessonContent, LessonSection, LessonTermDefinition, PostLessonResu
 export type { QuizQuestionType, QuizQuestion, QuizContent, QuizQuestionReview, QuizCompletionResult } from './payloads/quizzes'
 export type {
   ConversationListItem,
+  ChatAttachment,
+  ChatAttachmentInput,
+  ChatConversationDetail,
+  ChatConversationMessage,
+  ChatLessonAttachmentOption,
   ChatMessageBlock,
+  ChatUploadKind,
   QuizCardProps,
   ConceptBreakdownProps,
   ProgressNudgeProps,
