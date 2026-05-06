@@ -36,6 +36,7 @@ const studentNavItems: NavItem[] = [
 ];
 
 const guardianNavItems: NavItem[] = [
+    { href: "/home", label: "Home", description: "Dashboard", icon: Home01Icon },
     { href: "/guardian", label: "My Children", description: "Household", icon: UserGroupIcon },
     { href: "/settings", label: "Settings", description: "Your setup", icon: Settings02Icon },
 ];
@@ -49,7 +50,7 @@ export function AppShellNav() {
     const sidebarDescription = isGuardian
         ? "Manage your children's learning and configure your household."
         : "Move between home, progress, chat, settings, and your household.";
-    const mobileGridCols = isGuardian ? "grid-cols-2" : "grid-cols-5";
+    const mobileGridCols = isGuardian ? "grid-cols-3" : "grid-cols-5";
 
     return (
         <>

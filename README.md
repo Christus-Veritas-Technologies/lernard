@@ -1,48 +1,161 @@
-Using this design as the base, create a design system, then write it as an instructions skill for github opilot (or a set of skills), that doesn't make the AI copy 1 pecific design but gives the AI a set of design PRINCIPLES in terms fo layout, responsiveness, (on web, and even  obile on tablet devices spacing), typography, brand colors, color [sychology, color meaning...basically everything to be used in all frontend aspects of the app. i gave you 1 design, but these principles should ebexpande dina way that allows the AI to create mutlkple pages, which si why we dont' want toc oppy the deisng, but the prionciples behind ti instead, ibcluding the clean code and all tht. For native and web icons, use hugeicons, for the web, sue shadcn, for native, sue recatnativereusables component,s referencing them where possible int eh design. And thencome up with skills for code qualoty, code cleanliness, code reusability, using primitives such as hooks, functions, turborepo packageas, the middleware -router - controler archictecture, then write the design systen and this soec as a github copilot skill as doen here:
-GitHub Copilot Agent Skills are specialized, reusable units of knowledge and logic that enhance the capabilities of Copilot. Unlike general custom instructions that set global coding standards, Skills are on-demand modules containing instructions, scripts, and resources for specific tasks. 
-GitHub Docs
-GitHub Docs
- +3
-Key Characteristics
-Modular & On-Demand: Skills are loaded only when relevant to your prompt, preventing "context rot" from unnecessary data.
-Resource Bundling: A skill folder can include not just markdown instructions (SKILL.md), but also helper scripts (Python, Node.js), templates, and reference data.
-Open Standard: They follow the Agent Skills specification, making them portable across tools like GitHub Copilot Chat in VS Code, Copilot CLI, and the Copilot cloud agent.
-Automatic Discovery: Copilot uses the skill's name and description to automatically trigger it when you ask a related question. 
-GitHub Docs
-GitHub Docs
- +5
-Common Use Cases
-DevOps & SRE: Creating incident triage playbooks, Kubernetes rollback scripts, or Terraform review standards.
-Standardizing Workflows: Turning internal "tribal knowledge" into a repeatable runbook for tasks like PR summaries or bug triage.
-Advanced Refactoring: Defining multi-step processes for extracting logic into domain services or migrating legacy code.
-Specialized Domain Knowledge: Teaching Copilot about proprietary SDKs, internal design systems, or specific framework quirks. 
-GitHub Docs
-GitHub Docs
- +5
-How to Create and Use Skills
-Storage Locations:
-Project-specific: Place them in .github/skills/ within your repository.
-Personal/Global: Store them in ~/.copilot/skills/ to use them across all your projects.
-Structure: Each skill must be its own subfolder containing a SKILL.md file. This file uses frontmatter for metadata (name and description) and contains the core instructions.
-Activation:
-Manual: Use a slash command in VS Code Chat (e.g., /my-custom-skill).
-Automatic: Simply prompt Copilot with keywords that match the skill's description.
-Community Resources: You can find and contribute skills through community collections like github/awesome-copilot or microsoft/skills. 
+New error:
+PS C:\Users\kinzi\Desktop\lernard> Set-Location "C:\Users\kinzi\Desktop\lernard\apps\native"; bun run start -- --clear
+$ expo start --dev-client --clear
+Starting project at C:\Users\kinzi\Desktop\lernard\apps\native
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+█ ▄▄▄▄▄ █ ▄▄ █▀ █▄█▄█▀▄ █▀█ ▄▄▄▄▄ █
+█ █   █ ██▄█▀█ ▄█    ▀ ▀ ██ █   █ █
+█ █▄▄▄█ █ ▀▀▄ ▄██ ▄▀█▄▀ ███ █▄▄▄█ █
+█▄▄▄▄▄▄▄█ ▀▄█▄█ █▄█▄█ █▄█▄█▄▄▄▄▄▄▄█
+█▄ ▄██▄▄▀ ▄█ ██ ▀██▀▀ █▀ ▀   ▄▀▀▄ █
+█▀▀█▄ █▄█▄▄ ▄▄██▄█▄█ ▄▄█ ▀▄█▀▄ ▄▀ █
+█▀▀▀▄ █▄▀▄  ▀█▀  ██▀ ▀▀▄▀ ▀  █ █▄▀█
+█▄▄▀█▀ ▄▄▀ █▄▄▄▄  ▄▄▄▀▄▀▄ ▄▄▀▀▀▄▄▄█
+█▄  ▀▀▀▄ █ █ █▀▄▄ █▄ ▀██▀ █ ▄███  █
+█  ▄██▄▄  █▀▄▄██ ▄▄▀ ▀█ ▄▀▀▀▀▀ ██▄█
+█▄ ▄▄ ▀▄▄▄██▀██  ██ ▀█▀█  ▄ ▄█ ▀ ▀█
+█▄▄▀▄ ▄▄▀█▄▀▄█▄ ▄▀█  ▀▄█  ▀█▄▀ █▀▄█
+█▄▄███▄▄▄  ▄▄ ▀▄ ▄▄█▀▄▀█  ▄▄▄ ▄██ █
+█ ▄▄▄▄▄ █▀ ▀ ███  ▄ ▄ ▄ ▀ █▄█ ▀▄█ █
+█ █   █ ██▄▀ █▀ ▄ █▄ ▀██ ▄ ▄  ██▄██
+█ █▄▄▄█ █ ▄▀▄▀▄▄ ▄▄▀  ▄▀█  █▄▄ ██▄█
+█▄▄▄▄▄▄▄█▄█▄▄▄█▄▄██▄█▄███▄▄▄█▄▄██▄█
 
+› Metro waiting on
+exp+lernard://expo-development-client/?url=http%3A%2F%2F192.168.1.8%3A8081
+› Scan the QR code above to open the project in a development build. Learn more:
+https://expo.fyi/start
 
+› Using development build
+› Press s │ switch to Expo Go
 
+› Press a │ open Android
+› Press w │ open web
 
+› Press j │ open debugger
+› Press r │ reload app
+› Press m │ toggle menu
+› shift+m │ more tools
+› Press o │ open project code in your editor
 
+› Press ? │ show all commands
 
+Logs for your project will appear below. Press Ctrl+C to exit.
+Android Bundled 23125ms node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\entry.js (5850 modules)
+ ERROR  A props object containing a "key" prop is being spread into JSX:
+  let props = %s;
+  <%s {...props} />
+React keys must be passed directly to JSX without using spread:
+  let props = %s;
+  <%s key={someKey} {...props} /> {key: someKey, d: ..., stroke: ..., strokeLinejoin: ..., strokeWidth: ...} Path {d: ..., stroke: ..., strokeLinejoin: ..., strokeWidth: ...} Path 
 
+Call Stack
+  construct (apps\native\<native>)
+  apply (apps\native\<native>)
+  _construct (node_modules\.bun\@babel+runtime@7.29.2\node_modules\@babel\runtime\helpers\construct.js)
+  Wrapper (node_modules\.bun\@babel+runtime@7.29.2\node_modules\@babel\runtime\helpers\wrapNativeSuper.js)
+  construct (apps\native\<native>)
+  _callSuper (node_modules\.bun\@babel+runtime@7.29.2\node_modules\@babel\runtime\helpers\callSuper.js)
+  NamelessError (node_modules\.bun\@expo+metro-runtime@6.1.2+245a6c089f6d1b20\node_modules\@expo\metro-runtime\src\metroServerLogs.native.ts)
+  captureCurrentStack (node_modules\.bun\@expo+metro-runtime@6.1.2+245a6c089f6d1b20\node_modules\@expo\metro-runtime\src\metroServerLogs.native.ts)
+  HMRClient.log (node_modules\.bun\@expo+metro-runtime@6.1.2+245a6c089f6d1b20\node_modules\@expo\metro-runtime\src\metroServerLogs.native.ts)
+  console.level (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Core\setUpDeveloperTools.js)
+  jsxDEVImpl (node_modules\.bun\react@19.1.0\node_modules\react\cjs\react-jsx-runtime.development.js)
+  exports.jsx (node_modules\.bun\react@19.1.0\node_modules\react\cjs\react-jsx-runtime.development.js)
+  f.m.map$argument_0 (node_modules\.bun\hugeicons-react-native@0.0.2+6b2d21d9f63ca339\node_modules\hugeicons-react-native\dist\esm\create-hugeicon-component.js)
+  map (apps\native\<native>)
+  w$argument_0 (node_modules\.bun\hugeicons-react-native@0.0.2+6b2d21d9f63ca339\node_modules\hugeicons-react-native\dist\esm\create-hugeicon-component.js)
+  callComponent.reactStackBottomFrame (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  renderWithHooks (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  updateForwardRef (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  beginWork (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  runWithFiberInDEV (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  performUnitOfWork (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  workLoopSync (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  renderRootSync (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  performWorkOnRoot (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  performSyncWorkOnRoot (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  flushSyncWorkAcrossRoots_impl (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  flushPassiveEffects (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  scheduleCallback$argument_1 (node_modules\.bun\react-native@0.81.5+395f71ae3c4cac51\node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js) 
 
-
-Plan out what needs to be done for lernard to come to fruition feature by feature, starting with the first feature to the last one, taking into consid what neds to be done on the frontend, backend, clean code pracitces, how the code should eb structure, we're usong as turborpeo setup witb an apps and packages foldeR
-
-
-
-Explain what eneds to be made a package fur reusability, what enedd to be made its own seperate function (not specific, write out specific guidelines for maintaining code quality)
-
-
-
-And then write it out as a prompt file for github copilot
+Call Stack
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  LoginScreen (apps\native\app\(auth)\login.tsx)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  BaseRoute (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\useScreens.js)
+  SceneView (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\SceneView.js)
+  render (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useDescriptors.js)
+  routes.reduce$argument_0 (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useDescriptors.js)
+  reduce (apps\native\<native>)
+  useDescriptors (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useDescriptors.js)
+  useNavigationBuilder (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useNavigationBuilder.js)
+  NativeStackNavigator (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\fork\native-stack\createNativeStackNavigator.js)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  <anonymous> (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\layouts\withLayoutContext.js)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  Object.assign$argument_0 (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\layouts\StackClient.js)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  AuthLayout (apps\native\app\(auth)\_layout.tsx)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  BaseRoute (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\useScreens.js)
+  SceneView (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\SceneView.js)
+  render (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useDescriptors.js)
+  routes.reduce$argument_0 (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useDescriptors.js)
+  reduce (apps\native\<native>)
+  useDescriptors (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useDescriptors.js)
+  useNavigationBuilder (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useNavigationBuilder.js)
+  NativeStackNavigator (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\fork\native-stack\createNativeStackNavigator.js)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  <anonymous> (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\layouts\withLayoutContext.js)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  Object.assign$argument_0 (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\layouts\StackClient.js)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  RootLayout (apps\native\app\_layout.tsx)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  BaseRoute (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\useScreens.js)
+  SceneView (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\SceneView.js)
+  render (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useDescriptors.js)
+  routes.reduce$argument_0 (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useDescriptors.js)
+  reduce (apps\native\<native>)
+  useDescriptors (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useDescriptors.js)
+  useNavigationBuilder (node_modules\.bun\@react-navigation+core@7.17.1+4bcfe187168658ad\node_modules\@react-navigation\core\lib\module\useNavigationBuilder.js)
+  Content (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\ExpoRoot.js)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  ContextNavigator (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\ExpoRoot.js)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  ExpoRoot (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\ExpoRoot.js)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  App (node_modules\.bun\expo-router@6.0.23+d810a8eaec11917d\node_modules\expo-router\build\qualified-entry.js)
+  call (apps\native\<native>)
+  apply (apps\native\<native>)
+  <anonymous> (node_modules\.bun\react-native-css-interop@0.2.3+dd195d037b083b1a\node_modules\react-native-css-interop\dist\runtime\wrap-jsx.js)
+  WithDevTools (node_modules\.bun\expo@54.0.33+245a6c089f6d1b20\node_modules\expo\src\launch\withDevTools.tsx)

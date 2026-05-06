@@ -20,6 +20,11 @@ export function HomePageClient() {
     const { data, error, isAuthenticated, loading, refetch } =
         usePagePayload<HomeContent>(ROUTES.HOME.PAYLOAD);
     const [chatPrompt, setChatPrompt] = useState("");
+    // Must be before any early returns to satisfy Rules of Hooks
+    const initials = useMemo(
+        () => (data ? getInitialsFromGreeting(data.content.greeting) : ""),
+        [data],
+    );
 
     if (!isAuthenticated) {
         return (
@@ -49,7 +54,6 @@ export function HomePageClient() {
     }
 
     const { content, slots } = data;
-    const initials = useMemo(() => getInitialsFromGreeting(content.greeting), [content.greeting]);
 
     return (
         <div className="flex flex-col gap-6">
