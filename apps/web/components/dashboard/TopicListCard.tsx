@@ -2,7 +2,7 @@ import { BookOpen01Icon } from "hugeicons-react";
 
 import type { TopicSummary } from "@lernard/shared-types";
 
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "@/components/ui/Badge";
 
 interface TopicListCardProps {
     topics: TopicSummary[];

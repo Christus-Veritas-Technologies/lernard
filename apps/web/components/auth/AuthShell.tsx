@@ -2,7 +2,7 @@ import type { ComponentType, ReactNode } from "react";
 
 import { ArrowRight01Icon, SparklesIcon } from "hugeicons-react";
 
-import { Card } from "@/components/ui/card";
+import { Card } from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
 
 interface AuthHighlight {
