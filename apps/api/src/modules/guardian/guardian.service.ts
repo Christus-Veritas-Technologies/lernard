@@ -4,6 +4,7 @@ import type {
   ChildCompanionContent,
   ChildProfileContent,
   CompanionControls,
+  GuardianManagedChildSettings,
   GuardianChildOverview,
   GuardianDashboardContent,
   PagePayload,
@@ -14,12 +15,15 @@ import type {
 } from '@lernard/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { buildPagePayload } from '../../common/utils/build-page-payload';
+import { listPendingInviteSnapshots } from '../../common/utils/page-payload-queries';
 import {
-  listPendingInviteSnapshots,
-} from '../../common/utils/page-payload-queries';
-import { toSharedStrengthLevel } from '../../common/utils/shared-model-mappers';
+  toSharedAppearance,
+  toSharedLearningMode,
+  toSharedStrengthLevel,
+} from '../../common/utils/shared-model-mappers';
 import type {
   InviteChildDto,
+  UpdateChildSettingsDto,
   UpdateChildCompanionControlsDto,
 } from './dto/guardian.dto';
 
@@ -122,6 +126,30 @@ export class GuardianService {
     }
 
     return { cancelled: true };
+  }
+
+  async resendInvite(userId: string, token: string): Promise<PendingInvite> {
+    const guardian = await this.getGuardianByUserId(userId);
+    const existingInvite = await this.prisma.childInvite.findFirst({
+      where: {
+        guardianId: guardian.id,
+        usedAt: null,
+        OR: [{ id: token }, { code: token }],
+      },
+    });
+
+    if (!existingInvite) {
+      throw new NotFoundException('Invite not found');
+    }
+
+    const updatedInvite = await this.prisma.childInvite.update({
+      where: { id: existingInvite.id },
+      data: {
+        expiresAt: daysFromNow(7),
+      },
+    });
+
+    return mapPendingInvite(updatedInvite);
   }
 
   async getChild(userId: string, childId: string): Promise<GuardianChildOverview> {
@@ -227,6 +255,39 @@ export class GuardianService {
     });
 
     return mapCompanionControls(companionControls);
+  }
+
+  async updateChildSettings(
+    userId: string,
+    childId: string,
+    dto: UpdateChildSettingsDto,
+  ): Promise<GuardianManagedChildSettings> {
+    await this.getChildForGuardian(userId, childId);
+
+    const updatedChild = await this.prisma.user.update({
+      where: { id: childId },
+      data: {
+        name: dto.name.trim(),
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        streakDays: true,
+        lastActiveAt: true,
+        learningMode: true,
+        appearance: true,
+        dailyGoal: true,
+        notificationsEnabled: true,
+        lockedSettings: true,
+      },
+    });
+
+    const companionControls = await this.prisma.companionControls.findUnique({
+      where: { studentId: childId },
+    });
+
+    return mapGuardianManagedChildSettings(updatedChild, companionControls);
   }
 
   private async buildDashboardContent(userId: string): Promise<GuardianDashboardContent> {
@@ -399,7 +460,7 @@ export class GuardianService {
 
     return child;
   }
-  }
+}
 
 function buildGuardianPermissions(children: GuardianChildOverview[]): ScopedPermission[] {
   return children.flatMap((child) => buildGuardianChildPermissions(child.studentId));
@@ -407,6 +468,11 @@ function buildGuardianPermissions(children: GuardianChildOverview[]): ScopedPerm
 
 function buildGuardianChildPermissions(childId: string): ScopedPermission[] {
   return [
+    {
+      action: 'can_edit_child_settings',
+      resourceId: childId,
+      resourceType: 'child',
+    },
     {
       action: 'can_view_child_progress',
       resourceId: childId,
@@ -515,4 +581,43 @@ function ensureSettingLocked(existingSettings: string[], settingKey: string): st
   return existingSettings.includes(settingKey)
     ? existingSettings
     : [...existingSettings, settingKey];
+}
+
+function mapGuardianManagedChildSettings(
+  child: {
+    id: string;
+    email: string | null;
+    name: string;
+    streakDays: number;
+    lastActiveAt: Date | null;
+    learningMode: string;
+    appearance: string;
+    dailyGoal: number;
+    notificationsEnabled: boolean;
+    lockedSettings: string[];
+  },
+  companionControls: {
+    showCorrectAnswers: boolean;
+    allowHints: boolean;
+    allowSkip: boolean;
+    lockedByGuardian: boolean;
+    lastChangedAt: Date;
+    lastChangedBy: string;
+  } | null,
+): GuardianManagedChildSettings {
+  return {
+    studentId: child.id,
+    name: child.name,
+    email: child.email,
+    streak: child.streakDays,
+    lastActiveAt: child.lastActiveAt?.toISOString() ?? null,
+    settings: {
+      learningMode: toSharedLearningMode(child.learningMode),
+      appearance: toSharedAppearance(child.appearance),
+      dailyGoal: child.dailyGoal,
+      notificationsEnabled: child.notificationsEnabled,
+    },
+    lockedSettings: child.lockedSettings,
+    companionControls: companionControls ? mapCompanionControls(companionControls) : null,
+  };
 }

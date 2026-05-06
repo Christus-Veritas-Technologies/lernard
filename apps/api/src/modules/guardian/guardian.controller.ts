@@ -12,6 +12,7 @@ import {
   InviteChildDto,
   AcceptInviteDto,
   UpdateChildCompanionControlsDto,
+  UpdateChildSettingsDto,
 } from './dto/guardian.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
@@ -66,6 +67,12 @@ export class GuardianController {
     return this.guardianService.cancelInvite(user.id, token);
   }
 
+  @ProtectedRoute({ roles: [Role.GUARDIAN] })
+  @Patch('children/invite/:token/resend')
+  async resendInvite(@CurrentUser() user: User, @Param('token') token: string) {
+    return this.guardianService.resendInvite(user.id, token);
+  }
+
   @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
   @Get('children/:childId/payload')
   async getChildPayload(
@@ -79,6 +86,16 @@ export class GuardianController {
   @Get('children/:childId')
   async getChild(@CurrentUser() user: User, @Param('childId') childId: string) {
     return this.guardianService.getChild(user.id, childId);
+  }
+
+  @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
+  @Patch('children/:childId')
+  async updateChildSettings(
+    @CurrentUser() user: User,
+    @Param('childId') childId: string,
+    @Body() dto: UpdateChildSettingsDto,
+  ) {
+    return this.guardianService.updateChildSettings(user.id, childId, dto);
   }
 
   @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })

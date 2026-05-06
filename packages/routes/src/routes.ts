@@ -85,6 +85,7 @@ export const ROUTES = {
     ACCEPT_INVITE: '/v1/guardian/children/accept-invite',
     PENDING: '/v1/guardian/children/pending',
     CANCEL_INVITE: (token: string) => `/v1/guardian/children/invite/${token}` as const,
+    RESEND_INVITE: (token: string) => `/v1/guardian/children/invite/${token}/resend` as const,
     CHILD: (childId: string) => `/v1/guardian/children/${childId}` as const,
     CHILD_PAYLOAD: (childId: string) => `/v1/guardian/children/${childId}/payload` as const,
     REMOVE_CHILD: (childId: string) => `/v1/guardian/children/${childId}` as const,

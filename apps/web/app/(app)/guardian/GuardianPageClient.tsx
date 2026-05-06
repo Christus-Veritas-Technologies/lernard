@@ -2,7 +2,7 @@
 
 import { can } from "@lernard/auth-core";
 import { ROUTES } from "@lernard/routes";
-import type { GuardianDashboardContent } from "@lernard/shared-types";
+import type { GuardianDashboardContent, PendingInvite } from "@lernard/shared-types";
 import {
     ArrowRight02Icon,
     ChartBarLineIcon,
@@ -12,13 +12,25 @@ import {
 } from "hugeicons-react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePagePayload } from "@/hooks/usePagePayload";
+import { browserApiFetch } from "@/lib/browser-api";
 import { formatRelativeDate } from "@/lib/formatters";
 
 const containerVariants = {
@@ -37,9 +49,11 @@ const itemVariants = {
     visible: {
         opacity: 1,
         y: 0,
-        transition: { duration: 0.4, ease: "easeOut" },
+        transition: { duration: 0.4, ease: "easeOut" as const },
     },
 };
+
+type ChildrenSortMode = "name" | "activity";
 
 function getStrengthTone(strengthLevel: string) {
     if (strengthLevel === "strong") {
@@ -58,6 +72,54 @@ export function GuardianPageClient() {
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<GuardianDashboardContent>(
         ROUTES.GUARDIAN.DASHBOARD_PAYLOAD,
     );
+
+    const [dashboard, setDashboard] = useState<GuardianDashboardContent | null>(null);
+    const [sortMode, setSortMode] = useState<ChildrenSortMode>("name");
+    const [isInviteDialogOpen, setInviteDialogOpen] = useState(false);
+    const [inviteEmailDraft, setInviteEmailDraft] = useState("");
+    const [isCreatingInvite, setIsCreatingInvite] = useState(false);
+    const [isCopyingInviteCode, setIsCopyingInviteCode] = useState(false);
+    const [resendingInviteId, setResendingInviteId] = useState<string | null>(null);
+    const [cancelingInviteId, setCancelingInviteId] = useState<string | null>(null);
+    const childrenSectionRef = useRef<HTMLElement | null>(null);
+    const pendingInvitesSectionRef = useRef<HTMLElement | null>(null);
+
+    useEffect(() => {
+        if (!data?.content) {
+            return;
+        }
+
+        setDashboard(data.content);
+        setSortMode("name");
+    }, [data]);
+
+    const sortedChildren = useMemo(() => {
+        if (!dashboard) {
+            return [];
+        }
+
+        const children = [...dashboard.children];
+        if (sortMode === "activity") {
+            children.sort((left, right) => {
+                const leftTime = left.lastActiveAt ? new Date(left.lastActiveAt).getTime() : 0;
+                const rightTime = right.lastActiveAt ? new Date(right.lastActiveAt).getTime() : 0;
+
+                if (rightTime !== leftTime) {
+                    return rightTime - leftTime;
+                }
+
+                if (right.streak !== left.streak) {
+                    return right.streak - left.streak;
+                }
+
+                return left.name.localeCompare(right.name);
+            });
+            return children;
+        }
+
+        children.sort((left, right) => left.name.localeCompare(right.name));
+        return children;
+    }, [dashboard, sortMode]);
 
     if (!isAuthenticated) {
         return (
@@ -100,7 +162,7 @@ export function GuardianPageClient() {
         );
     }
 
-    if (error || !data) {
+    if (error || !dashboard || !data) {
         return (
             <Card>
                 <CardHeader>
@@ -119,241 +181,457 @@ export function GuardianPageClient() {
         );
     }
 
-    const { content, permissions } = data;
+    const { permissions } = data;
 
     return (
-        <motion.div animate="visible" className="flex flex-col gap-6" initial="hidden" variants={containerVariants}>
-            <motion.section variants={itemVariants}>
-                <Card className="overflow-hidden border-0 bg-[linear-gradient(135deg,#102f68_0%,#1e4f97_45%,#0f766e_100%)] text-white shadow-[0_24px_80px_-34px_rgba(15,118,110,0.58)]">
-                    <CardContent className="mt-0 grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_320px] xl:items-start">
-                        <div className="space-y-4">
-                            <Badge className="w-fit bg-white/14 text-white" tone="muted">Guardian hub</Badge>
-                            <div>
-                                <CardTitle className="text-3xl text-white">A calm overview of your household learning</CardTitle>
-                                <CardDescription className="mt-2 max-w-2xl text-base text-white/80">
-                                    Keep every child in view, spot who needs a nudge, and handle invites or companion controls without digging through settings.
-                                </CardDescription>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                <Badge className="bg-white/14 text-white" tone="muted">{content.summary.childrenCount} linked children</Badge>
-                                <Badge className="bg-emerald-300/16 text-white" tone="muted">{content.summary.activeThisWeek} active this week</Badge>
-                                <Badge className="bg-amber-300/18 text-white" tone="muted">Average streak {content.summary.averageStreak} days</Badge>
-                            </div>
-                            <div className="flex flex-wrap gap-2 pt-2">
-                                <Button className="bg-white text-sky-800 hover:bg-white/92">
-                                    Invite child
-                                    <ArrowRight02Icon size={16} strokeWidth={1.8} />
-                                </Button>
-                                <Button className="border-white/20 bg-white/10 text-white hover:bg-white/16" variant="ghost">
-                                    Review pending invites
-                                </Button>
-                                <Button className="border-white/20 bg-transparent text-white hover:bg-white/10" onClick={() => router.push("/settings")} variant="ghost">
-                                    <Settings02Icon size={16} strokeWidth={1.8} />
-                                    Household settings
-                                </Button>
-                            </div>
-                        </div>
-
-                        <div className="grid gap-3 rounded-[28px] border border-white/16 bg-white/10 p-4 backdrop-blur-sm">
-                            <HubSnapshotCard
-                                description="Students active in the last seven days"
-                                icon={<ChartBarLineIcon size={20} strokeWidth={1.8} />}
-                                tone="teal"
-                                title="Weekly pulse"
-                                value={`${content.summary.activeThisWeek}/${Math.max(content.summary.childrenCount, 1)}`}
-                            />
-                            <HubSnapshotCard
-                                description="Invites still waiting to be claimed"
-                                icon={<UserGroupIcon size={20} strokeWidth={1.8} />}
-                                tone="white"
-                                title="Invite queue"
-                                value={`${content.summary.pendingInvites}`}
-                            />
-                        </div>
-                    </CardContent>
-                </Card>
-            </motion.section>
-
-            <motion.section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" variants={itemVariants}>
-                <HouseholdStatCard description="Children connected to your Household" icon={<UserGroupIcon size={18} strokeWidth={1.8} />} label="Linked children" tone="primary" value={`${content.summary.childrenCount}`} />
-                <HouseholdStatCard description="Students showing recent activity" icon={<SchoolBell01Icon size={18} strokeWidth={1.8} />} label="Active this week" tone="success" value={`${content.summary.activeThisWeek}`} />
-                <HouseholdStatCard description="Average current streak across learners" icon={<ChartBarLineIcon size={18} strokeWidth={1.8} />} label="Average streak" tone="cool" value={`${content.summary.averageStreak} days`} />
-                <HouseholdStatCard description="Invites still awaiting acceptance" icon={<Settings02Icon size={18} strokeWidth={1.8} />} label="Pending invites" tone="warm" value={`${content.summary.pendingInvites}`} />
-            </motion.section>
-
-            <motion.section className="grid gap-4 lg:grid-cols-3" variants={itemVariants}>
-                <Card className="border-0 bg-[linear-gradient(160deg,#eef2ff_0%,#ffffff_100%)] shadow-sm">
-                    <CardHeader>
-                        <CardTitle>Invite a child</CardTitle>
-                        <CardDescription>Create a fresh invite when you want to link another child account to your Household.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <p className="text-sm leading-6 text-text-secondary">Use this when a learner already has their own login or email address.</p>
-                        <div className="flex flex-wrap gap-2">
-                            <Button>Send invite</Button>
-                            <Button variant="ghost">Copy invite code</Button>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="border-0 bg-[linear-gradient(160deg,#eff8ff_0%,#ffffff_100%)] shadow-sm">
-                    <CardHeader>
-                        <CardTitle>Review progress</CardTitle>
-                        <CardDescription>Open any child profile to review Lernard&apos;s Read on You, recent sessions, and growth areas.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <p className="text-sm leading-6 text-text-secondary">Best for checking progress before companion controls need changing.</p>
-                        <div className="flex flex-wrap gap-2">
-                            <Button onClick={() => router.push("/guardian")}>Open overview</Button>
-                            <Button onClick={() => router.push("/guardian")} variant="secondary">See all children</Button>
-                        </div>
-                    </CardContent>
-                </Card>
-                <Card className="border-0 bg-[linear-gradient(160deg,#fff7ed_0%,#ffffff_100%)] shadow-sm">
-                    <CardHeader>
-                        <CardTitle>Change companion controls</CardTitle>
-                        <CardDescription>Tighten or relax help settings per child so support matches the moment.</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <p className="text-sm leading-6 text-text-secondary">Use this before homework-heavy weeks or revision sessions.</p>
-                        <div className="flex flex-wrap gap-2">
-                            <Button onClick={() => router.push("/guardian")} variant="secondary">Adjust controls</Button>
-                            <Button onClick={() => router.push("/settings")} variant="ghost">Review defaults</Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            </motion.section>
-
-            <motion.section className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]" variants={itemVariants}>
-                <Card>
-                    <CardHeader>
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                                <CardTitle>Children overview</CardTitle>
-                                <CardDescription>
-                                    Quick reads on streaks, recent activity, and which subjects might need more support.
-                                </CardDescription>
-                            </div>
-                            <Button variant="ghost">Sort by activity</Button>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        {content.children.length ? (
-                            <div className="overflow-x-auto">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Child</TableHead>
-                                            <TableHead>Last active</TableHead>
-                                            <TableHead>Streak</TableHead>
-                                            <TableHead>Strength mix</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {content.children.map((child) => (
-                                            <TableRow key={child.studentId}>
-                                                <TableCell className="font-semibold">{child.name}</TableCell>
-                                                <TableCell>{formatRelativeDate(child.lastActiveAt)}</TableCell>
-                                                <TableCell>{child.streak} days</TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-wrap gap-1.5">
-                                                        {child.subjects.slice(0, 3).map((subject) => (
-                                                            <Badge key={`${child.studentId}-${subject.name}`} tone={getStrengthTone(subject.strengthLevel)}>
-                                                                {subject.name}
-                                                            </Badge>
-                                                        ))}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex justify-end gap-2">
-                                                        <Button
-                                                            disabled={!can(permissions, "can_view_child_progress", child.studentId)}
-                                                            onClick={() => router.push(`/guardian/${child.studentId}`)}
-                                                        >
-                                                            View child
-                                                        </Button>
-                                                        <Button
-                                                            disabled={!can(permissions, "can_change_companion_controls", child.studentId)}
-                                                            onClick={() => router.push(`/guardian/${child.studentId}/companion`)}
-                                                            variant="secondary"
-                                                        >
-                                                            Controls
-                                                        </Button>
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
-                        ) : (
-                            <div className="rounded-2xl border border-dashed border-border bg-background/60 p-4 text-sm leading-6 text-text-secondary">
-                                No linked children yet. When a guardian invite is accepted, each learner will appear here with real streaks, activity, and subject signals.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <div className="grid gap-6">
-                    <Card className="border-0 bg-[linear-gradient(160deg,#eefbf6_0%,#ffffff_100%)] shadow-sm">
-                        <CardHeader>
-                            <CardTitle>Household momentum</CardTitle>
-                            <CardDescription>
-                                A simple chart showing who has the strongest learning rhythm right now.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {buildMomentumItems(content).map((item) => (
-                                <div className="space-y-2" key={item.label}>
-                                    <div className="flex items-center justify-between gap-3">
-                                        <p className="text-sm font-semibold text-text-primary">{item.label}</p>
-                                        <span className="text-xs text-text-secondary">{item.trailing}</span>
-                                    </div>
-                                    <Progress value={item.value} />
+        <>
+            <motion.div animate="visible" className="flex flex-col gap-6" initial="hidden" variants={containerVariants}>
+                <motion.section variants={itemVariants}>
+                    <Card className="overflow-hidden border-0 bg-[linear-gradient(135deg,#102f68_0%,#1e4f97_45%,#0f766e_100%)] text-white shadow-[0_24px_80px_-34px_rgba(15,118,110,0.58)]">
+                        <CardContent className="mt-0 grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_320px] xl:items-start">
+                            <div className="space-y-4">
+                                <Badge className="w-fit bg-white/14 text-white" tone="muted">Guardian hub</Badge>
+                                <div>
+                                    <CardTitle className="text-3xl text-white">A calm overview of your household learning</CardTitle>
+                                    <CardDescription className="mt-2 max-w-2xl text-base text-white/80">
+                                        Keep every child in view, spot who needs a nudge, and handle invites or companion controls without digging through settings.
+                                    </CardDescription>
                                 </div>
-                            ))}
+                                <div className="flex flex-wrap gap-2">
+                                    <Badge className="bg-white/14 text-white" tone="muted">{dashboard.summary.childrenCount} linked children</Badge>
+                                    <Badge className="bg-emerald-300/16 text-white" tone="muted">{dashboard.summary.activeThisWeek} active this week</Badge>
+                                    <Badge className="bg-amber-300/18 text-white" tone="muted">Average streak {dashboard.summary.averageStreak} days</Badge>
+                                </div>
+                                <div className="flex flex-wrap gap-2 pt-2">
+                                    <Button className="bg-white text-sky-800 hover:bg-white/92" onClick={() => setInviteDialogOpen(true)}>
+                                        Invite child
+                                        <ArrowRight02Icon size={16} strokeWidth={1.8} />
+                                    </Button>
+                                    <Button className="border-white/20 bg-white/10 text-white hover:bg-white/16" onClick={scrollToPendingInvites} variant="ghost">
+                                        Review pending invites
+                                    </Button>
+                                    <Button className="border-white/20 bg-transparent text-white hover:bg-white/10" onClick={() => router.push("/settings")} variant="ghost">
+                                        <Settings02Icon size={16} strokeWidth={1.8} />
+                                        Household settings
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-3 rounded-[28px] border border-white/16 bg-white/10 p-4 backdrop-blur-sm">
+                                <HubSnapshotCard
+                                    description="Students active in the last seven days"
+                                    icon={<ChartBarLineIcon size={20} strokeWidth={1.8} />}
+                                    tone="teal"
+                                    title="Weekly pulse"
+                                    value={`${dashboard.summary.activeThisWeek}/${Math.max(dashboard.summary.childrenCount, 1)}`}
+                                />
+                                <HubSnapshotCard
+                                    description="Invites still waiting to be claimed"
+                                    icon={<UserGroupIcon size={20} strokeWidth={1.8} />}
+                                    tone="white"
+                                    title="Invite queue"
+                                    value={`${dashboard.summary.pendingInvites}`}
+                                />
+                            </div>
                         </CardContent>
                     </Card>
+                </motion.section>
 
+                <motion.section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4" variants={itemVariants}>
+                    <HouseholdStatCard description="Children connected to your Household" icon={<UserGroupIcon size={18} strokeWidth={1.8} />} label="Linked children" tone="primary" value={`${dashboard.summary.childrenCount}`} />
+                    <HouseholdStatCard description="Students showing recent activity" icon={<SchoolBell01Icon size={18} strokeWidth={1.8} />} label="Active this week" tone="success" value={`${dashboard.summary.activeThisWeek}`} />
+                    <HouseholdStatCard description="Average current streak across learners" icon={<ChartBarLineIcon size={18} strokeWidth={1.8} />} label="Average streak" tone="cool" value={`${dashboard.summary.averageStreak} days`} />
+                    <HouseholdStatCard description="Invites still awaiting acceptance" icon={<Settings02Icon size={18} strokeWidth={1.8} />} label="Pending invites" tone="warm" value={`${dashboard.summary.pendingInvites}`} />
+                </motion.section>
+
+                <motion.section className="grid gap-4 lg:grid-cols-3" variants={itemVariants}>
+                    <Card className="border-0 bg-[linear-gradient(160deg,#eef2ff_0%,#ffffff_100%)] shadow-sm">
+                        <CardHeader>
+                            <CardTitle>Invite a child</CardTitle>
+                            <CardDescription>Create a fresh invite when you want to link another child account to your Household.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-sm leading-6 text-text-secondary">Use this when a learner already has their own login or email address.</p>
+                            <div className="flex flex-wrap gap-2">
+                                <Button onClick={() => setInviteDialogOpen(true)}>Send invite</Button>
+                                <Button onClick={copyLatestInviteCode} variant="ghost">Copy invite code</Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-0 bg-[linear-gradient(160deg,#eff8ff_0%,#ffffff_100%)] shadow-sm">
+                        <CardHeader>
+                            <CardTitle>Review progress</CardTitle>
+                            <CardDescription>Open any child profile to review Lernard&apos;s Read on You, recent sessions, and growth areas.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <p className="text-sm leading-6 text-text-secondary">Best for checking progress before companion controls need changing.</p>
+                            <div className="flex flex-wrap gap-2">
+                                <Button onClick={openFirstChildOverview}>Open overview</Button>
+                                <Button onClick={scrollToChildrenOverview} variant="secondary">See all children</Button>
+                            </div>
+                        </CardContent>
+                    </Card>
                     <Card className="border-0 bg-[linear-gradient(160deg,#fff7ed_0%,#ffffff_100%)] shadow-sm">
                         <CardHeader>
-                            <CardTitle>Pending invites</CardTitle>
-                            <CardDescription>
-                                Create, monitor, and revoke invites without losing the current child overview.
-                            </CardDescription>
+                            <CardTitle>Change companion controls</CardTitle>
+                            <CardDescription>Tighten or relax help settings per child so support matches the moment.</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                            {content.pendingInvites.length ? (
-                                content.pendingInvites.map((invite) => (
-                                    <div className="rounded-2xl border border-amber-100 bg-white/80 p-4" key={invite.id}>
-                                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                            <div>
-                                                <p className="text-sm font-semibold text-text-primary">
-                                                    {invite.childEmail ?? `Invite code ${invite.code}`}
-                                                </p>
-                                                <p className="mt-1 text-sm text-text-secondary">
-                                                    Sent {formatRelativeDate(invite.sentAt)}
-                                                </p>
-                                            </div>
-                                            <div className="flex flex-wrap gap-2">
-                                                <Badge tone="warm">{invite.status}</Badge>
-                                                <Button variant="secondary">Resend</Button>
-                                                <Button variant="ghost">Copy code</Button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-sm leading-6 text-text-secondary">
-                                    You don&apos;t have any pending invites right now.
-                                </p>
-                            )}
+                        <CardContent className="space-y-3">
+                            <p className="text-sm leading-6 text-text-secondary">Use this before homework-heavy weeks or revision sessions.</p>
+                            <div className="flex flex-wrap gap-2">
+                                <Button onClick={openFirstChildControls} variant="secondary">Adjust controls</Button>
+                                <Button onClick={() => router.push("/settings")} variant="ghost">Review defaults</Button>
+                            </div>
                         </CardContent>
                     </Card>
-                </div>
-            </motion.section>
-        </motion.div>
+                </motion.section>
+
+                <motion.section className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]" variants={itemVariants}>
+                    <Card>
+                        <CardHeader>
+                            <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div>
+                                    <CardTitle>Children overview</CardTitle>
+                                    <CardDescription>
+                                        Quick reads on streaks, recent activity, and which subjects might need more support.
+                                    </CardDescription>
+                                </div>
+                                <Button onClick={toggleSortMode} variant="ghost">
+                                    {sortMode === "activity" ? "Sort by name" : "Sort by activity"}
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <section ref={childrenSectionRef}>
+                                {sortedChildren.length ? (
+                                    <div className="overflow-x-auto">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Child</TableHead>
+                                                    <TableHead>Last active</TableHead>
+                                                    <TableHead>Streak</TableHead>
+                                                    <TableHead>Strength mix</TableHead>
+                                                    <TableHead className="text-right">Actions</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {sortedChildren.map((child) => (
+                                                    <TableRow key={child.studentId}>
+                                                        <TableCell className="font-semibold">{child.name}</TableCell>
+                                                        <TableCell>{formatRelativeDate(child.lastActiveAt)}</TableCell>
+                                                        <TableCell>{child.streak} days</TableCell>
+                                                        <TableCell>
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {child.subjects.slice(0, 3).map((subject) => (
+                                                                    <Badge key={`${child.studentId}-${subject.name}`} tone={getStrengthTone(subject.strengthLevel)}>
+                                                                        {subject.name}
+                                                                    </Badge>
+                                                                ))}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex justify-end gap-2">
+                                                                <Button
+                                                                    disabled={!can(permissions, "can_view_child_progress", child.studentId)}
+                                                                    onClick={() => router.push(`/guardian/${child.studentId}`)}
+                                                                >
+                                                                    View child
+                                                                </Button>
+                                                                <Button
+                                                                    disabled={!can(permissions, "can_change_companion_controls", child.studentId)}
+                                                                    onClick={() => router.push(`/guardian/${child.studentId}/companion`)}
+                                                                    variant="secondary"
+                                                                >
+                                                                    Controls
+                                                                </Button>
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                ) : (
+                                    <div className="rounded-2xl border border-dashed border-border bg-background/60 p-4 text-sm leading-6 text-text-secondary">
+                                        No linked children yet. When a guardian invite is accepted, each learner will appear here with real streaks, activity, and subject signals.
+                                    </div>
+                                )}
+                            </section>
+                        </CardContent>
+                    </Card>
+
+                    <div className="grid gap-6">
+                        <Card className="border-0 bg-[linear-gradient(160deg,#eefbf6_0%,#ffffff_100%)] shadow-sm">
+                            <CardHeader>
+                                <CardTitle>Household momentum</CardTitle>
+                                <CardDescription>
+                                    A simple chart showing who has the strongest learning rhythm right now.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {buildMomentumItems(dashboard).map((item) => (
+                                    <div className="space-y-2" key={item.label}>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <p className="text-sm font-semibold text-text-primary">{item.label}</p>
+                                            <span className="text-xs text-text-secondary">{item.trailing}</span>
+                                        </div>
+                                        <Progress value={item.value} />
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+
+                        <section ref={pendingInvitesSectionRef}>
+                            <Card className="border-0 bg-[linear-gradient(160deg,#fff7ed_0%,#ffffff_100%)] shadow-sm">
+                                <CardHeader>
+                                    <CardTitle>Pending invites</CardTitle>
+                                    <CardDescription>
+                                        Create, monitor, resend, and revoke invites without losing the current child overview.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {dashboard.pendingInvites.length ? (
+                                        dashboard.pendingInvites.map((invite) => (
+                                            <div className="rounded-2xl border border-amber-100 bg-white/80 p-4" key={invite.id}>
+                                                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-text-primary">
+                                                            {invite.childEmail ?? `Invite code ${invite.code}`}
+                                                        </p>
+                                                        <p className="mt-1 text-sm text-text-secondary">
+                                                            Sent {formatRelativeDate(invite.sentAt)}
+                                                        </p>
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        <Badge tone="warm">{invite.status}</Badge>
+                                                        <Button
+                                                            disabled={invite.status === "Accepted" || resendingInviteId === invite.id || cancelingInviteId === invite.id}
+                                                            onClick={() => resendInvite(invite)}
+                                                            variant="secondary"
+                                                        >
+                                                            {resendingInviteId === invite.id ? "Resending..." : "Resend"}
+                                                        </Button>
+                                                        <Button
+                                                            disabled={isCopyingInviteCode}
+                                                            onClick={() => copyInviteCode(invite)}
+                                                            variant="ghost"
+                                                        >
+                                                            Copy code
+                                                        </Button>
+                                                        <Button
+                                                            disabled={cancelingInviteId === invite.id}
+                                                            onClick={() => cancelInvite(invite)}
+                                                            variant="danger"
+                                                        >
+                                                            {cancelingInviteId === invite.id ? "Canceling..." : "Cancel invite"}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-sm leading-6 text-text-secondary">
+                                            You don&apos;t have any pending invites right now.
+                                        </p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </section>
+                    </div>
+                </motion.section>
+            </motion.div>
+
+            <Dialog onOpenChange={setInviteDialogOpen} open={isInviteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Invite a child</DialogTitle>
+                        <DialogDescription>
+                            Add an optional email, or send a code-only invite. Email must be 254 characters or fewer.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-text-primary" htmlFor="guardian-invite-email">
+                            Child email (optional)
+                        </label>
+                        <Input
+                            id="guardian-invite-email"
+                            maxLength={254}
+                            onChange={(event) => setInviteEmailDraft(event.target.value)}
+                            placeholder="child@example.com"
+                            type="email"
+                            value={inviteEmailDraft}
+                        />
+                    </div>
+
+                    <DialogFooter>
+                        <Button disabled={isCreatingInvite} onClick={() => setInviteDialogOpen(false)} variant="secondary">
+                            Cancel
+                        </Button>
+                        <Button disabled={isCreatingInvite} onClick={createInvite}>
+                            {isCreatingInvite ? "Sending..." : "Send invite"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
+
+    function toggleSortMode() {
+        setSortMode((current) => current === "name" ? "activity" : "name");
+    }
+
+    function scrollToChildrenOverview() {
+        childrenSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function scrollToPendingInvites() {
+        pendingInvitesSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function openFirstChildOverview() {
+        if (!dashboard) {
+            return;
+        }
+
+        const firstChild = dashboard.children[0];
+        if (!firstChild) {
+            toast.error("No linked children yet.");
+            return;
+        }
+
+        router.push(`/guardian/${firstChild.studentId}`);
+    }
+
+    function openFirstChildControls() {
+        if (!dashboard) {
+            return;
+        }
+
+        const firstEditableChild = dashboard.children.find((child) => can(permissions, "can_change_companion_controls", child.studentId));
+        if (!firstEditableChild) {
+            toast.error("No child is currently available for companion control changes.");
+            return;
+        }
+
+        router.push(`/guardian/${firstEditableChild.studentId}/companion`);
+    }
+
+    async function createInvite() {
+        const trimmedEmail = inviteEmailDraft.trim();
+        if (trimmedEmail.length > 254) {
+            toast.error("Email must be 254 characters or fewer.");
+            return;
+        }
+
+        setIsCreatingInvite(true);
+
+        try {
+            const createdInvite = await browserApiFetch<PendingInvite>(ROUTES.GUARDIAN.INVITE, {
+                method: "POST",
+                body: JSON.stringify({ childEmail: trimmedEmail || undefined }),
+            });
+
+            setDashboard((current) => {
+                if (!current) {
+                    return current;
+                }
+
+                return withRecomputedSummary({
+                    ...current,
+                    pendingInvites: [createdInvite, ...current.pendingInvites],
+                });
+            });
+
+            setInviteEmailDraft("");
+            setInviteDialogOpen(false);
+            toast.success("Invite sent.");
+        } catch (createError) {
+            toast.error(createError instanceof Error ? createError.message : "Failed to send invite.");
+        } finally {
+            setIsCreatingInvite(false);
+        }
+    }
+
+    async function copyLatestInviteCode() {
+        if (!dashboard) {
+            return;
+        }
+
+        const firstInvite = dashboard.pendingInvites[0];
+        if (!firstInvite) {
+            toast.error("There is no invite code to copy yet.");
+            return;
+        }
+
+        await copyInviteCode(firstInvite);
+    }
+
+    async function copyInviteCode(invite: PendingInvite) {
+        try {
+            setIsCopyingInviteCode(true);
+            await navigator.clipboard.writeText(invite.code);
+            toast.success("Invite code copied.");
+        } catch {
+            toast.error("Copy failed. Please copy the code manually.");
+        } finally {
+            setIsCopyingInviteCode(false);
+        }
+    }
+
+    async function resendInvite(invite: PendingInvite) {
+        setResendingInviteId(invite.id);
+
+        try {
+            const resendRoute = `${ROUTES.GUARDIAN.CANCEL_INVITE(invite.id)}/resend`;
+            const refreshedInvite = await browserApiFetch<PendingInvite>(resendRoute, {
+                method: "PATCH",
+            });
+
+            setDashboard((current) => {
+                if (!current) {
+                    return current;
+                }
+
+                return withRecomputedSummary({
+                    ...current,
+                    pendingInvites: current.pendingInvites.map((entry) => entry.id === invite.id ? refreshedInvite : entry),
+                });
+            });
+            toast.success("Invite resent. The same code remains valid.");
+        } catch (resendError) {
+            toast.error(resendError instanceof Error ? resendError.message : "Failed to resend invite.");
+        } finally {
+            setResendingInviteId(null);
+        }
+    }
+
+    async function cancelInvite(invite: PendingInvite) {
+        setCancelingInviteId(invite.id);
+
+        try {
+            await browserApiFetch<{ cancelled: boolean }>(ROUTES.GUARDIAN.CANCEL_INVITE(invite.id), {
+                method: "DELETE",
+            });
+
+            setDashboard((current) => {
+                if (!current) {
+                    return current;
+                }
+
+                return withRecomputedSummary({
+                    ...current,
+                    pendingInvites: current.pendingInvites.filter((entry) => entry.id !== invite.id),
+                });
+            });
+            toast.success("Invite canceled.");
+        } catch (cancelError) {
+            toast.error(cancelError instanceof Error ? cancelError.message : "Failed to cancel invite.");
+        } finally {
+            setCancelingInviteId(null);
+        }
+    }
 }
 
 function HouseholdStatCard({
@@ -460,4 +738,25 @@ function buildMomentumItems(content: GuardianDashboardContent) {
         value: Math.min(child.streak * 10, 100),
         trailing: `${child.streak}-day streak`,
     }));
+}
+
+function withRecomputedSummary(content: GuardianDashboardContent): GuardianDashboardContent {
+    return {
+        ...content,
+        summary: {
+            childrenCount: content.children.length,
+            activeThisWeek: content.children.filter((child) => {
+                if (!child.lastActiveAt) {
+                    return false;
+                }
+
+                const threshold = Date.now() - 7 * 24 * 60 * 60 * 1000;
+                return new Date(child.lastActiveAt).getTime() >= threshold;
+            }).length,
+            pendingInvites: content.pendingInvites.filter((invite) => invite.status === "Awaiting acceptance").length,
+            averageStreak: content.children.length
+                ? Math.round(content.children.reduce((total, child) => total + child.streak, 0) / content.children.length)
+                : 0,
+        },
+    };
 }
