@@ -1,12 +1,23 @@
-import { Controller, Post, Get, Body, Query, UseGuards, Req, Res, NotFoundException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  UseGuards,
+  Req,
+  Res,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@lernard/shared-types';
 import { AuthService } from './auth.service';
 import { GoogleSessionStore } from './google-session.store';
 import type { GoogleSessionData } from './google-session.store';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
+import { RequestMagicLinkDto } from './dto/request-magic-link.dto';
+import { VerifyMagicLinkDto } from './dto/verify-magic-link.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { GoogleCodeDto } from './dto/google-code.dto';
 import { GuardianVerifyPasswordDto } from './dto/guardian-verify-password.dto';
@@ -23,32 +34,48 @@ export class AuthController {
     private readonly configService: ConfigService,
   ) {}
 
-  @Post('register')
-  async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  // ─── Magic Link ────────────────────────────────────────────────────────────
+
+  @Post('magic-link/request')
+  async requestMagicLink(@Body() dto: RequestMagicLinkDto) {
+    return this.authService.sendMagicLink(dto.email, dto.platform ?? 'web');
   }
 
-  @Post('login')
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  @Post('magic-link/verify')
+  async verifyMagicLink(@Body() dto: VerifyMagicLinkDto, @Res() res: Response) {
+    if (!dto.token && !(dto.email && dto.otp)) {
+      throw new BadRequestException('Provide either token or email + otp.');
+    }
+
+    const result = dto.token
+      ? await this.authService.verifyMagicLinkToken(dto.token)
+      : await this.authService.verifyMagicLinkOtp(dto.email!, dto.otp!);
+
+    // Native: exchange for a short-lived session code so the web verify page
+    // can deep-link back into the app without exposing tokens in the URL.
+    if (result.platform === 'native') {
+      const sessionCode = this.googleSessionStore.create({
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        onboardingComplete: result.user.onboardingComplete,
+      });
+      return res.json({ sessionCode });
+    }
+
+    const { platform: _platform, ...response } = result;
+    return res.json(response);
   }
+
+  // ─── Token Management ──────────────────────────────────────────────────────
 
   @Post('refresh')
   async refresh(@Body() dto: RefreshDto) {
     return this.authService.refresh(dto.refreshToken);
   }
 
-  @Post('google/code')
-  async loginWithGoogleCode(@Body() dto: GoogleCodeDto) {
-    return this.authService.loginWithGoogleCode(dto.code);
-  }
-
   @ProtectedRoute()
   @Post('logout')
-  async logout(
-    @CurrentUser() user: User,
-    @Body() dto: RefreshDto,
-  ) {
+  async logout(@CurrentUser() user: User, @Body() dto: RefreshDto) {
     await this.authService.logout(user.id, dto.refreshToken);
     return { message: 'Logged out' };
   }
@@ -57,6 +84,13 @@ export class AuthController {
   @Get('me')
   async getMe(@CurrentUser() user: User) {
     return this.authService.getMe(user);
+  }
+
+  // ─── Google OAuth ──────────────────────────────────────────────────────────
+
+  @Post('google/code')
+  async loginWithGoogleCode(@Body() dto: GoogleCodeDto) {
+    return this.authService.loginWithGoogleCode(dto.code);
   }
 
   @UseGuards(AuthGuard('google'))
@@ -75,7 +109,6 @@ export class AuthController {
         user?: { onboardingComplete: boolean };
       };
 
-      // Validate that tokens were issued
       if (!tokens?.accessToken || !tokens?.refreshToken || !tokens?.user) {
         console.error('Google callback: Missing tokens in req.user', { tokens });
         return res.redirect(`${this.configService.get('WEB_APP_URL')}/login?error=auth_failed`);
@@ -92,7 +125,6 @@ export class AuthController {
       });
 
       if (client === 'native') {
-        // Native still uses hash for deep link compatibility
         const hash = `#accessToken=${encodeURIComponent(tokens.accessToken)}&refreshToken=${encodeURIComponent(tokens.refreshToken)}&onboardingComplete=${tokens.user.onboardingComplete ? '1' : '0'}`;
         return res.redirect(`lernard://auth/callback${hash}`);
       }
@@ -113,18 +145,7 @@ export class AuthController {
     return session;
   }
 
-  @Post('apple')
-  async apple() {
-    // TODO: Implement Apple OAuth
-    return { message: 'Not implemented' };
-  }
-
-  @ProtectedRoute()
-  @Post('migrate-guest')
-  async migrateGuest() {
-    // TODO: Implement guest migration
-    return { message: 'Not implemented' };
-  }
+  // ─── Guardian PIN ──────────────────────────────────────────────────────────
 
   @ProtectedRoute({ roles: [Role.GUARDIAN] })
   @Post('guardian/verify-password')

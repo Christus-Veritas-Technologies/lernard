@@ -1,21 +1,27 @@
 import {
   Injectable,
-  ConflictException,
   UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
 import type { User } from '@prisma/client';
+
+interface MagicLinkRecord {
+  id: string;
+  email: string;
+  platform: string;
+  expiresAt: Date;
+  usedAt: Date | null;
+}
 import { PrismaService } from '../../prisma/prisma.service';
 import { toSharedPlan, toSharedRole } from '../../common/utils/shared-model-mappers';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
+import { MailService } from './mail.service';
 
-const SALT_ROUNDS = 12;
 const REFRESH_TOKEN_DAYS = 90;
+const MAGIC_LINK_MINUTES = 15;
 
 interface GoogleProfile {
   googleId: string;
@@ -39,71 +45,95 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly mailService: MailService,
   ) {}
 
-  async register(dto: RegisterDto) {
-    const normalizedEmail = dto.email.toLowerCase();
-    const existing = await this.prisma.user.findUnique({
-      where: { email: normalizedEmail },
+  // ─── Magic Link ────────────────────────────────────────────────────────────
+
+  async sendMagicLink(email: string, platform: 'web' | 'native' = 'web') {
+    const normalizedEmail = email.toLowerCase();
+
+    // Invalidate any previous unused tokens for this address
+    await this.prisma.magicLinkToken.updateMany({
+      where: { email: normalizedEmail, usedAt: null },
+      data: { usedAt: new Date() },
     });
+
+    const token = uuidv4();
+    const tokenHash = this.hashToken(token);
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpHash = this.hashToken(otp);
+
+    await this.prisma.magicLinkToken.create({
+      data: {
+        email: normalizedEmail,
+        tokenHash,
+        otpHash,
+        platform,
+        expiresAt: new Date(Date.now() + MAGIC_LINK_MINUTES * 60 * 1000),
+      },
+    });
+
+    await this.mailService.sendMagicLink(normalizedEmail, token, otp);
+
+    return { message: 'Check your email for a sign-in link.' };
+  }
+
+  async verifyMagicLinkToken(token: string) {
+    const tokenHash = this.hashToken(token);
+    const record = await this.prisma.magicLinkToken.findUnique({ where: { tokenHash } });
+    return this.consumeMagicLink(record);
+  }
+
+  async verifyMagicLinkOtp(email: string, otp: string) {
+    const otpHash = this.hashToken(otp);
+    const record = await this.prisma.magicLinkToken.findFirst({
+      where: { email: email.toLowerCase(), otpHash, usedAt: null },
+    });
+    return this.consumeMagicLink(record);
+  }
+
+  private async consumeMagicLink(record: MagicLinkRecord | null) {
+    if (!record || record.usedAt) {
+      throw new UnauthorizedException('This link is invalid or has already been used.');
+    }
+    if (record.expiresAt < new Date()) {
+      throw new UnauthorizedException('This link has expired. Please request a new one.');
+    }
+
+    await this.prisma.magicLinkToken.update({
+      where: { id: record.id },
+      data: { usedAt: new Date() },
+    });
+
+    const user = await this.findOrCreateUserByEmail(record.email);
+    const tokens = await this.issueTokens(user);
+    return { ...tokens, platform: record.platform };
+  }
+
+  private async findOrCreateUserByEmail(email: string) {
+    const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
-      throw new ConflictException('Email already registered');
+      if (existing.deletedAt) throw new UnauthorizedException('Account not found.');
+      return existing;
     }
-
-    const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
-    const user = await this.prisma.$transaction(async (transaction) => {
-      const createdUser = await transaction.user.create({
-        data: {
-          name: dto.name,
-          email: normalizedEmail,
-          passwordHash,
-          role: dto.accountType === 'guardian' ? 'GUARDIAN' : 'STUDENT',
-          ...(dto.accountType === 'guardian' ? { onboardingComplete: true } : {}),
-        },
-      });
-
-      if (dto.accountType === 'guardian') {
-        await transaction.guardian.create({
-          data: {
-            userId: createdUser.id,
-            passwordHash,
-          },
-        });
-      }
-
-      return createdUser;
+    return this.prisma.user.create({
+      data: {
+        email,
+        name: email.split('@')[0],
+        role: 'STUDENT',
+      },
     });
-
-    return this.issueTokens(user);
   }
 
-  async login(dto: LoginDto) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
-    });
-
-    if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
-    const valid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valid) {
-      throw new UnauthorizedException('Invalid email or password');
-    }
-
-    return this.issueTokens(user);
-  }
+  // ─── Google OAuth ──────────────────────────────────────────────────────────
 
   async findOrCreateGoogleUser(profile: GoogleProfile) {
     const { googleId, name, email } = profile;
 
-    // 1. Existing user with this googleId
     const byGoogleId = await this.prisma.user.findUnique({ where: { googleId } });
-    if (byGoogleId) {
-      return this.issueTokens(byGoogleId);
-    }
+    if (byGoogleId) return this.issueTokens(byGoogleId);
 
-    // 2. Existing user with same email — link the account
     if (email) {
       const byEmail = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
       if (byEmail) {
@@ -115,7 +145,6 @@ export class AuthService {
       }
     }
 
-    // 3. Brand-new user
     const created = await this.prisma.user.create({
       data: {
         name,
@@ -133,16 +162,15 @@ export class AuthService {
     return this.findOrCreateGoogleUser(profile);
   }
 
+  // ─── Token Management ──────────────────────────────────────────────────────
+
   async refresh(refreshTokenRaw: string) {
     const tokenHash = this.hashToken(refreshTokenRaw);
     const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
 
-    if (!stored) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
+    if (!stored) throw new UnauthorizedException('Invalid refresh token');
 
     if (stored.revoked) {
-      // Reuse detection — revoke ALL tokens for this user
       await this.prisma.refreshToken.updateMany({
         where: { userId: stored.userId },
         data: { revoked: true },
@@ -150,18 +178,12 @@ export class AuthService {
       throw new UnauthorizedException('Token reuse detected — all sessions revoked');
     }
 
-    if (stored.expiresAt < new Date()) {
-      throw new UnauthorizedException('Refresh token expired');
-    }
+    if (stored.expiresAt < new Date()) throw new UnauthorizedException('Refresh token expired');
 
-    // Rotate: revoke old, issue new
     const user = await this.prisma.user.findUnique({ where: { id: stored.userId } });
-    if (!user || user.deletedAt) {
-      throw new UnauthorizedException();
-    }
+    if (!user || user.deletedAt) throw new UnauthorizedException();
 
     const tokens = await this.issueTokens(user);
-
     const newTokenHash = this.hashToken(tokens.refreshToken);
     await this.prisma.refreshToken.update({
       where: { id: stored.id },
@@ -179,26 +201,27 @@ export class AuthService {
     });
   }
 
+  getMe(user: User) {
+    return this.serializeAuthUser(user);
+  }
+
+  // ─── Guardian PIN ──────────────────────────────────────────────────────────
+
   async guardianVerifyPassword(userId: string, password: string) {
-    const guardian = await this.prisma.guardian.findUnique({
-      where: { userId },
-    });
+    const guardian = await this.prisma.guardian.findUnique({ where: { userId } });
 
-    if (!guardian) {
-      throw new UnauthorizedException('Guardian account not found');
+    if (!guardian || !guardian.passwordHash) {
+      throw new UnauthorizedException('No parental-controls PIN is set on this account.');
     }
 
+    const bcrypt = await import('bcrypt');
     const valid = await bcrypt.compare(password, guardian.passwordHash);
-    if (!valid) {
-      throw new UnauthorizedException('Incorrect guardian password');
-    }
+    if (!valid) throw new UnauthorizedException('Incorrect PIN.');
 
     return { verified: true };
   }
 
-  getMe(user: User) {
-    return this.serializeAuthUser(user);
-  }
+  // ─── Private Helpers ───────────────────────────────────────────────────────
 
   private async issueTokens(user: User) {
     const payload = { sub: user.id };
@@ -252,45 +275,28 @@ export class AuthService {
 
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: params,
     });
 
-    if (!response.ok) {
-      throw new UnauthorizedException('Google sign-in failed. Please try again.');
-    }
+    if (!response.ok) throw new UnauthorizedException('Google sign-in failed. Please try again.');
 
     const json = (await response.json()) as GoogleTokenResponse;
-    if (!json.access_token) {
-      throw new UnauthorizedException('Google sign-in failed. Please try again.');
-    }
+    if (!json.access_token) throw new UnauthorizedException('Google sign-in failed. Please try again.');
 
     return json.access_token;
   }
 
   private async fetchGoogleProfile(accessToken: string): Promise<GoogleProfile> {
     const response = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
-    if (!response.ok) {
-      throw new UnauthorizedException('Unable to read Google profile.');
-    }
+    if (!response.ok) throw new UnauthorizedException('Unable to read Google profile.');
 
     const json = (await response.json()) as GoogleUserInfoResponse;
+    if (!json.sub || !json.name) throw new UnauthorizedException('Google profile was incomplete.');
 
-    if (!json.sub || !json.name) {
-      throw new UnauthorizedException('Google profile was incomplete.');
-    }
-
-    return {
-      googleId: json.sub,
-      name: json.name,
-      email: json.email ?? null,
-    };
+    return { googleId: json.sub, name: json.name, email: json.email ?? null };
   }
 }
