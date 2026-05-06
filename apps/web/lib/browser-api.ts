@@ -77,14 +77,21 @@ async function requestJson<T>(
     options: BrowserApiOptions,
     accessToken: string | null,
 ): Promise<T> {
+    const headers = new Headers(options.headers);
+    const isMultipartRequest = typeof FormData !== "undefined" && options.body instanceof FormData;
+
+    if (!isMultipartRequest && !headers.has("Content-Type")) {
+        headers.set("Content-Type", "application/json");
+    }
+
+    if (accessToken && !headers.has("Authorization")) {
+        headers.set("Authorization", `Bearer ${accessToken}`);
+    }
+
     const response = await fetch(`${getBaseUrl()}${route}`, {
         ...options,
         cache: "no-store",
-        headers: {
-            "Content-Type": "application/json",
-            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-            ...options.headers,
-        },
+        headers,
     });
 
     if (!response.ok) {
