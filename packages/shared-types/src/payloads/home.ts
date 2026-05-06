@@ -41,6 +41,9 @@ export interface SubjectTopicBreakdown {
   strongCount: number
   developingCount: number
   needsWorkCount: number
+  readinessPercent: number | null
+  readinessState: 'baseline_only' | 'active'
+  activityCount: number
 }
 
 export interface RecentSession {

@@ -13,6 +13,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { buildNullSlots, buildPagePayload } from '../../common/utils/build-page-payload';
 import { toSharedStrengthLevel } from '../../common/utils/shared-model-mappers';
 
+const FIRST_LOOK_BASELINE_KEY = '__first_look__';
+
 @Injectable()
 export class HomeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -60,6 +62,28 @@ export class HomeService {
       }),
     ]);
 
+    const trackedSubjectNames = userSubjects.map((userSubject) => userSubject.subject.name);
+    const subjectSessionRows = trackedSubjectNames.length
+      ? await (this.prisma as any).session.groupBy({
+          by: ['subjectName'],
+          where: {
+            userId,
+            subjectName: {
+              in: trackedSubjectNames,
+            },
+          },
+          _count: {
+            _all: true,
+          },
+        })
+      : [];
+    const sessionCountBySubjectName = new Map<string, number>(
+      subjectSessionRows.map((row: { subjectName: string | null; _count: { _all: number } }) => [
+        row.subjectName ?? 'General',
+        row._count._all,
+      ]),
+    );
+
     const subjectProgressById = new Map(
       subjectProgress.map((progress) => [progress.subjectId, progress]),
     );
@@ -69,8 +93,14 @@ export class HomeService {
     const strengthBreakdown: StrengthBreakdown = { strong: 0, developing: 0, needsWork: 0 };
 
     for (const sp of subjectProgress) {
+      const activityCount = sessionCountBySubjectName.get(sp.subject.name) ?? 0;
+      if (activityCount === 0) {
+        continue;
+      }
+
       const topicData = sp.topicScores as Record<string, unknown>;
       for (const [topic, rawScore] of Object.entries(topicData)) {
+        if (topic === FIRST_LOOK_BASELINE_KEY) continue;
         if (typeof rawScore !== 'number' || Number.isNaN(rawScore)) continue;
         const score100 = rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
         allTopicScores.push({ topic, subjectName: sp.subject.name, score: score100 });
@@ -100,6 +130,7 @@ export class HomeService {
       .slice(0, 6);
 
     const subjectTopics: SubjectTopicBreakdown[] = userSubjects.map((us) => {
+      const activityCount = sessionCountBySubjectName.get(us.subject.name) ?? 0;
       const sp = subjectProgressById.get(us.subjectId);
       if (!sp) {
         return {
@@ -108,18 +139,38 @@ export class HomeService {
           strongCount: 0,
           developingCount: 0,
           needsWorkCount: 0,
+          readinessPercent: null,
+          readinessState: 'baseline_only',
+          activityCount,
         };
       }
+
       const topicData = sp.topicScores as Record<string, unknown>;
-      const topicValues = Object.values(topicData).filter(
-        (v): v is number => typeof v === 'number' && !Number.isNaN(v),
+      const topicValues = Object.entries(topicData).filter(
+        (entry): entry is [string, number] =>
+          typeof entry[1] === 'number' && !Number.isNaN(entry[1]),
       );
+
+      const nonBaselineScores = topicValues
+        .filter(([topic]) => topic !== FIRST_LOOK_BASELINE_KEY)
+        .map(([, score]) => score);
+      const readinessPercent = activityCount > 0 && nonBaselineScores.length
+        ? Math.round(
+            (nonBaselineScores.reduce((total, score) => total + score, 0)
+              / nonBaselineScores.length)
+              * 100,
+          )
+        : null;
+
       return {
         subjectId: us.subjectId,
         subjectName: us.subject.name,
-        strongCount: topicValues.filter((s) => s >= 0.7).length,
-        developingCount: topicValues.filter((s) => s >= 0.4 && s < 0.7).length,
-        needsWorkCount: topicValues.filter((s) => s < 0.4).length,
+        strongCount: nonBaselineScores.filter((s) => s >= 0.7).length,
+        developingCount: nonBaselineScores.filter((s) => s >= 0.4 && s < 0.7).length,
+        needsWorkCount: nonBaselineScores.filter((s) => s < 0.4).length,
+        readinessPercent,
+        readinessState: readinessPercent === null ? 'baseline_only' : 'active',
+        activityCount,
       };
     });
 
