@@ -95,7 +95,9 @@ export function AppShellNav() {
                                         </span>
 
                                         <div>
-                                            <p className="text-sm font-semibold">{item.label}</p>
+                                            <p className={cn("text-sm font-semibold", isActive ? "text-text-inverse" : "text-text-primary")}>
+                                                {item.label}
+                                            </p>
                                             <p className={cn("text-xs", isActive ? "text-primary-100" : "text-text-secondary")}>
                                                 {item.description}
                                             </p>
@@ -136,7 +138,9 @@ export function AppShellNav() {
                                 key={item.href}
                             >
                                 <Icon className={isActive ? "text-text-inverse" : "text-primary-500"} size={20} strokeWidth={1.9} />
-                                <span className="text-xs font-semibold">{item.label}</span>
+                                <span className={cn("text-xs font-semibold", isActive ? "text-text-inverse" : "text-text-primary")}>
+                                    {item.label}
+                                </span>
                                 <span className={cn("mt-1 text-[11px]", isActive ? "text-primary-100" : "text-text-tertiary")}>
                                     {item.description}
                                 </span>
