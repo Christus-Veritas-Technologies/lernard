@@ -16,14 +16,21 @@ export interface AuthUser {
   firstLookComplete: boolean
 }
 
-export interface RegisterPayload {
+export interface MagicLinkRequestPayload {
   email: string
-  password: string
-  name: string
-  accountType: 'student' | 'guardian'
+  platform?: 'web' | 'native'
 }
 
-export interface LoginPayload {
-  email: string
-  password: string
+export interface MagicLinkVerifyPayload {
+  token?: string
+  email?: string
+  otp?: string
+}
+
+export interface MagicLinkRequestResponse {
+  message: string
+}
+
+export interface MagicLinkNativeVerifyResponse {
+  sessionCode: string
 }

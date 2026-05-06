@@ -63,7 +63,14 @@ export type {
   ChildProfileContent,
   ChildCompanionContent,
 } from './payloads/guardian'
-export type { AuthResponse, AuthUser, RegisterPayload, LoginPayload } from './payloads/auth'
+export type {
+  AuthResponse,
+  AuthUser,
+  MagicLinkRequestPayload,
+  MagicLinkVerifyPayload,
+  MagicLinkRequestResponse,
+  MagicLinkNativeVerifyResponse,
+} from './payloads/auth'
 export type {
   AccountTypePayload,
   ProfileSetupPayload,

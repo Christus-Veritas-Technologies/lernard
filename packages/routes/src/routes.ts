@@ -4,8 +4,8 @@ export const ROUTES = {
   },
 
   AUTH: {
-    REGISTER: '/v1/auth/register',
-    LOGIN: '/v1/auth/login',
+    MAGIC_LINK_REQUEST: '/v1/auth/magic-link/request',
+    MAGIC_LINK_VERIFY: '/v1/auth/magic-link/verify',
     GOOGLE: '/v1/auth/google',
     GOOGLE_CODE: '/v1/auth/google/code',
     GOOGLE_CALLBACK: '/v1/auth/google/callback',
