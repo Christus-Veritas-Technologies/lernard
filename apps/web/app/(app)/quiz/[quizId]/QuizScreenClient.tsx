@@ -209,15 +209,12 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                         <div className="flex flex-wrap gap-3">
                             <Button
                                 onClick={() => {
-                                    if (quiz.question.type === "multiple_select") {
-                                        setSelectedOptions(["I am not sure"]);
-                                    } else {
-                                        setAnswer("I am not sure");
-                                    }
+                                    setAnswer("");
+                                    setSelectedOptions([]);
                                 }}
                                 variant="ghost"
                             >
-                                I&apos;m not sure
+                                Clear answer
                             </Button>
                             <Button disabled={submitting || !canSubmit} onClick={submitAnswer}>
                                 Submit

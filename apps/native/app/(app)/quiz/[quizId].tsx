@@ -239,14 +239,11 @@ export default function QuizScreen() {
           <TouchableOpacity
             className="flex-1 items-center rounded-xl border border-slate-200 py-3"
             onPress={() => {
-              if (quiz.question.type === 'multiple_select') {
-                setSelectedOptions(['I am not sure']);
-              } else {
-                setAnswer('I am not sure');
-              }
+              setAnswer('');
+              setSelectedOptions([]);
             }}
           >
-            <Text className="text-sm text-slate-500">Not sure</Text>
+            <Text className="text-sm text-slate-500">Clear answer</Text>
           </TouchableOpacity>
           <View className="flex-1">
             <Button

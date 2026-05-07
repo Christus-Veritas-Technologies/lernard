@@ -215,6 +215,7 @@ export class MastraService {
         '',
         'Rules:',
         '- Vary question types across: multiple_choice, multiple_select, true_false, fill_blank, short_answer',
+        '- If generating 5 or more questions, include at least 1 multiple_select question and at least 1 free-response question (fill_blank or short_answer)',
         '- Prefer multiple_choice and true_false; use fill_blank or short_answer for at most 1-2 questions',
         '- For multiple_choice: provide exactly 4 distinct real answer options; set correctAnswer to the EXACT text of the correct option',
         '- For multiple_select: provide 4-5 options; set correctAnswers as an array of all correct option texts (2+ correct)',
@@ -222,6 +223,7 @@ export class MastraService {
         '- For fill_blank/short_answer: no options; set correctAnswer to a concise expected answer (1-5 words)',
         '- Every question must have a one-sentence "explanation" field explaining why the answer is correct',
         '- Question text must be specific and educational — NEVER write generic text like "Which statement best describes X?"',
+        '- Do not repeat the same question pattern, wording, or concept framing in multiple questions',
         '- Do NOT number the question text (no "1." prefix)',
         '',
         'Return ONLY a JSON object:',
@@ -237,9 +239,7 @@ export class MastraService {
       });
 
       const parsed = safeJsonParse<{ questions?: GeneratedQuizQuestion[] }>(text);
-      const questions = Array.isArray(parsed?.questions)
-        ? parsed.questions.slice(0, input.questionCount).map((q) => normalizeGeneratedQuestion(q))
-        : fallbackQuestions;
+      const questions = buildQuizQuestionSet(parsed?.questions, input.topic, input.questionCount);
 
       return {
         topic: input.topic,
@@ -546,23 +546,252 @@ function buildFallbackLesson(
   };
 }
 
-function buildFallbackQuizQuestions(topic: string, questionCount: number): QuizQuestion[] {
-  return Array.from({ length: questionCount }, (_, index) => ({
-    type: 'multiple_choice',
-    text: `${index + 1}. Which statement best describes ${topic}?`,
-    options: ['Definition A', 'Definition B', 'Definition C', 'Definition D'],
-  }));
+function buildFallbackQuizQuestions(topic: string, questionCount: number): GeneratedQuizQuestion[] {
+  const normalizedTopic = topic.trim() || 'this topic';
+
+  return Array.from({ length: questionCount }, (_, index) => {
+    const variant = index % 5;
+
+    if (variant === 0) {
+      return {
+        type: 'multiple_choice',
+        text: `Which option gives the clearest summary of ${normalizedTopic}?`,
+        options: [
+          `${normalizedTopic} is a concept or process that can be understood step by step.`,
+          `${normalizedTopic} is only a random guess with no pattern.`,
+          `${normalizedTopic} cannot be explained or practiced.`,
+          `${normalizedTopic} is unrelated to problem-solving or reasoning.`,
+        ],
+        correctAnswer: `${normalizedTopic} is a concept or process that can be understood step by step.`,
+        explanation: `A strong summary of ${normalizedTopic} should explain that it can be learned, analyzed, and applied.`,
+      };
+    }
+
+    if (variant === 1) {
+      return {
+        type: 'true_false',
+        text: `True or false: learning ${normalizedTopic} usually becomes easier when you break it into smaller ideas and examples.`,
+        correctAnswer: 'true',
+        explanation: `Breaking ${normalizedTopic} into smaller parts is a reliable way to improve understanding.`,
+      };
+    }
+
+    if (variant === 2) {
+      return {
+        type: 'multiple_select',
+        text: `Which actions would help someone understand ${normalizedTopic} more deeply?`,
+        options: [
+          `Define the key terms in ${normalizedTopic}`,
+          `Work through a concrete example of ${normalizedTopic}`,
+          `Ignore how the ideas in ${normalizedTopic} connect`,
+          `Explain ${normalizedTopic} in your own words`,
+        ],
+        correctAnswers: [
+          `Define the key terms in ${normalizedTopic}`,
+          `Work through a concrete example of ${normalizedTopic}`,
+          `Explain ${normalizedTopic} in your own words`,
+        ],
+        explanation: `Definitions, examples, and self-explanations strengthen understanding more than passive review.`,
+      };
+    }
+
+    if (variant === 3) {
+      return {
+        type: 'fill_blank',
+        text: `Fill in the blank: This quiz is helping you practise _____.`,
+        correctAnswer: normalizedTopic,
+        explanation: `The blank should be filled with the topic the quiz is focused on.`,
+      };
+    }
+
+    return {
+      type: 'short_answer',
+      text: `In one short phrase, what is the main idea you should be able to explain after studying ${normalizedTopic}?`,
+      correctAnswer: normalizedTopic,
+      explanation: `A concise answer should name the core topic being practised.`,
+    };
+  });
+}
+
+function buildQuizQuestionSet(
+  generatedQuestions: GeneratedQuizQuestion[] | undefined,
+  topic: string,
+  questionCount: number,
+): GeneratedQuizQuestion[] {
+  const normalized = Array.isArray(generatedQuestions)
+    ? generatedQuestions.map((question) => normalizeGeneratedQuestion(question)).filter(isUsableGeneratedQuestion)
+    : [];
+  const uniqueQuestions: GeneratedQuizQuestion[] = [];
+  const seen = new Set<string>();
+
+  for (const question of normalized) {
+    const dedupeKey = `${question.type}|${normalizeQuestionKey(question.text)}`;
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+    uniqueQuestions.push(question);
+
+  }
+
+  for (const fallbackQuestion of buildFallbackQuizQuestions(topic, questionCount * 2)) {
+    const dedupeKey = `${fallbackQuestion.type}|${normalizeQuestionKey(fallbackQuestion.text)}`;
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+    uniqueQuestions.push(fallbackQuestion);
+
+    if (uniqueQuestions.length === questionCount) {
+      break;
+    }
+  }
+
+  return ensureMinimumQuizVariety(uniqueQuestions.slice(0, questionCount), topic, questionCount);
 }
 
 function normalizeGeneratedQuestion(question: GeneratedQuizQuestion): GeneratedQuizQuestion {
   return {
     type: normalizeQuestionType(question.type),
     text: typeof question.text === 'string' ? question.text.trim() : String(question.text ?? ''),
-    options: Array.isArray(question.options) ? question.options : undefined,
-    correctAnswer: typeof question.correctAnswer === 'string' ? question.correctAnswer : undefined,
-    correctAnswers: Array.isArray(question.correctAnswers) ? question.correctAnswers : undefined,
-    explanation: typeof question.explanation === 'string' ? question.explanation : undefined,
+    options: Array.isArray(question.options)
+      ? question.options
+          .filter((option): option is string => typeof option === 'string')
+          .map((option) => option.trim())
+          .filter(Boolean)
+      : undefined,
+    correctAnswer: typeof question.correctAnswer === 'string' ? question.correctAnswer.trim() : undefined,
+    correctAnswers: Array.isArray(question.correctAnswers)
+      ? question.correctAnswers
+          .filter((answer): answer is string => typeof answer === 'string')
+          .map((answer) => answer.trim())
+          .filter(Boolean)
+      : undefined,
+    explanation: typeof question.explanation === 'string' ? question.explanation.trim() : undefined,
   };
+}
+
+function isUsableGeneratedQuestion(question: GeneratedQuizQuestion): boolean {
+  if (!question.text || isGenericQuestionText(question.text)) {
+    return false;
+  }
+
+  switch (question.type) {
+    case 'multiple_choice': {
+      if (!hasDistinctOptions(question.options, 4)) {
+        return false;
+      }
+      return Boolean(question.correctAnswer && optionListIncludes(question.options, question.correctAnswer));
+    }
+    case 'multiple_select': {
+      if (!hasDistinctOptions(question.options, 4) || !Array.isArray(question.correctAnswers) || question.correctAnswers.length < 2) {
+        return false;
+      }
+      return question.correctAnswers.every((answer) => optionListIncludes(question.options, answer));
+    }
+    case 'true_false': {
+      return question.correctAnswer === 'true' || question.correctAnswer === 'false';
+    }
+    case 'fill_blank':
+    case 'short_answer':
+    case 'ordering': {
+      return Boolean(question.correctAnswer);
+    }
+    default:
+      return false;
+  }
+}
+
+function hasDistinctOptions(options: string[] | undefined, minCount: number): boolean {
+  if (!Array.isArray(options) || options.length < minCount) {
+    return false;
+  }
+
+  return new Set(options.map((option) => option.trim().toLowerCase())).size === options.length;
+}
+
+function optionListIncludes(options: string[] | undefined, candidate: string): boolean {
+  if (!Array.isArray(options)) {
+    return false;
+  }
+
+  const normalizedCandidate = candidate.trim().toLowerCase();
+  return options.some((option) => option.trim().toLowerCase() === normalizedCandidate);
+}
+
+function isGenericQuestionText(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+
+  return normalized.length < 12
+    || normalized.startsWith('which statement best describes')
+    || normalized.includes('definition a')
+    || normalized.includes('definition b')
+    || /^\d+\./.test(normalized);
+}
+
+function normalizeQuestionKey(text: string): string {
+  return text.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function ensureMinimumQuizVariety(
+  questions: GeneratedQuizQuestion[],
+  topic: string,
+  questionCount: number,
+): GeneratedQuizQuestion[] {
+  if (questionCount < 5 || questions.length === 0) {
+    return questions.slice(0, questionCount);
+  }
+
+  const result = [...questions];
+  const fallbackPool = buildFallbackQuizQuestions(topic, questionCount * 2);
+
+  if (!result.some((question) => question.type === 'multiple_select')) {
+    const fallback = fallbackPool.find((question) => question.type === 'multiple_select');
+    if (fallback) {
+      result.push(fallback);
+    }
+  }
+
+  if (!result.some((question) => question.type === 'fill_blank' || question.type === 'short_answer')) {
+    const fallback = fallbackPool.find(
+      (question) => question.type === 'fill_blank' || question.type === 'short_answer',
+    );
+    if (fallback) {
+      result.push(fallback);
+    }
+  }
+
+  while (result.length > questionCount) {
+    const removableIndex = findRemovableQuestionIndex(result);
+    if (removableIndex === -1) {
+      break;
+    }
+    result.splice(removableIndex, 1);
+  }
+
+  return result.slice(0, questionCount);
+}
+
+function findRemovableQuestionIndex(questions: GeneratedQuizQuestion[]): number {
+  for (let index = questions.length - 1; index >= 0; index -= 1) {
+    const next = questions[index];
+    const typeCount = questions.filter((question) => question.type === next.type).length;
+    const freeResponseCount = questions.filter(
+      (question) => question.type === 'fill_blank' || question.type === 'short_answer',
+    ).length;
+
+    if (next.type === 'multiple_select' && typeCount <= 1) {
+      continue;
+    }
+
+    if ((next.type === 'fill_blank' || next.type === 'short_answer') && freeResponseCount <= 1) {
+      continue;
+    }
+
+    return index;
+  }
+
+  return -1;
 }
 
 function normalizeQuestionType(type: string | undefined): QuizQuestionType {

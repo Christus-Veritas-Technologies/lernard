@@ -23,6 +23,10 @@ export class QuizzesService {
 
     await validateGeneratedContent(generated, this.mastraService);
 
+    if (generated.questions.length !== dto.questionCount) {
+      throw new Error(`Quiz generation returned ${generated.questions.length} questions instead of ${dto.questionCount}.`);
+    }
+
     const quiz = await (this.prisma as any).quiz.create({
       data: {
         userId: user.id,
@@ -39,11 +43,7 @@ export class QuizzesService {
     for (let i = 0; i < generated.questions.length; i++) {
       const question = generated.questions[i];
 
-      // For multiple_select, store the array of correct answers as JSON
-      const correctAnswer =
-        question.type === 'multiple_select'
-          ? JSON.stringify(question.correctAnswers ?? [])
-          : (question.correctAnswer ?? question.options?.[0] ?? 'See explanation');
+      const correctAnswer = serializeCorrectAnswer(question);
 
       await (this.prisma as any).quizQuestion.create({
         data: {
@@ -271,16 +271,68 @@ function fromDbQuestionType(type: string): 'multiple_choice' | 'multiple_select'
 }
 
 function checkAnswer(dbQuestionType: string, studentAnswer: string, storedCorrect: string): boolean {
-  if (dbQuestionType === 'MULTIPLE_SELECT') {
-    try {
-      const correct: string[] = JSON.parse(storedCorrect);
-      const student: string[] = JSON.parse(studentAnswer);
-      const sortedCorrect = [...correct].map((s) => s.trim().toLowerCase()).sort();
-      const sortedStudent = [...student].map((s) => s.trim().toLowerCase()).sort();
-      return JSON.stringify(sortedCorrect) === JSON.stringify(sortedStudent);
-    } catch {
-      return false;
+  switch (dbQuestionType) {
+    case 'MULTIPLE_SELECT':
+      return compareMultipleSelectAnswers(studentAnswer, storedCorrect);
+    case 'TRUE_FALSE': {
+      const normalizedStudentAnswer = normalizeFreeTextAnswer(studentAnswer);
+      if (normalizedStudentAnswer !== 'true' && normalizedStudentAnswer !== 'false') {
+        return false;
+      }
+      return normalizedStudentAnswer === normalizeFreeTextAnswer(storedCorrect);
     }
+    case 'FILL_BLANK':
+    case 'SHORT_ANSWER':
+    case 'ORDERING':
+      return compareAcceptedAnswers(studentAnswer, storedCorrect);
+    case 'MULTIPLE_CHOICE':
+    default:
+      return normalizeFreeTextAnswer(studentAnswer) === normalizeFreeTextAnswer(storedCorrect);
   }
-  return studentAnswer.trim().toLowerCase() === storedCorrect.trim().toLowerCase();
+}
+
+function serializeCorrectAnswer(question: {
+  type: string;
+  correctAnswer?: string;
+  correctAnswers?: string[];
+}): string {
+  if (question.type === 'multiple_select') {
+    return JSON.stringify((question.correctAnswers ?? []).map((answer) => answer.trim()));
+  }
+
+  return question.correctAnswer?.trim() ?? '';
+}
+
+function compareMultipleSelectAnswers(studentAnswer: string, storedCorrect: string): boolean {
+  try {
+    const correct: string[] = JSON.parse(storedCorrect);
+    const student: string[] = JSON.parse(studentAnswer);
+    const sortedCorrect = [...correct].map(normalizeFreeTextAnswer).sort();
+    const sortedStudent = [...student].map(normalizeFreeTextAnswer).sort();
+    return JSON.stringify(sortedCorrect) === JSON.stringify(sortedStudent);
+  } catch {
+    return false;
+  }
+}
+
+function compareAcceptedAnswers(studentAnswer: string, storedCorrect: string): boolean {
+  const normalizedStudent = normalizeFreeTextAnswer(studentAnswer);
+  if (!normalizedStudent) {
+    return false;
+  }
+
+  const acceptedAnswers = storedCorrect
+    .split(/\||\n|;/)
+    .map(normalizeFreeTextAnswer)
+    .filter(Boolean);
+
+  if (acceptedAnswers.length === 0) {
+    return false;
+  }
+
+  return acceptedAnswers.some((acceptedAnswer) => normalizedStudent === acceptedAnswer);
+}
+
+function normalizeFreeTextAnswer(value: string): string {
+  return value.trim().toLowerCase().replace(/[\s_-]+/g, ' ').replace(/[^a-z0-9 ]/g, '');
 }
