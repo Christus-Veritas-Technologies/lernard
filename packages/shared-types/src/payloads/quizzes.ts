@@ -1,5 +1,6 @@
 export type QuizQuestionType =
   | 'multiple_choice'
+  | 'multiple_select'
   | 'true_false'
   | 'fill_blank'
   | 'short_answer'

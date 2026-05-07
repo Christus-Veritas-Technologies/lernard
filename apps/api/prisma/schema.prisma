@@ -65,6 +65,7 @@ enum SessionType {
 
 enum QuizQuestionType {
   MULTIPLE_CHOICE
+  MULTIPLE_SELECT
   TRUE_FALSE
   FILL_BLANK
   SHORT_ANSWER
