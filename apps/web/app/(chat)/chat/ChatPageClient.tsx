@@ -3,11 +3,14 @@
 import {
     Add01Icon,
     AlertCircleIcon,
+    ArrowLeft01Icon,
     BookOpen01Icon,
+    Menu01Icon,
     Message01Icon,
     SentIcon,
     SparklesIcon,
 } from "hugeicons-react";
+import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
@@ -25,9 +28,10 @@ import type {
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { BrowserApiError, BrowserAuthError, browserApiFetch } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
@@ -53,8 +57,10 @@ export function ChatPageClient() {
     const [uploading, setUploading] = useState(false);
     const [loadingConversation, setLoadingConversation] = useState(false);
     const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
+    const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const deferredLessonQuery = useDeferredValue(lessonQuery);
 
     useEffect(() => {
@@ -82,6 +88,10 @@ export function ChatPageClient() {
         };
     }, []);
 
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, [messages]);
+
     const filteredLessons = lessons.filter((lesson) => {
         const normalizedQuery = deferredLessonQuery.trim().toLowerCase();
         if (!normalizedQuery) {
@@ -94,6 +104,7 @@ export function ChatPageClient() {
     const attachmentCount = uploadedFiles.length + selectedLessons.length;
 
     async function loadConversation(nextConversationId: string) {
+        setMobileSidebarOpen(false);
         setLoadingConversation(true);
         setErrorMessage(null);
 
@@ -230,6 +241,7 @@ export function ChatPageClient() {
     }
 
     function onStartNewChat() {
+        setMobileSidebarOpen(false);
         startTransition(() => {
             setConversationId(null);
             setConversationTitle("New chat");
@@ -242,73 +254,93 @@ export function ChatPageClient() {
         });
     }
 
-    return (
-        <div className="grid h-[calc(100vh-120px)] min-h-[600px] gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-            <Card className="flex h-full flex-col overflow-hidden border-none bg-linear-to-br from-accent-cool-100 via-background to-accent-warm-100 shadow-[0_28px_80px_-36px_rgba(36,52,88,0.45)]">
-                <CardHeader className="space-y-4 border-b border-border/60 pb-4">
-                    <div className="flex items-start justify-between gap-3">
-                        <div className="space-y-2">
-                            <Badge className="gap-2" tone="cool">
-                                <SparklesIcon size={14} />
-                                Lernard chat
-                            </Badge>
-                            <div>
-                                <CardTitle className="text-xl">Your thinking space</CardTitle>
-                                <CardDescription className="max-w-sm text-sm text-text-secondary">
-                                    Pick up an older conversation or open a fresh thread when you want a new lane.
-                                </CardDescription>
+    const sidebarBody = (
+        <div className="flex h-full flex-col overflow-hidden">
+            <div className="space-y-3 border-b border-border/60 p-4 pb-5">
+                <div className="flex items-center justify-between gap-2">
+                    <Link
+                        className="inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-background-subtle hover:text-text-primary"
+                        href="/home"
+                    >
+                        <ArrowLeft01Icon size={14} strokeWidth={2} />
+                        Back to home
+                    </Link>
+                    <SheetClose className="xl:hidden inline-flex h-8 w-8 items-center justify-center rounded-xl text-text-secondary transition hover:bg-background-subtle hover:text-text-primary focus:outline-none" />
+                </div>
+
+                <div>
+                    <Badge className="gap-2 mb-2" tone="cool">
+                        <SparklesIcon size={14} />
+                        Lernard chat
+                    </Badge>
+                    <CardTitle className="text-xl">Your thinking space</CardTitle>
+                    <CardDescription className="mt-1 max-w-sm text-sm text-text-secondary">
+                        Pick up an older conversation or open a fresh thread when you want a new lane.
+                    </CardDescription>
+                </div>
+
+                <Button className="w-full gap-2" onClick={onStartNewChat} variant="secondary">
+                    <Add01Icon size={16} strokeWidth={1.8} />
+                    New chat
+                </Button>
+            </div>
+
+            <div className="flex min-h-0 flex-1 flex-col p-4">
+                <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-text-tertiary">
+                    Recent conversations
+                </p>
+                <ScrollArea className="flex-1 pr-1">
+                    <div className="space-y-2">
+                        {conversations.length === 0 ? (
+                            <div className="rounded-3xl border border-dashed border-border bg-surface/70 p-4 text-sm text-text-secondary">
+                                Your latest conversations will appear here.
                             </div>
-                        </div>
-                        <Button className="gap-2" onClick={onStartNewChat} variant="secondary">
-                            <Add01Icon size={16} strokeWidth={1.8} />
-                            New chat
-                        </Button>
-                    </div>
-                </CardHeader>
-                <CardContent className="flex min-h-0 flex-1 flex-col p-4">
-                    <ScrollArea className="flex-1 pr-2">
-                        <div className="space-y-2">
-                            {conversations.length === 0 ? (
-                                <div className="rounded-3xl border border-dashed border-border bg-surface/70 p-4 text-sm text-text-secondary">
-                                    Your latest conversations will appear here.
-                                </div>
-                            ) : null}
+                        ) : null}
 
-                            {conversations.map((conversation) => {
-                                const isActive = conversation.id === conversationId;
+                        {conversations.map((conversation) => {
+                            const isActive = conversation.id === conversationId;
 
-                                return (
-                                    <button
-                                        className={cn(
-                                            "w-full rounded-3xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-                                            isActive
-                                                ? "border-primary-300 bg-white shadow-[0_18px_44px_-34px_rgba(36,52,88,0.4)]"
-                                                : "border-border/70 bg-surface/80 hover:bg-white",
-                                        )}
-                                        key={conversation.id}
-                                        onClick={() => {
-                                            void loadConversation(conversation.id);
-                                        }}
-                                        type="button"
-                                    >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <p className="truncate text-sm font-semibold text-text-primary">
-                                                {conversation.title}
-                                            </p>
-                                            {isActive ? <Badge tone="primary">Open</Badge> : null}
-                                        </div>
-                                        <p className="mt-2 line-clamp-2 text-xs leading-5 text-text-secondary">
-                                            {conversation.lastMessage || "No messages yet"}
+                            return (
+                                <button
+                                    className={cn(
+                                        "w-full rounded-3xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                        isActive
+                                            ? "border-primary-300 bg-white shadow-[0_18px_44px_-34px_rgba(36,52,88,0.4)]"
+                                            : "border-border/70 bg-surface/80 hover:bg-white",
+                                    )}
+                                    key={conversation.id}
+                                    onClick={() => {
+                                        void loadConversation(conversation.id);
+                                    }}
+                                    type="button"
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <p className="truncate text-sm font-semibold text-text-primary">
+                                            {conversation.title}
                                         </p>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </ScrollArea>
-                </CardContent>
+                                        {isActive ? <Badge tone="primary">Open</Badge> : null}
+                                    </div>
+                                    <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-text-secondary">
+                                        {conversation.lastMessage || "No messages yet"}
+                                    </p>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </ScrollArea>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="flex flex-col gap-4 p-4 xl:h-dvh xl:flex-row xl:overflow-hidden">
+            {/* Desktop sidebar */}
+            <Card className="hidden xl:flex xl:w-[320px] xl:shrink-0 xl:flex-col xl:h-full xl:overflow-hidden border-none bg-linear-to-br from-accent-cool-100 via-background to-accent-warm-100 shadow-[0_28px_80px_-36px_rgba(36,52,88,0.45)]">
+                {sidebarBody}
             </Card>
 
-            <Card className="relative flex h-full flex-col overflow-hidden border-none bg-linear-to-b from-white via-background to-accent-cool-100/60 shadow-[0_30px_90px_-40px_rgba(36,52,88,0.42)]">
+            {/* Main chat panel */}
+            <Card className="relative flex min-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-none bg-linear-to-b from-white via-background to-accent-cool-100/60 shadow-[0_30px_90px_-40px_rgba(36,52,88,0.42)] xl:min-h-0 xl:flex-1 xl:h-full">
                 {attachmentMenuOpen ? (
                     <div className="absolute bottom-44 left-4 right-4 z-20 rounded-[28px] border border-border/70 bg-white/95 p-4 shadow-[0_24px_64px_-32px_rgba(36,52,88,0.45)] backdrop-blur xl:left-auto xl:right-6 xl:w-104">
                         <div className="flex items-start justify-between gap-3">
@@ -391,8 +423,23 @@ export function ChatPageClient() {
                     </div>
                 ) : null}
 
-                <CardHeader className="border-b border-border/60 pb-4">
+                <CardHeader className="shrink-0 border-b border-border/60 pb-4">
                     <div className="flex items-center gap-3">
+                        {/* Mobile hamburger — opens sidebar Sheet */}
+                        <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
+                            <SheetTrigger asChild>
+                                <Button
+                                    className="xl:hidden h-10 w-10 shrink-0 px-0"
+                                    variant="secondary"
+                                >
+                                    <Menu01Icon size={18} strokeWidth={1.8} />
+                                </Button>
+                            </SheetTrigger>
+                            <SheetContent className="bg-linear-to-br from-accent-cool-100 via-background to-accent-warm-100">
+                                {sidebarBody}
+                            </SheetContent>
+                        </Sheet>
+
                         <Badge className="gap-2" tone="warm">
                             <Message01Icon size={14} />
                             {conversationTitle}
@@ -459,10 +506,12 @@ export function ChatPageClient() {
                                     Lernard is stitching the next explanation together...
                                 </div>
                             ) : null}
+
+                            <div ref={messagesEndRef} />
                         </div>
                     </ScrollArea>
 
-                    <div className="rounded-4xl border border-border/70 bg-white/90 p-3 shadow-[0_24px_64px_-40px_rgba(36,52,88,0.48)] backdrop-blur">
+                    <div className="shrink-0 rounded-4xl border border-border/70 bg-white/90 p-3 shadow-[0_24px_64px_-40px_rgba(36,52,88,0.48)] backdrop-blur">
                         {attachmentCount > 0 ? (
                             <div className="mb-3 flex flex-wrap gap-2">
                                 {uploadedFiles.map((file) => (
