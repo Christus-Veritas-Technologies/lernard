@@ -31,14 +31,6 @@ import { usePagePayload } from '@/hooks/usePagePayload';
 import { capitalize } from '@/lib/formatters';
 import { nativeApiFetch } from '@/lib/native-api';
 
-interface AuthUser {
-    id: string;
-    name: string;
-    email: string | null;
-    role: string;
-    plan: string;
-}
-
 export default function SettingsScreen() {
     const router = useRouter();
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<SettingsContent>(
@@ -47,7 +39,6 @@ export default function SettingsScreen() {
     const [settings, setSettings] = useState<UserSettings | null>(null);
     const [lockedSettings, setLockedSettings] = useState<string[]>([]);
     const [savingField, setSavingField] = useState<string | null>(null);
-    const [user, setUser] = useState<AuthUser | null>(null);
 
     useEffect(() => {
         if (!data?.content || data.content.roleView !== 'student') {
@@ -59,10 +50,6 @@ export default function SettingsScreen() {
         setSettings(data.content.settings);
         setLockedSettings(data.content.lockedSettings);
     }, [data]);
-
-    useEffect(() => {
-        nativeApiFetch<AuthUser>(ROUTES.AUTH.ME).then(setUser).catch(() => null);
-    }, []);
 
     if (!isAuthenticated) {
         return (
@@ -183,7 +170,8 @@ export default function SettingsScreen() {
     const companionControls = ensureCompanionControls(settings.companionControls);
     const companionControlsLocked = companionControls.lockedByGuardian || isLocked(lockedSettings, 'companion-controls');
 
-    const initials = (user?.name ?? '?')
+    const viewer = data.content.viewer;
+    const initials = viewer.name
         .split(' ')
         .map((w) => w[0])
         .join('')
@@ -201,17 +189,17 @@ export default function SettingsScreen() {
                             <Text className="text-lg font-semibold text-indigo-600">{initials}</Text>
                         </View>
                         <View className="flex-1">
-                            <Text className="text-base font-semibold text-slate-900">{user?.name ?? '—'}</Text>
-                            <Text className="mt-0.5 text-sm text-slate-500">{user?.email ?? '—'}</Text>
+                            <Text className="text-base font-semibold text-slate-900">{viewer.name}</Text>
+                            <Text className="mt-0.5 text-sm text-slate-500">{viewer.email ?? '—'}</Text>
                             <View className="mt-2 flex-row flex-wrap gap-1.5">
                                 <View className="rounded-full bg-indigo-100 px-2.5 py-0.5">
                                     <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
-                                        {capitalize(user?.plan ?? 'explorer')}
+                                        {capitalize(viewer.plan)}
                                     </Text>
                                 </View>
                                 <View className="rounded-full bg-sky-100 px-2.5 py-0.5">
                                     <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
-                                        {capitalize(user?.role ?? 'student')}
+                                        {capitalize(viewer.role)}
                                     </Text>
                                 </View>
                             </View>
@@ -305,7 +293,7 @@ export default function SettingsScreen() {
                         icon={<Settings02Icon color="#6366f1" size={20} />}
                         label="Plans & billing"
                         onPress={() => router.push('/settings/plans')}
-                        value={capitalize(user?.plan ?? 'Explorer')}
+                        value={capitalize(viewer.plan)}
                     />
                 </View>
 
