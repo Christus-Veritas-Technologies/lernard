@@ -7,49 +7,41 @@ import {
     ArrowRight01Icon,
     BookOpen01Icon,
     Bookmark01Icon,
+    Home01Icon,
     PaintBrushIcon,
     Settings02Icon,
     Target01Icon,
     UserCircleIcon,
+    UserGroupIcon,
 } from 'hugeicons-react-native';
 
 import { can } from '@lernard/auth-core';
 import { ROUTES } from '@lernard/routes';
-import {
-    type CompanionControls,
-    type GuardianManagedChildSettings,
-    type SettingsContent,
-    type UserSettings,
+import type {
+    CompanionControls,
+    GuardianManagedChildSettings,
+    GuardianSettingsContent,
+    SettingsContent,
+    StudentSettingsContent,
+    UserSettings,
 } from '@lernard/shared-types';
 
 import { Switch } from '@rnr/switch';
 import { Text } from '@rnr/text';
 
+import { Button } from '@/components/Button';
 import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { usePagePayload } from '@/hooks/usePagePayload';
 import { capitalize } from '@/lib/formatters';
 import { nativeApiFetch } from '@/lib/native-api';
 
+// ─── Main screen ────────────────────────────────────────────────────────────
+
 export default function SettingsScreen() {
-    const router = useRouter();
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<SettingsContent>(
         ROUTES.SETTINGS.PAYLOAD,
     );
-    const [settings, setSettings] = useState<UserSettings | null>(null);
-    const [lockedSettings, setLockedSettings] = useState<string[]>([]);
-    const [savingField, setSavingField] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (!data?.content || data.content.roleView !== 'student') {
-            setSettings(null);
-            setLockedSettings([]);
-            return;
-        }
-
-        setSettings(data.content.settings);
-        setLockedSettings(data.content.lockedSettings);
-    }, [data]);
 
     if (!isAuthenticated) {
         return (
@@ -64,6 +56,10 @@ export default function SettingsScreen() {
                 </View>
             </SafeAreaView>
         );
+    }
+
+    if (loading) {
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     if (error) {
@@ -83,10 +79,6 @@ export default function SettingsScreen() {
         );
     }
 
-    if (loading) {
-        return <RoleFullScreenLoadingOverlay forceVisible />;
-    }
-
     if (!data?.content) {
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -94,7 +86,7 @@ export default function SettingsScreen() {
                     <StateNotice
                         actionTitle="Try again"
                         badge="Settings unavailable"
-                        description="The settings payload was empty for this request."
+                        description="The settings payload was empty. Please try again."
                         onActionPress={refetch}
                         title="Could not open settings"
                         tone="warning"
@@ -105,72 +97,132 @@ export default function SettingsScreen() {
     }
 
     if (data.content.roleView === 'guardian') {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
-                    <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
-                        <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Guardian settings</Text>
-                        <Text className="mt-3 text-3xl font-semibold text-slate-900">Household controls</Text>
-                        <Text className="mt-3 text-base leading-7 text-slate-600">
-                            Manage linked children from one role-aware settings payload.
+        return <GuardianSettingsView content={data.content} />;
+    }
+
+    return <StudentSettingsView content={data.content} permissions={data.permissions} />;
+}
+
+// ─── Guardian view ───────────────────────────────────────────────────────────
+
+function GuardianSettingsView({ content }: { content: GuardianSettingsContent }) {
+    const router = useRouter();
+
+    return (
+        <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+            <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
+
+                {/* Hero */}
+                <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
+                    <View className="flex-row items-center gap-2">
+                        <Home01Icon color="#4F46E5" size={18} />
+                        <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">
+                            Guardian settings
                         </Text>
-                        <View className="mt-5 flex-row flex-wrap gap-2">
-                            <View className="rounded-full bg-indigo-100 px-3 py-1">
-                                <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">
-                                    {data.content.children.length} linked children
-                                </Text>
-                            </View>
-                        </View>
-                        <View className="mt-5 flex-row flex-wrap gap-2">
-                            <Button onPress={() => router.push('/guardian')} title="Open Household" />
-                        </View>
+                    </View>
+                    <Text className="mt-3 text-3xl font-semibold text-slate-900">
+                        Household controls
+                    </Text>
+                    <Text className="mt-2 text-base leading-7 text-slate-600">
+                        {content.viewer.name} · {content.children.length} linked{' '}
+                        {content.children.length === 1 ? 'child' : 'children'}
+                    </Text>
+                    <View className="mt-5 flex-row flex-wrap gap-3">
+                        <Button
+                            iconLeft={<Home01Icon color="#FFFFFF" size={16} />}
+                            onPress={() => router.push('/guardian')}
+                            title="Open Household"
+                        />
+                    </View>
+                </View>
+
+                {/* Children list */}
+                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                    <View className="flex-row items-center gap-2">
+                        <UserGroupIcon color="#0F172A" size={20} />
+                        <Text className="text-2xl font-semibold text-slate-900">Children</Text>
                     </View>
 
-                    <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                        <Text className="text-2xl font-semibold text-slate-900">Children</Text>
-                        <View className="mt-5 gap-4">
-                            {data.content.children.length ? data.content.children.map((child) => (
-                                <GuardianChildRow
+                    <View className="mt-5 gap-4">
+                        {content.children.length === 0 ? (
+                            <Text className="text-base leading-7 text-slate-600">
+                                No linked children yet. Invite a child from Household to start managing settings.
+                            </Text>
+                        ) : (
+                            content.children.map((child) => (
+                                <GuardianChildCard
                                     child={child}
                                     key={child.studentId}
-                                    onOpenCompanion={() => router.push(`/guardian/${child.studentId}/companion`)}
-                                    onOpenProfile={() => router.push(`/guardian/${child.studentId}`)}
+                                    onCompanion={() => router.push(`/guardian/${child.studentId}/companion`)}
+                                    onProfile={() => router.push(`/guardian/${child.studentId}`)}
                                 />
-                            )) : (
-                                <Text className="text-base leading-7 text-slate-600">
-                                    No linked children yet. Invite a child from Household to start managing settings.
-                                </Text>
-                            )}
-                        </View>
+                            ))
+                        )}
                     </View>
-                </ScrollView>
-            </SafeAreaView>
-        );
-    }
-
-    if (!settings) {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
-                    <StateNotice
-                        actionTitle="Back to Household"
-                        badge="Settings unavailable"
-                        description="This settings payload is not available for your current role yet."
-                        onActionPress={() => router.push('/guardian')}
-                        title="Could not open settings"
-                        tone="warning"
-                    />
                 </View>
-            </SafeAreaView>
-        );
-    }
 
-    const permissions = data?.permissions ?? [];
-    const canEditMode = can(permissions, 'can_edit_mode') && !isLocked(lockedSettings, 'mode');
+            </ScrollView>
+        </SafeAreaView>
+    );
+}
+
+function GuardianChildCard({
+    child,
+    onProfile,
+    onCompanion,
+}: {
+    child: GuardianManagedChildSettings;
+    onProfile: () => void;
+    onCompanion: () => void;
+}) {
+    return (
+        <View className="rounded-[24px] bg-slate-50 p-4">
+            <Text className="text-base font-semibold text-slate-900">{child.name}</Text>
+            <Text className="mt-0.5 text-sm text-slate-500">{child.email ?? 'No email on file'}</Text>
+            <View className="mt-3 flex-row flex-wrap gap-2">
+                <View className="rounded-full bg-indigo-100 px-2.5 py-1">
+                    <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
+                        {capitalize(child.settings.learningMode)}
+                    </Text>
+                </View>
+                <View className="rounded-full bg-sky-100 px-2.5 py-1">
+                    <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
+                        {child.settings.dailyGoal} sessions
+                    </Text>
+                </View>
+            </View>
+            <View className="mt-4 flex-row flex-wrap gap-2">
+                <Button onPress={onProfile} title="View child" variant="secondary" />
+                <Button onPress={onCompanion} title="Companion controls" />
+            </View>
+        </View>
+    );
+}
+
+// ─── Student view ────────────────────────────────────────────────────────────
+
+function StudentSettingsView({
+    content,
+    permissions,
+}: {
+    content: StudentSettingsContent;
+    permissions: string[];
+}) {
+    const router = useRouter();
+    const [settings, setSettings] = useState<UserSettings>(content.settings);
+    const [lockedSettings] = useState<string[]>(content.lockedSettings);
+    const [savingField, setSavingField] = useState<string | null>(null);
+
+    useEffect(() => {
+        setSettings(content.settings);
+    }, [content.settings]);
+
+    const viewer = content.viewer;
+    const canEditMode = can(permissions, 'can_edit_mode') && !lockedSettings.includes('mode');
     const companionControls = ensureCompanionControls(settings.companionControls);
-    const companionControlsLocked = companionControls.lockedByGuardian || isLocked(lockedSettings, 'companion-controls');
+    const companionControlsLocked =
+        companionControls.lockedByGuardian || lockedSettings.includes('companion-controls');
 
-    const viewer = data.content.viewer;
     const initials = viewer.name
         .split(' ')
         .map((w) => w[0])
@@ -217,7 +269,7 @@ export default function SettingsScreen() {
                     </Pressable>
                 </View>
 
-                {/* Section: Learning */}
+                {/* Learning */}
                 <SectionHeader title="Learning" />
                 <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                     <NavRow
@@ -228,7 +280,7 @@ export default function SettingsScreen() {
                     />
                 </View>
 
-                {/* Section: Preferences */}
+                {/* Preferences */}
                 <SectionHeader title="Preferences" />
                 <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                     <NavRow
@@ -246,32 +298,32 @@ export default function SettingsScreen() {
                     />
                 </View>
 
-                {/* Section: Study controls */}
+                {/* Study controls */}
                 <SectionHeader title="Study controls" />
                 <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                     <InlineToggleRow
                         checked={companionControls.showCorrectAnswers}
                         disabled={companionControlsLocked || savingField === 'companion-controls'}
                         label="Show correct answers"
-                        onCheckedChange={(v) => updateCompanionControl('showCorrectAnswers', v)}
+                        onCheckedChange={(v) => void updateCompanionControl('showCorrectAnswers', v)}
                     />
                     <View className="mx-4 h-px bg-slate-100" />
                     <InlineToggleRow
                         checked={companionControls.allowHints}
                         disabled={companionControlsLocked || savingField === 'companion-controls'}
                         label="Allow hints"
-                        onCheckedChange={(v) => updateCompanionControl('allowHints', v)}
+                        onCheckedChange={(v) => void updateCompanionControl('allowHints', v)}
                     />
                     <View className="mx-4 h-px bg-slate-100" />
                     <InlineToggleRow
                         checked={companionControls.allowSkip}
                         disabled={companionControlsLocked || savingField === 'companion-controls'}
                         label="Allow skip"
-                        onCheckedChange={(v) => updateCompanionControl('allowSkip', v)}
+                        onCheckedChange={(v) => void updateCompanionControl('allowSkip', v)}
                     />
                 </View>
 
-                {/* Section: Account */}
+                {/* Account */}
                 <SectionHeader title="Account" />
                 <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                     <NavRow
@@ -287,7 +339,7 @@ export default function SettingsScreen() {
                     />
                 </View>
 
-                {/* Plans & billing */}
+                {/* Plans */}
                 <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                     <NavRow
                         icon={<Settings02Icon color="#6366f1" size={20} />}
@@ -306,64 +358,33 @@ export default function SettingsScreen() {
         value: boolean,
     ) {
         if (companionControlsLocked) return;
-        const nextControls = { ...companionControls, [key]: value };
-        setSettings((current) => current ? { ...current, companionControls: nextControls } : current);
+        const next = { ...companionControls, [key]: value };
+        setSettings((s) => ({ ...s, companionControls: next }));
         setSavingField('companion-controls');
         try {
-            const savedControls = await nativeApiFetch<CompanionControls>(ROUTES.SETTINGS.COMPANION_CONTROLS, {
+            const saved = await nativeApiFetch<CompanionControls>(ROUTES.SETTINGS.COMPANION_CONTROLS, {
                 method: 'PATCH',
                 body: JSON.stringify({
-                    showCorrectAnswers: nextControls.showCorrectAnswers,
-                    allowHints: nextControls.allowHints,
-                    allowSkip: nextControls.allowSkip,
+                    showCorrectAnswers: next.showCorrectAnswers,
+                    allowHints: next.allowHints,
+                    allowSkip: next.allowSkip,
                 }),
             });
-            setSettings((current) => current ? { ...current, companionControls: savedControls } : current);
+            setSettings((s) => ({ ...s, companionControls: saved }));
         } catch {
-            setSettings((current) => current ? { ...current, companionControls } : current);
+            setSettings((s) => ({ ...s, companionControls }));
         } finally {
             setSavingField(null);
         }
     }
 }
 
-function GuardianChildRow({
-    child,
-    onOpenCompanion,
-    onOpenProfile,
-}: {
-    child: GuardianManagedChildSettings;
-    onOpenCompanion: () => void;
-    onOpenProfile: () => void;
-}) {
-    return (
-        <View className="rounded-[24px] bg-slate-50 p-4">
-            <Text className="text-lg font-semibold text-slate-900">{child.name}</Text>
-            <Text className="mt-1 text-sm text-slate-600">{child.email ?? 'No email on file'}</Text>
-            <View className="mt-3 flex-row flex-wrap gap-2">
-                <View className="rounded-full bg-indigo-100 px-2.5 py-1">
-                    <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
-                        {child.settings.learningMode}
-                    </Text>
-                </View>
-                <View className="rounded-full bg-sky-100 px-2.5 py-1">
-                    <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
-                        {child.settings.dailyGoal} sessions
-                    </Text>
-                </View>
-            </View>
-            <View className="mt-4 flex-row flex-wrap gap-2">
-                <Button onPress={onOpenProfile} title="View child" variant="secondary" />
-                <Button onPress={onOpenCompanion} title="Companion controls" />
-            </View>
-        </View>
-    );
-}
+// ─── Shared sub-components ───────────────────────────────────────────────────
 
 function SectionHeader({ title }: { title: string }) {
     return (
         <Text className="px-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
-                {title}
+            {title}
         </Text>
     );
 }
@@ -419,8 +440,10 @@ function InlineToggleRow({
     );
 }
 
-function ensureCompanionControls(companionControls: CompanionControls | null) {
-    return companionControls ?? {
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function ensureCompanionControls(controls: CompanionControls | null): CompanionControls {
+    return controls ?? {
         showCorrectAnswers: true,
         allowHints: true,
         allowSkip: false,
@@ -428,8 +451,4 @@ function ensureCompanionControls(companionControls: CompanionControls | null) {
         lastChangedAt: new Date().toISOString(),
         lastChangedBy: 'You',
     };
-}
-
-function isLocked(lockedSettings: string[], key: string) {
-    return lockedSettings.includes(key);
 }
