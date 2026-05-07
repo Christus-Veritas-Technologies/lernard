@@ -3,6 +3,7 @@
 import { ArrowLeft01Icon } from "hugeicons-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
 import type { LessonContent } from "@lernard/shared-types";
@@ -12,7 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { usePagePayload } from "@/hooks/usePagePayload";
+import { browserApiFetch } from "@/lib/browser-api";
 
 interface LessonReaderClientProps {
     lessonId: string;
@@ -20,14 +21,36 @@ interface LessonReaderClientProps {
 
 export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
     const router = useRouter();
-    const { data, loading, error, refetch } =
-        usePagePayload<{ status: "generating" | "ready"; content?: LessonContent }>(
-            ROUTES.LESSONS.GET(lessonId),
-        );
+    const [lesson, setLesson] = useState<{ status: "generating" | "ready"; content?: LessonContent } | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
+
+    const loadLesson = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await browserApiFetch<{ status: "generating" | "ready"; content?: LessonContent }>(
+                ROUTES.LESSONS.GET(lessonId),
+            );
+            setLesson(data);
+        } catch (err) {
+            setError(err instanceof Error ? err : new Error("Unable to load lesson."));
+        } finally {
+            setLoading(false);
+        }
+    }, [lessonId]);
+
+    useEffect(() => { void loadLesson(); }, [loadLesson]);
+
+    useEffect(() => {
+        if (lesson?.status === "generating") {
+            router.replace(`/learn/${lessonId}/loading`);
+        }
+    }, [lesson, lessonId, router]);
 
     if (loading) return <div className="h-72 rounded-3xl bg-background-subtle" />;
 
-    if (error || !data) {
+    if (error || !lesson) {
         return (
             <Card>
                 <CardHeader>
@@ -35,18 +58,17 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
                     <CardDescription>{error?.message ?? "Try again."}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Button onClick={refetch}>Retry</Button>
+                    <Button onClick={loadLesson}>Retry</Button>
                 </CardContent>
             </Card>
         );
     }
 
-    if (data.status === "generating" || !data.content) {
-        router.replace(`/learn/${lessonId}/loading`);
+    if (lesson.status === "generating" || !lesson.content) {
         return null;
     }
 
-    const lesson = data.content;
+    const content = lesson.content;
 
     return (
         <div className="flex flex-col gap-4">
@@ -56,14 +78,14 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
                         <ArrowLeft01Icon size={16} strokeWidth={1.8} />
                     </Button>
                 </Link>
-                <Badge tone="cool">{lesson.subjectName}</Badge>
+                <Badge tone="cool">{content.subjectName}</Badge>
                 <Progress className="max-w-60" value={15} />
-                <span className="text-xs text-text-tertiary">~{lesson.estimatedMinutes} mins</span>
+                <span className="text-xs text-text-tertiary">~{content.estimatedMinutes} mins</span>
             </div>
 
             <ScrollArea className="max-h-[65vh] rounded-3xl border border-border p-4" orientation="vertical">
                 <div className="space-y-4">
-                    {lesson.sections.map((section, index) => (
+                    {content.sections.map((section, index) => (
                         <Card key={`${section.type}-${index}`}>
                             <CardHeader>
                                 <CardTitle className="text-base">
@@ -80,7 +102,15 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
                 </div>
             </ScrollArea>
 
-            <Button onClick={() => router.push(`/learn/${lessonId}/complete`)}>I&apos;m done</Button>
+            <Button
+                onClick={() =>
+                    router.push(
+                        `/learn/${lessonId}/complete?topic=${encodeURIComponent(content.topic)}`,
+                    )
+                }
+            >
+                I&apos;m done
+            </Button>
         </div>
     );
 }
