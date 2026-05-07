@@ -43,7 +43,7 @@ export class ProfileSetupDto {
 
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(10)
+  @ArrayMaxSize(20)
   @IsString({ each: true })
   @MaxLength(100, { each: true })
   subjects: string[];
