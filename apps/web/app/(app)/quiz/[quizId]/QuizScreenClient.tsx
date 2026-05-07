@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
 import type { QuizContent } from "@lernard/shared-types";
@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { usePagePayload } from "@/hooks/usePagePayload";
 import { browserApiFetch } from "@/lib/browser-api";
 
 interface QuizScreenClientProps {
@@ -22,19 +21,35 @@ interface QuizScreenClientProps {
 
 export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     const router = useRouter();
-    const { data, loading, error, refetch } = usePagePayload<QuizContent>(ROUTES.QUIZZES.GET(quizId));
+    const [quiz, setQuiz] = useState<QuizContent | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
     const [answer, setAnswer] = useState("");
     const [submitting, setSubmitting] = useState(false);
     const [feedback, setFeedback] = useState<string | null>(null);
 
-    const progressValue = useMemo(() => {
-        if (!data) return 0;
-        return ((data.content.currentQuestionIndex + 1) / Math.max(data.content.totalQuestions, 1)) * 100;
-    }, [data]);
+    const loadQuiz = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const data = await browserApiFetch<QuizContent>(ROUTES.QUIZZES.GET(quizId));
+            setQuiz(data);
+        } catch (err) {
+            setError(err instanceof Error ? err : new Error("Unable to load quiz."));
+        } finally {
+            setLoading(false);
+        }
+    }, [quizId]);
+
+    useEffect(() => { void loadQuiz(); }, [loadQuiz]);
+
+    const progressValue = quiz
+        ? ((quiz.currentQuestionIndex + 1) / Math.max(quiz.totalQuestions, 1)) * 100
+        : 0;
 
     if (loading) return <div className="h-72 rounded-3xl bg-background-subtle" />;
 
-    if (error || !data) {
+    if (error || !quiz) {
         return (
             <Card>
                 <CardHeader>
@@ -42,13 +57,11 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                     <CardDescription>{error?.message ?? "Try again"}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Button onClick={refetch}>Retry</Button>
+                    <Button onClick={loadQuiz}>Retry</Button>
                 </CardContent>
             </Card>
         );
     }
-
-    const quiz = data.content;
 
     async function submitAnswer() {
         if (!answer.trim()) return;
@@ -75,7 +88,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
             setTimeout(() => {
                 setAnswer("");
                 setFeedback(null);
-                refetch();
+                void loadQuiz();
             }, 500);
         } finally {
             setSubmitting(false);
