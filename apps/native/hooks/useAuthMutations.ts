@@ -5,11 +5,13 @@ import * as WebBrowser from 'expo-web-browser';
 import { ROUTES } from '@lernard/routes';
 import type {
     AccountTypePayload,
+    AuthSessionExchangeResponse,
     AuthResponse,
     FirstLookResult,
     FirstLookSkipResponse,
     FirstLookStartResponse,
     FirstLookSubmission,
+    MagicLinkNativeVerifyResponse,
     MagicLinkRequestPayload,
     MagicLinkRequestResponse,
     ProfileSetupPayload,
@@ -28,6 +30,12 @@ WebBrowser.maybeCompleteAuthSession();
 function extractMessage(e: unknown): string {
     if (e instanceof Error) return e.message;
     return 'Something went wrong. Please try again.';
+}
+
+function isAuthResponse(value: AuthResponse | MagicLinkNativeVerifyResponse): value is AuthResponse {
+    return typeof (value as AuthResponse).accessToken === 'string'
+        && typeof (value as AuthResponse).refreshToken === 'string'
+        && typeof (value as AuthResponse).user?.onboardingComplete === 'boolean';
 }
 
 // ---------------------------------------------------------------------------
@@ -79,20 +87,39 @@ export function useNativeVerifyMagicLink() {
     const mutate = useCallback(
         async (
             payload: { email: string; otp: string },
-            callbacks?: { onSuccess?: (data: AuthResponse) => void; onError?: (msg: string) => void },
+            callbacks?: { onSuccess?: (data: { onboardingComplete: boolean }) => void; onError?: (msg: string) => void },
         ) => {
             setIsLoading(true);
             setError(null);
             try {
-                const result = await nativeApiFetch<AuthResponse>(ROUTES.AUTH.MAGIC_LINK_VERIFY, {
+                const result = await nativeApiFetch<AuthResponse | MagicLinkNativeVerifyResponse>(ROUTES.AUTH.MAGIC_LINK_VERIFY, {
                     method: 'POST',
                     body: JSON.stringify(payload),
                     skipAuth: true,
                 });
-                setTokens({ accessToken: result.accessToken, refreshToken: result.refreshToken });
-                setOnboardingComplete(result.user.onboardingComplete);
-                callbacks?.onSuccess?.(result);
-                return result;
+
+                let accessToken = '';
+                let refreshToken = '';
+                let onboardingComplete = false;
+
+                if (isAuthResponse(result)) {
+                    accessToken = result.accessToken;
+                    refreshToken = result.refreshToken;
+                    onboardingComplete = result.user.onboardingComplete;
+                } else {
+                    const session = await nativeApiFetch<AuthSessionExchangeResponse>(
+                        `${ROUTES.AUTH.GOOGLE_SESSION}?code=${encodeURIComponent(result.sessionCode)}`,
+                        { skipAuth: true },
+                    );
+                    accessToken = session.accessToken;
+                    refreshToken = session.refreshToken;
+                    onboardingComplete = session.onboardingComplete;
+                }
+
+                setTokens({ accessToken, refreshToken });
+                setOnboardingComplete(onboardingComplete);
+                callbacks?.onSuccess?.({ onboardingComplete });
+                return { onboardingComplete };
             } catch (e) {
                 const msg = extractMessage(e);
                 setError(msg);

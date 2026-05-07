@@ -62,7 +62,7 @@ export default function CheckEmailScreen() {
             { email, otp: code },
             {
                 onSuccess: (data) => {
-                    router.replace(data.user.onboardingComplete ? '/(app)/(home)' : '/(auth)/account-type');
+                    router.replace(data.onboardingComplete ? '/(app)/(home)' : '/(auth)/account-type');
                 },
             },
         );

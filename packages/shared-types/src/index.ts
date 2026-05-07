@@ -78,6 +78,7 @@ export type {
   MagicLinkVerifyPayload,
   MagicLinkRequestResponse,
   MagicLinkNativeVerifyResponse,
+  AuthSessionExchangeResponse,
 } from './payloads/auth'
 export type {
   AccountTypePayload,

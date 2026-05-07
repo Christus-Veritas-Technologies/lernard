@@ -35,3 +35,9 @@ export interface MagicLinkRequestResponse {
 export interface MagicLinkNativeVerifyResponse {
   sessionCode: string
 }
+
+export interface AuthSessionExchangeResponse {
+  accessToken: string
+  refreshToken: string
+  onboardingComplete: boolean
+}
