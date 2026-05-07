@@ -10,6 +10,7 @@ import type { UserSettings } from '@lernard/shared-types';
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { NativePageHeader } from '@/components/NativePageHeader';
 import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { capitalize, formatDepthLabel } from '@/lib/formatters';
@@ -134,6 +135,12 @@ export default function ProfileScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
+                <NativePageHeader
+                    onBackPress={() => router.push('/settings')}
+                    subtitle="Account details and learning defaults"
+                    title="Profile"
+                />
+
                 <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
                     <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Profile</Text>
 

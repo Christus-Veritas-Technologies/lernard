@@ -75,19 +75,10 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
                         activeOpacity={0.7}
                         className="flex-1 items-center justify-center"
                     >
-                        {isFocused ? (
-                            // Active: horizontal pill with icon + label
-                            <View className="flex-row items-center gap-1.5 rounded-2xl bg-primary-500 px-4 py-2">
-                                <Icon size={18} color="#FFFFFF" strokeWidth={2} />
-                                <Text className="text-xs font-bold text-white">{label}</Text>
-                            </View>
-                        ) : (
-                            // Inactive: icon stacked above label
-                            <View className="items-center gap-0.5 py-1.5">
-                                <Icon size={22} color="#64748B" strokeWidth={1.8} />
-                                <Text className="text-[10px] font-medium text-slate-500">{label}</Text>
-                            </View>
-                        )}
+                        <View className="items-center gap-0.5 py-1.5">
+                            <Icon size={22} color={isFocused ? '#4F46E5' : '#64748B'} strokeWidth={1.8} />
+                            <Text className={isFocused ? 'text-[10px] font-semibold text-indigo-600' : 'text-[10px] font-medium text-slate-500'}>{label}</Text>
+                        </View>
                     </TouchableOpacity>
                 );
             })}

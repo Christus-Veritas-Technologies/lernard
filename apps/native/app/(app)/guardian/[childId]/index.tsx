@@ -1,4 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -12,10 +13,12 @@ import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
 import { GuardianEmptyVisual } from '@/components/guardian/GuardianEmptyVisual';
+import { NativePageHeader } from '@/components/NativePageHeader';
 import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { usePagePayload } from '@/hooks/usePagePayload';
 import { formatMinutes, formatPercent, formatRelativeDate } from '@/lib/formatters';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/rnr/tabs';
 
 export default function ChildProfileScreen() {
     const { childId } = useLocalSearchParams<{ childId: string }>();
@@ -23,6 +26,7 @@ export default function ChildProfileScreen() {
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<ChildProfileContent>(
         ROUTES.GUARDIAN.CHILD_PAYLOAD(childId),
     );
+    const [activeTab, setActiveTab] = useState('subjects');
 
     if (!isAuthenticated) {
         return (
@@ -67,6 +71,12 @@ export default function ChildProfileScreen() {
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
+                <NativePageHeader
+                    onBackPress={() => router.push('/guardian')}
+                    subtitle="Detailed learner snapshot"
+                    title={content.child.name}
+                />
+
                 <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
                     <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Child overview</Text>
                     <Text className="mt-3 text-3xl font-semibold text-slate-900">{content.child.name}'s Lernard snapshot</Text>
@@ -95,30 +105,68 @@ export default function ChildProfileScreen() {
                     </View>
                 </View>
 
-                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <View className="flex-row items-center gap-2">
-                        <ChartBarLineIcon color="#0F172A" size={20} strokeWidth={1.8} />
-                        <Text className="text-2xl font-semibold text-slate-900">Subject comparison</Text>
-                    </View>
-                    <View className="mt-5 gap-4">
-                        {content.progress.length ? content.progress.map((subject) => (
-                            <View className="rounded-[28px] bg-slate-50 p-4" key={subject.subjectId}>
-                                <Text className="text-lg font-semibold text-slate-900">{subject.subjectName}</Text>
-                                <Text className="mt-2 text-sm leading-6 text-slate-600">
-                                    {subject.totalLessons} lessons • {subject.totalQuizzes} quizzes • {formatPercent(subject.averageScore)} average
-                                </Text>
-                                <Text className="mt-2 text-sm leading-6 text-slate-500">
-                                    Last active {formatRelativeDate(subject.lastActiveAt)}
-                                </Text>
+                <Tabs onValueChange={setActiveTab} value={activeTab}>
+                    <TabsList>
+                        <TabsTrigger value="subjects">Subjects</TabsTrigger>
+                        <TabsTrigger value="sessions">Sessions</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent className="mt-4" value="subjects">
+                        <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                            <View className="flex-row items-center gap-2">
+                                <ChartBarLineIcon color="#0F172A" size={20} strokeWidth={1.8} />
+                                <Text className="text-2xl font-semibold text-slate-900">Subject comparison</Text>
                             </View>
-                        )) : (
-                            <GuardianEmptyVisual
-                                subtitle="Subject performance cards will appear once work is completed."
-                                title="No subject progress yet"
-                            />
-                        )}
-                    </View>
-                </View>
+                            <View className="mt-5 gap-4">
+                                {content.progress.length ? content.progress.map((subject) => (
+                                    <View className="rounded-[28px] bg-slate-50 p-4" key={subject.subjectId}>
+                                        <Text className="text-lg font-semibold text-slate-900">{subject.subjectName}</Text>
+                                        <Text className="mt-2 text-sm leading-6 text-slate-600">
+                                            {subject.totalLessons} lessons • {subject.totalQuizzes} quizzes • {formatPercent(subject.averageScore)} average
+                                        </Text>
+                                        <Text className="mt-2 text-sm leading-6 text-slate-500">
+                                            Last active {formatRelativeDate(subject.lastActiveAt)}
+                                        </Text>
+                                    </View>
+                                )) : (
+                                    <GuardianEmptyVisual
+                                        subtitle="Subject performance cards will appear once work is completed."
+                                        title="No subject progress yet"
+                                    />
+                                )}
+                            </View>
+                        </View>
+                    </TabsContent>
+
+                    <TabsContent className="mt-4" value="sessions">
+                        <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                            <View className="flex-row items-center gap-2">
+                                <Message01Icon color="#0F172A" size={20} strokeWidth={1.8} />
+                                <Text className="text-2xl font-semibold text-slate-900">Recent sessions</Text>
+                            </View>
+                            <View className="mt-5 gap-4">
+                                {content.recentSessions.length ? content.recentSessions.map((session) => (
+                                    <View className="rounded-[28px] bg-slate-50 p-4" key={session.id}>
+                                        <Text className="text-base font-semibold text-slate-900">
+                                            {session.subject} • {session.topic}
+                                        </Text>
+                                        <Text className="mt-1 text-sm leading-6 text-slate-600">
+                                            {session.type === 'lesson' ? 'Lesson' : 'Quiz'} • {formatMinutes(session.duration)} • {session.xpEarned} XP earned
+                                        </Text>
+                                        <Text className="mt-2 text-sm leading-6 text-slate-500">
+                                            {formatRelativeDate(session.createdAt)}
+                                        </Text>
+                                    </View>
+                                )) : (
+                                    <GuardianEmptyVisual
+                                        subtitle="New lesson and quiz sessions will populate this timeline."
+                                        title="No session history yet"
+                                    />
+                                )}
+                            </View>
+                        </View>
+                    </TabsContent>
+                </Tabs>
 
                 <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
                     <View className="flex-row items-center gap-2">
@@ -141,32 +189,6 @@ export default function ChildProfileScreen() {
                     </View>
                 </View>
 
-                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <View className="flex-row items-center gap-2">
-                        <Message01Icon color="#0F172A" size={20} strokeWidth={1.8} />
-                        <Text className="text-2xl font-semibold text-slate-900">Recent sessions</Text>
-                    </View>
-                    <View className="mt-5 gap-4">
-                        {content.recentSessions.length ? content.recentSessions.map((session) => (
-                            <View className="rounded-[28px] bg-slate-50 p-4" key={session.id}>
-                                <Text className="text-base font-semibold text-slate-900">
-                                    {session.subject} • {session.topic}
-                                </Text>
-                                <Text className="mt-1 text-sm leading-6 text-slate-600">
-                                    {session.type === 'lesson' ? 'Lesson' : 'Quiz'} • {formatMinutes(session.duration)} • {session.xpEarned} XP earned
-                                </Text>
-                                <Text className="mt-2 text-sm leading-6 text-slate-500">
-                                    {formatRelativeDate(session.createdAt)}
-                                </Text>
-                            </View>
-                        )) : (
-                            <GuardianEmptyVisual
-                                subtitle="New lesson and quiz sessions will populate this timeline."
-                                title="No session history yet"
-                            />
-                        )}
-                    </View>
-                </View>
             </ScrollView>
         </SafeAreaView>
     );
