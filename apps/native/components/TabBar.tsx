@@ -8,6 +8,7 @@ import {
     BookOpen01Icon,
     ChartBarLineIcon,
     Home01Icon,
+    Menu11Icon,
     Message01Icon,
     Settings02Icon,
 } from 'hugeicons-react-native';
@@ -20,18 +21,17 @@ const STUDENT_TABS = [
     { name: '(home)', label: 'Home', Icon: Home01Icon },
     { name: '(learn)', label: 'Learn', Icon: BookOpen01Icon },
     { name: '(chat)/index', label: 'Chat', Icon: Message01Icon },
-    { name: '(progress)', label: 'Progress', Icon: ChartBarLineIcon },
-    { name: 'settings', label: 'Settings', Icon: Settings02Icon },
 ] as const;
 
 const GUARDIAN_TABS = [
-    { name: 'guardian', label: 'Household', Icon: Home01Icon },
+    { name: 'guardian/index', label: 'Household', Icon: Home01Icon },
     { name: 'settings', label: 'Settings', Icon: Settings02Icon },
 ] as const;
 
 export function TabBar({ state, navigation }: BottomTabBarProps) {
     const insets = useSafeAreaInsets();
     const role = useAuthStore((currentState) => currentState.role);
+    const openStudentDrawer = useAuthStore((currentState) => currentState.openStudentDrawer);
     const tabs = role === Role.GUARDIAN ? GUARDIAN_TABS : STUDENT_TABS;
 
     return (
@@ -91,6 +91,21 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
                     </TouchableOpacity>
                 );
             })}
+
+            {role === Role.STUDENT ? (
+                <TouchableOpacity
+                    onPress={openStudentDrawer}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open drawer"
+                    activeOpacity={0.7}
+                    className="flex-1 items-center justify-center"
+                >
+                    <View className="items-center gap-0.5 py-1.5">
+                        <Menu11Icon size={22} color="#64748B" strokeWidth={1.8} />
+                        <Text className="text-[10px] font-medium text-slate-500">More</Text>
+                    </View>
+                </TouchableOpacity>
+            ) : null}
         </View>
     );
 }

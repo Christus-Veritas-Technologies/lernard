@@ -10,6 +10,7 @@ interface AuthState {
   onboardingComplete: boolean;
   role: Role | null;
   networkLoadingCount: number;
+  isStudentDrawerOpen: boolean;
   setToken: (token: string | null) => void;
   setAccessToken: (token: string | null) => void;
   setRefreshToken: (token: string | null) => void;
@@ -17,6 +18,9 @@ interface AuthState {
   setRole: (role: Role | null) => void;
   incrementNetworkLoading: () => void;
   decrementNetworkLoading: () => void;
+  openStudentDrawer: () => void;
+  closeStudentDrawer: () => void;
+  toggleStudentDrawer: () => void;
   setOnboardingComplete: (complete: boolean) => void;
   logout: () => void;
 }
@@ -30,6 +34,7 @@ export const useAuthStore = create<AuthState>()(
       onboardingComplete: false,
       role: null,
       networkLoadingCount: 0,
+      isStudentDrawerOpen: false,
       setToken: (token) =>
         set((state) => ({
           accessToken: token,
@@ -60,6 +65,12 @@ export const useAuthStore = create<AuthState>()(
         set((state) => ({
           networkLoadingCount: Math.max(0, state.networkLoadingCount - 1),
         })),
+      openStudentDrawer: () => set({ isStudentDrawerOpen: true }),
+      closeStudentDrawer: () => set({ isStudentDrawerOpen: false }),
+      toggleStudentDrawer: () =>
+        set((state) => ({
+          isStudentDrawerOpen: !state.isStudentDrawerOpen,
+        })),
       setOnboardingComplete: (complete) => set({ onboardingComplete: complete }),
       logout: () =>
         set({
@@ -69,6 +80,7 @@ export const useAuthStore = create<AuthState>()(
           onboardingComplete: false,
           role: null,
           networkLoadingCount: 0,
+          isStudentDrawerOpen: false,
         }),
     }),
     {

@@ -7,6 +7,7 @@ import { ROUTES } from '@lernard/routes';
 import { TabBar } from '@/components/TabBar';
 import { GuardianFullScreenLoading } from '@/components/GuardianFullScreenLoading';
 import { StudentFullScreenLoading } from '@/components/StudentFullScreenLoading';
+import { StudentDrawer } from '@/components/StudentDrawer';
 import { nativeApiFetch } from '@/lib/native-api';
 import { useAuthStore } from '@/store/store';
 
@@ -76,31 +77,34 @@ export default function AppLayout() {
         if (appSection !== 'guardian' && appSection !== 'settings') {
             return <Redirect href="/(app)/guardian" />;
         }
-    } else if (appSection === 'guardian') {
+    } else if (role === Role.STUDENT && appSection === 'guardian') {
         return <Redirect href="/(app)/(home)" />;
     }
 
     return (
-        <Tabs
-            initialRouteName={role === Role.GUARDIAN ? 'guardian' : '(home)'}
-            screenOptions={{
-                headerShown: false,
-                sceneStyle: {
-                    backgroundColor: '#F8FAFC',
-                },
-            }}
-            tabBar={(props) => <TabBar {...props} />}
-        >
-            <Tabs.Screen name="(home)" options={{ title: 'Home', href: role === Role.GUARDIAN ? null : undefined }} />
-            <Tabs.Screen name="(learn)" options={{ title: 'Learn', href: role === Role.GUARDIAN ? null : undefined }} />
-            <Tabs.Screen name="(chat)/index" options={{ title: 'Chat', href: role === Role.GUARDIAN ? null : undefined }} />
-            <Tabs.Screen name="(progress)" options={{ title: 'Progress', href: role === Role.GUARDIAN ? null : undefined }} />
-            <Tabs.Screen name="settings" options={{ title: 'Settings' }} />
-            <Tabs.Screen name="guardian" options={{ title: 'Household', href: role === Role.GUARDIAN ? undefined : null }} />
-            <Tabs.Screen name="learn/[lessonId]" options={{ href: null }} />
-            <Tabs.Screen name="quiz/entry" options={{ href: null }} />
-            <Tabs.Screen name="quiz/[quizId]" options={{ href: null }} />
-            <Tabs.Screen name="quiz/results/[quizId]" options={{ href: null }} />
-        </Tabs>
+        <>
+            <Tabs
+                initialRouteName={role === Role.GUARDIAN ? 'guardian/index' : '(home)'}
+                screenOptions={{
+                    headerShown: false,
+                    sceneStyle: {
+                        backgroundColor: '#F8FAFC',
+                    },
+                }}
+                tabBar={(props) => <TabBar {...props} />}
+            >
+                <Tabs.Screen name="(home)" options={{ title: 'Home', href: role === Role.GUARDIAN ? null : undefined }} />
+                <Tabs.Screen name="(learn)" options={{ title: 'Learn', href: role === Role.GUARDIAN ? null : undefined }} />
+                <Tabs.Screen name="(chat)/index" options={{ title: 'Chat', href: role === Role.GUARDIAN ? null : undefined }} />
+                <Tabs.Screen name="(progress)" options={{ title: 'Progress', href: null }} />
+                <Tabs.Screen name="settings" options={{ title: 'Settings', href: role === Role.GUARDIAN ? undefined : null }} />
+                <Tabs.Screen name="guardian/index" options={{ title: 'Household', href: role === Role.GUARDIAN ? undefined : null }} />
+                <Tabs.Screen name="learn/[lessonId]" options={{ href: null }} />
+                <Tabs.Screen name="quiz/entry" options={{ href: null }} />
+                <Tabs.Screen name="quiz/[quizId]" options={{ href: null }} />
+                <Tabs.Screen name="quiz/results/[quizId]" options={{ href: null }} />
+            </Tabs>
+            {role === Role.STUDENT ? <StudentDrawer /> : null}
+        </>
     );
 }
