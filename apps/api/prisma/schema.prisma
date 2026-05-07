@@ -91,6 +91,7 @@ model User {
   deletedAt    DateTime?
 
   // Profile
+  profilePictureUrl String?
   ageGroup       AgeGroup?
   grade          String?
   learningGoal   LearningGoal?

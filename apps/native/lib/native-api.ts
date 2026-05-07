@@ -72,10 +72,11 @@ async function requestJson<T>(
   options: NativeApiOptions,
   accessToken: string | null,
 ): Promise<T> {
+  const isFormData = options.body instanceof FormData;
   const response = await fetch(`${getBaseUrl()}${route}`, {
     ...options,
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options.headers,
     },

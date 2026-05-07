@@ -76,6 +76,7 @@ export const ROUTES = {
     COMPANION_CONTROLS: '/v1/settings/companion-controls',
     APPEARANCE: '/v1/settings/appearance',
     DAILY_GOAL: '/v1/settings/daily-goal',
+    AVATAR_UPLOAD: '/v1/settings/avatar',
   },
 
   GUARDIAN: {

@@ -1,4 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { extname } from 'node:path';
+import { R2Service } from '../../r2/r2.service';
 import type {
   Appearance,
   CompanionControls,
@@ -21,9 +24,19 @@ import {
   toSharedSessionDepth,
 } from '../../common/utils/shared-model-mappers';
 
+const ALLOWED_AVATAR_TYPES: Record<string, string> = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+}
+
 @Injectable()
 export class SettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly r2: R2Service,
+  ) {}
 
   async get(userId: string): Promise<UserSettings> {
     return this.getUserSettings(userId);
@@ -150,6 +163,34 @@ export class SettingsService {
     });
 
     return this.get(userId);
+  }
+
+  async uploadAvatar(userId: string, file: { buffer: Buffer; mimetype: string; originalname: string } | undefined): Promise<{ profilePictureUrl: string }> {
+    if (!file) {
+      throw new BadRequestException('No file provided.')
+    }
+
+    const ext = ALLOWED_AVATAR_TYPES[file.mimetype]
+    if (!ext) {
+      throw new BadRequestException('Only JPEG, PNG, WEBP, and GIF images are allowed.')
+    }
+
+    if (!file.buffer || file.buffer.length === 0) {
+      throw new BadRequestException('The uploaded file was empty.')
+    }
+
+    const originalExt = extname(file.originalname).toLowerCase() || ext
+    const key = `profile-pictures/${userId}/${randomUUID()}${originalExt}`
+    await this.r2.upload(key, file.buffer, file.mimetype)
+
+    const profilePictureUrl = this.r2.getPublicUrl(key)
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { profilePictureUrl },
+    })
+
+    return { profilePictureUrl }
   }
 
   private async getUserSettings(userId: string): Promise<UserSettings> {

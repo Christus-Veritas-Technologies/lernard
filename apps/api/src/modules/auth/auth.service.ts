@@ -254,6 +254,7 @@ export class AuthService {
       plan: toSharedPlan(user.plan),
       onboardingComplete: user.onboardingComplete,
       firstLookComplete: user.firstLookComplete,
+      profilePictureUrl: (user as any).profilePictureUrl ?? null,
     };
   }
 

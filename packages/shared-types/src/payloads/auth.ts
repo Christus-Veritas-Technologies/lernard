@@ -14,6 +14,7 @@ export interface AuthUser {
   plan: Plan
   onboardingComplete: boolean
   firstLookComplete: boolean
+  profilePictureUrl: string | null
 }
 
 export interface MagicLinkRequestPayload {
