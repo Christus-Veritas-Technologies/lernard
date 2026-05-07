@@ -36,6 +36,22 @@ export class LessonsService {
     return { lessonId: lesson.id, status: 'ready' };
   }
 
+  async list(user: User): Promise<{ lessonId: string; topic: string; subjectName: string; completedAt: string | null }[]> {
+    const lessons = await (this.prisma as any).lesson.findMany({
+      where: { userId: user.id, status: 'READY' },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: { id: true, topic: true, subjectName: true, completedAt: true },
+    });
+
+    return lessons.map((l: { id: string; topic: string; subjectName: string | null; completedAt: Date | null }) => ({
+      lessonId: l.id,
+      topic: l.topic,
+      subjectName: l.subjectName ?? 'General',
+      completedAt: l.completedAt ? l.completedAt.toISOString() : null,
+    }));
+  }
+
   async getLesson(user: User, lessonId: string): Promise<{ status: 'generating' | 'ready'; content?: LessonContent }> {
     const lesson = await (this.prisma as any).lesson.findFirst({
       where: { id: lessonId, userId: user.id },

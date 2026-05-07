@@ -47,6 +47,7 @@ export const ROUTES = {
   },
 
   LESSONS: {
+    LIST: '/v1/lessons',
     GENERATE: '/v1/lessons/generate',
     GET: (lessonId: string) => `/v1/lessons/${lessonId}` as const,
     SECTION_CHECK: (lessonId: string) => `/v1/lessons/${lessonId}/section-check` as const,

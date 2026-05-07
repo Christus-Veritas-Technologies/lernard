@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
@@ -8,6 +8,12 @@ import { LessonsService } from './lessons.service';
 @Controller('lessons')
 export class LessonsController {
   constructor(private readonly lessonsService: LessonsService) {}
+
+  @ProtectedRoute()
+  @Get()
+  async list(@CurrentUser() user: User) {
+    return this.lessonsService.list(user);
+  }
 
   @ProtectedRoute()
   @Post('generate')
