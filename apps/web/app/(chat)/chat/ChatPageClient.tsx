@@ -15,6 +15,7 @@ import {
 } from "hugeicons-react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
 
@@ -61,6 +62,7 @@ export function ChatPageClient() {
     const [loadingConversation, setLoadingConversation] = useState(false);
     const [attachmentMenuOpen, setAttachmentMenuOpen] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -140,7 +142,11 @@ export function ChatPageClient() {
             return;
         }
 
-        const optimisticBlocks = buildOptimisticUserBlocks(input.trim(), uploadedFiles, selectedLessons);
+        const trimmed = input.trim();
+        const sentUploads = uploadedFiles;
+        const sentLessons = selectedLessons;
+
+        const optimisticBlocks = buildOptimisticUserBlocks(trimmed, sentUploads, sentLessons);
         const nextUserMessage: ChatConversationMessage = {
             id: crypto.randomUUID(),
             role: "user",
@@ -150,6 +156,10 @@ export function ChatPageClient() {
 
         setErrorMessage(null);
         setMessages((current) => [...current, nextUserMessage]);
+        setInput("");
+        setUploadedFiles([]);
+        setSelectedLessons([]);
+        setAttachmentMenuOpen(false);
         setSending(true);
 
         try {
@@ -157,8 +167,8 @@ export function ChatPageClient() {
                 method: "POST",
                 body: JSON.stringify({
                     conversationId,
-                    message: input.trim(),
-                    attachments: buildAttachmentPayload(uploadedFiles, selectedLessons),
+                    message: trimmed,
+                    attachments: buildAttachmentPayload(sentUploads, sentLessons),
                 }),
             });
 
@@ -173,10 +183,6 @@ export function ChatPageClient() {
                         createdAt: new Date().toISOString(),
                     },
                 ]);
-                setInput("");
-                setUploadedFiles([]);
-                setSelectedLessons([]);
-                setAttachmentMenuOpen(false);
             });
 
             const refreshedConversations = await browserApiFetch<ConversationListItem[]>(ROUTES.CHAT.CONVERSATIONS);
@@ -270,13 +276,22 @@ export function ChatPageClient() {
     const sidebarBody = (
         <div className="flex h-full flex-col overflow-hidden">
             <div className="space-y-3 border-b border-border/60 p-4 pb-5">
-                <Link
-                    className="inline-flex items-center gap-1.5 self-start rounded-xl px-2 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-background-subtle hover:text-text-primary"
-                    href="/home"
-                >
-                    <ArrowLeft01Icon size={14} strokeWidth={2} />
-                    Back to home
-                </Link>
+                <div className="flex items-center justify-between gap-2">
+                    <Link
+                        className="inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-background-subtle hover:text-text-primary"
+                        href="/home"
+                    >
+                        <ArrowLeft01Icon size={14} strokeWidth={2} />
+                        Back to home
+                    </Link>
+                    <button
+                        className="hidden xl:inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-background-subtle hover:text-text-primary"
+                        onClick={() => setDesktopSidebarCollapsed(true)}
+                        type="button"
+                    >
+                        Collapse
+                    </button>
+                </div>
 
                 <div>
                     <Badge className="gap-2 mb-2" tone="cool">
@@ -313,10 +328,10 @@ export function ChatPageClient() {
                             return (
                                 <button
                                     className={cn(
-                                        "w-full rounded-3xl border p-4 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+                                        "w-full rounded-3xl border p-4 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                                         isActive
                                             ? "border-primary-300 bg-white shadow-[0_18px_44px_-34px_rgba(36,52,88,0.4)]"
-                                            : "border-border/70 bg-surface/80 hover:bg-white",
+                                            : "border-border/70 bg-surface/80 hover:-translate-y-px hover:border-primary-200 hover:bg-white hover:shadow-[0_12px_32px_-26px_rgba(36,52,88,0.35)]",
                                     )}
                                     key={conversation.id}
                                     onClick={() => {
@@ -343,14 +358,19 @@ export function ChatPageClient() {
     );
 
     return (
-        <div className="flex flex-col gap-4 p-4 xl:h-dvh xl:flex-row xl:overflow-hidden">
+        <div className="flex h-dvh flex-col gap-4 overflow-hidden p-4 xl:flex-row">
             {/* Desktop sidebar */}
-            <Card className="hidden xl:flex xl:w-[320px] xl:shrink-0 xl:flex-col xl:h-full xl:overflow-hidden border-none bg-linear-to-br from-accent-cool-100 via-background to-accent-warm-100 shadow-[0_28px_80px_-36px_rgba(36,52,88,0.45)]">
+            <Card
+                className={cn(
+                    "hidden xl:w-[320px] xl:shrink-0 xl:flex-col xl:h-full xl:overflow-hidden border-none bg-linear-to-br from-accent-cool-100 via-background to-accent-warm-100 shadow-[0_28px_80px_-36px_rgba(36,52,88,0.45)]",
+                    desktopSidebarCollapsed ? "xl:hidden" : "xl:flex",
+                )}
+            >
                 {sidebarBody}
             </Card>
 
             {/* Main chat panel */}
-            <Card className="relative flex min-h-[calc(100dvh-2rem)] flex-col overflow-hidden border-none bg-linear-to-b from-white via-background to-accent-cool-100/60 shadow-[0_30px_90px_-40px_rgba(36,52,88,0.42)] xl:min-h-0 xl:flex-1 xl:h-full">
+            <Card className="relative flex h-full flex-1 flex-col overflow-hidden border-none bg-linear-to-b from-white via-background to-accent-cool-100/60 shadow-[0_30px_90px_-40px_rgba(36,52,88,0.42)]">
                 {attachmentMenuOpen ? (
                     <div className="absolute bottom-44 left-4 right-4 z-20 rounded-[28px] border border-border/70 bg-white/95 p-4 shadow-[0_24px_64px_-32px_rgba(36,52,88,0.45)] backdrop-blur xl:left-auto xl:right-6 xl:w-104">
                         <div className="flex items-start justify-between gap-3">
@@ -449,6 +469,17 @@ export function ChatPageClient() {
                                 {sidebarBody}
                             </SheetContent>
                         </Sheet>
+
+                        {/* Desktop re-expand — only visible when sidebar is collapsed */}
+                        {desktopSidebarCollapsed ? (
+                            <Button
+                                className="hidden xl:inline-flex h-10 w-10 shrink-0 px-0"
+                                onClick={() => setDesktopSidebarCollapsed(false)}
+                                variant="secondary"
+                            >
+                                <Menu01Icon size={18} strokeWidth={1.8} />
+                            </Button>
+                        ) : null}
 
                         <Badge className="gap-2" tone="warm">
                             <Message01Icon size={14} />
@@ -643,14 +674,54 @@ function MessageBlock({ block, role }: { block: ChatMessageBlock; role: "user" |
     }
 
     if (block.type === "markdown") {
+        const isUser = role === "user";
         return (
-            <div
-                className={cn(
-                    "prose prose-sm max-w-none leading-7",
-                    role === "user" ? "prose-invert" : "prose-slate",
-                )}
-            >
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown>
+            <div className={cn("text-sm leading-7", isUser ? "text-white" : "text-text-primary")}>
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    components={{
+                        p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
+                        strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                        em: ({ children }) => <em className="italic">{children}</em>,
+                        ul: ({ children }) => <ul className="mb-3 ml-5 list-disc space-y-1 last:mb-0">{children}</ul>,
+                        ol: ({ children }) => <ol className="mb-3 ml-5 list-decimal space-y-1 last:mb-0">{children}</ol>,
+                        li: ({ children }) => <li className="leading-7">{children}</li>,
+                        h1: ({ children }) => <h1 className="mb-2 mt-3 text-base font-semibold">{children}</h1>,
+                        h2: ({ children }) => <h2 className="mb-2 mt-3 text-base font-semibold">{children}</h2>,
+                        h3: ({ children }) => <h3 className="mb-2 mt-3 text-sm font-semibold">{children}</h3>,
+                        h4: ({ children }) => <h4 className="mb-1 mt-2 text-sm font-semibold">{children}</h4>,
+                        a: ({ children, href }) => (
+                            <a
+                                className={cn(
+                                    "underline underline-offset-2",
+                                    isUser ? "text-white" : "text-primary-500 hover:text-primary-600",
+                                )}
+                                href={href}
+                                rel="noreferrer"
+                                target="_blank"
+                            >
+                                {children}
+                            </a>
+                        ),
+                        code: ({ children }) => (
+                            <code
+                                className={cn(
+                                    "rounded px-1 py-0.5 text-xs",
+                                    isUser ? "bg-white/20" : "bg-background-subtle text-text-primary",
+                                )}
+                            >
+                                {children}
+                            </code>
+                        ),
+                        blockquote: ({ children }) => (
+                            <blockquote className="my-2 border-l-2 border-border pl-3 text-text-secondary">
+                                {children}
+                            </blockquote>
+                        ),
+                    }}
+                >
+                    {block.content}
+                </ReactMarkdown>
             </div>
         );
     }
