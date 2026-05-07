@@ -238,6 +238,8 @@ function toDbQuestionType(type: string): string {
   switch (type) {
     case 'multiple_choice':
       return 'MULTIPLE_CHOICE';
+    case 'multiple_select':
+      return 'MULTIPLE_SELECT';
     case 'true_false':
       return 'TRUE_FALSE';
     case 'fill_blank':
@@ -251,8 +253,10 @@ function toDbQuestionType(type: string): string {
   }
 }
 
-function fromDbQuestionType(type: string): 'multiple_choice' | 'true_false' | 'fill_blank' | 'short_answer' | 'ordering' {
+function fromDbQuestionType(type: string): 'multiple_choice' | 'multiple_select' | 'true_false' | 'fill_blank' | 'short_answer' | 'ordering' {
   switch (type) {
+    case 'MULTIPLE_SELECT':
+      return 'multiple_select';
     case 'TRUE_FALSE':
       return 'true_false';
     case 'FILL_BLANK':
@@ -264,4 +268,19 @@ function fromDbQuestionType(type: string): 'multiple_choice' | 'true_false' | 'f
     default:
       return 'multiple_choice';
   }
+}
+
+function checkAnswer(dbQuestionType: string, studentAnswer: string, storedCorrect: string): boolean {
+  if (dbQuestionType === 'MULTIPLE_SELECT') {
+    try {
+      const correct: string[] = JSON.parse(storedCorrect);
+      const student: string[] = JSON.parse(studentAnswer);
+      const sortedCorrect = [...correct].map((s) => s.trim().toLowerCase()).sort();
+      const sortedStudent = [...student].map((s) => s.trim().toLowerCase()).sort();
+      return JSON.stringify(sortedCorrect) === JSON.stringify(sortedStudent);
+    } catch {
+      return false;
+    }
+  }
+  return studentAnswer.trim().toLowerCase() === storedCorrect.trim().toLowerCase();
 }
