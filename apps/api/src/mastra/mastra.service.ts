@@ -152,7 +152,7 @@ export class MastraService {
         : '';
 
       yield {
-        type: 'text',
+        type: 'markdown',
         content: `I heard you: ${input.message}.${attachmentNudge} I can help break this down step by step.`,
       };
       return;
@@ -168,7 +168,9 @@ export class MastraService {
       }),
     );
 
-    yield { type: 'text', content: text };
+    for (const block of splitMarkdownAndCodeBlocks(text)) {
+      yield block;
+    }
   }
 
   async generateSlotContent(input: {
@@ -371,4 +373,42 @@ function safeJsonParse<T>(value: string): T | null {
   } catch {
     return null;
   }
+}
+
+function splitMarkdownAndCodeBlocks(content: string): ChatMessageBlock[] {
+  const blocks: ChatMessageBlock[] = [];
+  const codePattern = /```([a-zA-Z0-9_+-]*)\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match = codePattern.exec(content);
+
+  while (match) {
+    const markdownChunk = content.slice(lastIndex, match.index).trim();
+    if (markdownChunk) {
+      blocks.push({ type: 'markdown', content: markdownChunk });
+    }
+
+    const language = (match[1] ?? '').trim();
+    const code = (match[2] ?? '').trim();
+    if (code) {
+      blocks.push({
+        type: 'code',
+        language: language || undefined,
+        code,
+      });
+    }
+
+    lastIndex = codePattern.lastIndex;
+    match = codePattern.exec(content);
+  }
+
+  const trailingMarkdown = content.slice(lastIndex).trim();
+  if (trailingMarkdown) {
+    blocks.push({ type: 'markdown', content: trailingMarkdown });
+  }
+
+  if (!blocks.length) {
+    return [{ type: 'markdown', content }];
+  }
+
+  return blocks;
 }

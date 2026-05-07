@@ -80,6 +80,8 @@ export type ChatAttachment = UploadedChatAttachment | LessonChatAttachment
 
 export type ChatMessageBlock =
   | { type: 'text'; content: string }
+  | { type: 'markdown'; content: string }
+  | { type: 'code'; code: string; language?: string; fileName?: string }
   | { type: 'attachments'; items: ChatAttachment[] }
   | { type: 'QuizCard'; props: QuizCardProps }
   | { type: 'ConceptBreakdown'; props: ConceptBreakdownProps }
