@@ -2,6 +2,8 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Role } from '@lernard/shared-types';
+
 import {
     BookOpen01Icon,
     ChartBarLineIcon,
@@ -12,7 +14,9 @@ import {
 
 import { Text } from '@rnr/text';
 
-const TABS = [
+import { useAuthStore } from '@/store/store';
+
+const STUDENT_TABS = [
     { name: '(home)', label: 'Home', Icon: Home01Icon },
     { name: '(learn)', label: 'Learn', Icon: BookOpen01Icon },
     { name: '(chat)', label: 'Chat', Icon: Message01Icon },
@@ -20,8 +24,15 @@ const TABS = [
     { name: 'settings', label: 'Settings', Icon: Settings02Icon },
 ] as const;
 
+const GUARDIAN_TABS = [
+    { name: 'guardian', label: 'Household', Icon: Home01Icon },
+    { name: 'settings', label: 'Settings', Icon: Settings02Icon },
+] as const;
+
 export function TabBar({ state, navigation }: BottomTabBarProps) {
     const insets = useSafeAreaInsets();
+    const role = useAuthStore((currentState) => currentState.role);
+    const tabs = role === Role.GUARDIAN ? GUARDIAN_TABS : STUDENT_TABS;
 
     return (
         <View
@@ -36,7 +47,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
                 elevation: 10,
             }}
         >
-            {TABS.map(({ name, label, Icon }) => {
+            {tabs.map(({ name, label, Icon }) => {
                 const route = state.routes.find((r) => r.name === name);
                 if (!route) return null;
 
