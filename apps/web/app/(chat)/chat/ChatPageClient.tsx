@@ -8,6 +8,8 @@ import {
     SentIcon,
     SparklesIcon,
 } from "hugeicons-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
@@ -241,8 +243,8 @@ export function ChatPageClient() {
     }
 
     return (
-        <div className="grid min-h-[76vh] gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
-            <Card className="overflow-hidden border-none bg-linear-to-br from-accent-cool-100 via-background to-accent-warm-100 shadow-[0_28px_80px_-36px_rgba(36,52,88,0.45)]">
+        <div className="grid h-[calc(100vh-120px)] min-h-[600px] gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+            <Card className="flex h-full flex-col overflow-hidden border-none bg-linear-to-br from-accent-cool-100 via-background to-accent-warm-100 shadow-[0_28px_80px_-36px_rgba(36,52,88,0.45)]">
                 <CardHeader className="space-y-4 border-b border-border/60 pb-4">
                     <div className="flex items-start justify-between gap-3">
                         <div className="space-y-2">
@@ -263,8 +265,8 @@ export function ChatPageClient() {
                         </Button>
                     </div>
                 </CardHeader>
-                <CardContent className="p-4">
-                    <ScrollArea className="h-112 pr-2 xl:h-144">
+                <CardContent className="flex min-h-0 flex-1 flex-col p-4">
+                    <ScrollArea className="flex-1 pr-2">
                         <div className="space-y-2">
                             {conversations.length === 0 ? (
                                 <div className="rounded-3xl border border-dashed border-border bg-surface/70 p-4 text-sm text-text-secondary">
@@ -306,7 +308,7 @@ export function ChatPageClient() {
                 </CardContent>
             </Card>
 
-            <Card className="relative flex min-h-[76vh] flex-col overflow-hidden border-none bg-linear-to-b from-white via-background to-accent-cool-100/60 shadow-[0_30px_90px_-40px_rgba(36,52,88,0.42)]">
+            <Card className="relative flex h-full flex-col overflow-hidden border-none bg-linear-to-b from-white via-background to-accent-cool-100/60 shadow-[0_30px_90px_-40px_rgba(36,52,88,0.42)]">
                 {attachmentMenuOpen ? (
                     <div className="absolute bottom-44 left-4 right-4 z-20 rounded-[28px] border border-border/70 bg-white/95 p-4 shadow-[0_24px_64px_-32px_rgba(36,52,88,0.45)] backdrop-blur xl:left-auto xl:right-6 xl:w-104">
                         <div className="flex items-start justify-between gap-3">
@@ -389,25 +391,12 @@ export function ChatPageClient() {
                     </div>
                 ) : null}
 
-                <CardHeader className="border-b border-border/60 pb-5">
-                    <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                        <div className="space-y-3">
-                            <Badge className="gap-2" tone="warm">
-                                <Message01Icon size={14} />
-                                {conversationTitle}
-                            </Badge>
-                            <div className="space-y-2">
-                                <CardTitle className="text-2xl">Ask Lernard anything</CardTitle>
-                                <CardDescription className="max-w-2xl text-sm leading-6 text-text-secondary">
-                                    Bring in a question, a screenshot, a PDF worksheet, or one of your own lessons and keep the explanation grounded in your work.
-                                </CardDescription>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Badge tone="cool">Lessons-first context</Badge>
-                            <Badge tone="warm">PDF and image support</Badge>
-                            <Badge tone="success">Responsive thread</Badge>
-                        </div>
+                <CardHeader className="border-b border-border/60 pb-4">
+                    <div className="flex items-center gap-3">
+                        <Badge className="gap-2" tone="warm">
+                            <Message01Icon size={14} />
+                            {conversationTitle}
+                        </Badge>
                     </div>
                 </CardHeader>
 
@@ -563,6 +552,34 @@ export function ChatPageClient() {
 function MessageBlock({ block, role }: { block: ChatMessageBlock; role: "user" | "assistant" }) {
     if (block.type === "text") {
         return <p className="whitespace-pre-wrap text-sm leading-7">{block.content}</p>;
+    }
+
+    if (block.type === "markdown") {
+        return (
+            <div
+                className={cn(
+                    "prose prose-sm max-w-none leading-7",
+                    role === "user" ? "prose-invert" : "prose-slate",
+                )}
+            >
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{block.content}</ReactMarkdown>
+            </div>
+        );
+    }
+
+    if (block.type === "code") {
+        return (
+            <div className="overflow-hidden rounded-2xl border border-border/60 bg-slate-900 text-sm">
+                {block.language && (
+                    <div className="border-b border-white/10 px-4 py-2 text-xs font-medium text-slate-400">
+                        {block.language}{block.fileName ? ` · ${block.fileName}` : ""}
+                    </div>
+                )}
+                <pre className="overflow-x-auto p-4 text-slate-200">
+                    <code>{block.code}</code>
+                </pre>
+            </div>
+        );
     }
 
     if (block.type === "attachments") {
