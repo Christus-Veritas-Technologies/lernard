@@ -1,18 +1,12 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(find:*)",
-      "Bash(ls:*)",
-      "Bash(cd \"C:/Users/kinzi/Desktop/projects/lernard/apps/api\" && npx prisma migrate dev --name add_magic_link_token --schema ./prisma/schema.prisma 2>&1)",
-      "Bash(cd \"C:/Users/kinzi/Desktop/projects/lernard/apps/api\" && npx prisma migrate reset --force --schema ./prisma/schema.prisma 2>&1)",
-      "Bash(cd \"C:/Users/kinzi/Desktop/projects/lernard/apps/api\" && npm install nodemailer @types/nodemailer 2>&1)",
-      "Bash(cd \"C:/Users/kinzi/Desktop/projects/lernard\" && npm install nodemailer @types/nodemailer --workspace=@lernard/api 2>&1)",
-      "Bash(cd \"C:/Users/kinzi/Desktop/projects/lernard/apps/api\" && bun add nodemailer && bun add -d @types/nodemailer 2>&1)",
-      "Bash(cd \"C:/Users/kinzi/Desktop/projects/lernard/apps/api\" && bunx tsc --noEmit 2>&1)",
-      "Bash(cd \"C:/Users/kinzi/Desktop/projects/lernard/apps/api\" && bunx prisma generate --schema ./prisma/schema.prisma 2>&1)",
-      "Bash(cd:*)",
-      "Bash(echo API OK:*)",
-      "Bash(head:*)"
-    ]
-  }
+    "defaultMode": "auto"
+  },
+  "allowedTools": [
+    "Edit",
+    "Bash",
+    "Read",
+    "Glob",
+    "Grep"
+  ]
 }
