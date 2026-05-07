@@ -2,6 +2,7 @@
   "expo": {
     "name": "lernard",
     "slug": "lernard",
+    "newArchEnabled": false,
     "version": "1.0.0",
     "scheme": "lernard",
     "platforms": [
