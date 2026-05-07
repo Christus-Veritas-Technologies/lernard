@@ -1,5 +1,3 @@
-import Constants from 'expo-constants';
-
 import { ROUTES } from '@lernard/routes';
 
 import { useAuthStore } from '@/store/store';
@@ -110,11 +108,5 @@ async function refreshSession(refreshToken: string): Promise<string> {
 }
 
 function getBaseUrl() {
-  const configuredApiUrl = Constants.expoConfig?.extra?.apiUrl;
-
-  if (typeof configuredApiUrl === 'string' && configuredApiUrl.trim().length > 0) {
-    return configuredApiUrl.replace(/\/$/, '');
-  }
-
-  return 'http://localhost:3001';
+  return (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/$/, '');
 }

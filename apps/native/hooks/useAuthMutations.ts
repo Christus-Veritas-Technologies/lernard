@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import Constants from 'expo-constants';
 
 import { ROUTES } from '@lernard/routes';
 import type {
@@ -125,12 +124,11 @@ export function useNativeGoogleAuth() {
         setIsLoading(true);
         setError(null);
         try {
-            const configuredApiUrl = Constants.expoConfig?.extra?.apiUrl as string | undefined;
-            const baseUrl = (configuredApiUrl ?? 'http://localhost:3001').replace(/\/$/, '');
+            const baseUrl = (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/$/, '');
 
             const result = await WebBrowser.openAuthSessionAsync(
                 `${baseUrl}/v1/auth/google?state=${encodeURIComponent('client=native')}`,
-                'lernard://',
+                `${process.env.EXPO_PUBLIC_APP_SCHEME ?? 'lernard'}://`,
             );
 
             if (result.type === 'cancel' || result.type === 'dismiss') return;
