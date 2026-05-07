@@ -32,36 +32,41 @@ export async function nativeApiFetch<T>(
   route: string,
   options: NativeApiOptions = {},
 ): Promise<T> {
+  useAuthStore.getState().incrementNetworkLoading();
   const refreshToken = useAuthStore.getState().refreshToken;
   let accessToken = useAuthStore.getState().accessToken;
 
-  if (!options.skipAuth && !accessToken && refreshToken) {
-    accessToken = await refreshSession(refreshToken);
-  }
-
-  if (!options.skipAuth && !accessToken) {
-    throw new NativeAuthError();
-  }
-
   try {
-    return await requestJson<T>(route, options, accessToken);
-  } catch (error) {
-    if (
-      !options.skipAuth
-      && error instanceof NativeApiError
-      && error.status === 401
-      && refreshToken
-    ) {
-      const refreshedAccessToken = await refreshSession(refreshToken);
-      return requestJson<T>(route, options, refreshedAccessToken);
+    if (!options.skipAuth && !accessToken && refreshToken) {
+      accessToken = await refreshSession(refreshToken);
     }
 
-    if (!options.skipAuth && error instanceof NativeApiError && error.status === 401) {
-      useAuthStore.getState().logout();
-      throw new NativeAuthError('Your session has expired. Sign in again to continue.');
+    if (!options.skipAuth && !accessToken) {
+      throw new NativeAuthError();
     }
 
-    throw error;
+    try {
+      return await requestJson<T>(route, options, accessToken);
+    } catch (error) {
+      if (
+        !options.skipAuth
+        && error instanceof NativeApiError
+        && error.status === 401
+        && refreshToken
+      ) {
+        const refreshedAccessToken = await refreshSession(refreshToken);
+        return requestJson<T>(route, options, refreshedAccessToken);
+      }
+
+      if (!options.skipAuth && error instanceof NativeApiError && error.status === 401) {
+        useAuthStore.getState().logout();
+        throw new NativeAuthError('Your session has expired. Sign in again to continue.');
+      }
+
+      throw error;
+    }
+  } finally {
+    useAuthStore.getState().decrementNetworkLoading();
   }
 }
 
