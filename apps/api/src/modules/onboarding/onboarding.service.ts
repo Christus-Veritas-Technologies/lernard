@@ -60,33 +60,29 @@ export class OnboardingService {
       },
     });
 
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.user.update({
+    const txOps: Prisma.PrismaPromise<unknown>[] = [
+      this.prisma.user.update({
         where: { id: userId },
         data: {
           role: accountType === 'guardian' ? 'GUARDIAN' : 'STUDENT',
-          // Guardians skip profile-setup and First Look — they're done after this step
           ...(accountType === 'guardian' ? { onboardingComplete: true } : {}),
         },
-      });
+      }),
+    ];
 
-      if (accountType === 'guardian') {
-        await transaction.guardian.upsert({
+    if (accountType === 'guardian') {
+      txOps.push(
+        this.prisma.guardian.upsert({
           where: { userId },
-          update: {
-            passwordHash: user.passwordHash ?? null,
-          },
-          create: {
-            userId,
-            passwordHash: user.passwordHash ?? null,
-          },
-        });
+          update: { passwordHash: user.passwordHash ?? null },
+          create: { userId, passwordHash: user.passwordHash ?? null },
+        }),
+      );
+    } else {
+      txOps.push(this.prisma.guardian.deleteMany({ where: { userId } }));
+    }
 
-        return;
-      }
-
-      await transaction.guardian.deleteMany({ where: { userId } });
-    });
+    await this.prisma.$transaction(txOps);
 
     return { accountType };
   }
@@ -102,8 +98,8 @@ export class OnboardingService {
       throw new BadRequestException('Select at least one subject to continue onboarding.');
     }
 
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.user.update({
+    await this.prisma.$transaction([
+      this.prisma.user.update({
         where: { id: userId },
         data: {
           ...(normalizedName ? { name: normalizedName } : {}),
@@ -116,10 +112,18 @@ export class OnboardingService {
           dailyGoal: dto.dailyGoal ?? undefined,
           onboardingComplete: false,
         },
-      });
-
-      await this.replaceUserSubjects(transaction, userId, subjects);
-    });
+      }),
+      this.prisma.userSubject.deleteMany({ where: { userId } }),
+      ...(subjects.length
+        ? [this.prisma.userSubject.createMany({
+            data: subjects.map((subject, index) => ({
+              userId,
+              subjectId: subject.id,
+              priorityIndex: index,
+            })),
+          })]
+        : []),
+    ]);
 
     const state = await this.getOnboardingState(userId);
     return {
@@ -135,9 +139,18 @@ export class OnboardingService {
       throw new BadRequestException('Select at least one subject to continue onboarding.');
     }
 
-    await this.prisma.$transaction(async (transaction) => {
-      await this.replaceUserSubjects(transaction, userId, resolvedSubjects);
-    });
+    await this.prisma.$transaction([
+      this.prisma.userSubject.deleteMany({ where: { userId } }),
+      ...(resolvedSubjects.length
+        ? [this.prisma.userSubject.createMany({
+            data: resolvedSubjects.map((subject, index) => ({
+              userId,
+              subjectId: subject.id,
+              priorityIndex: index,
+            })),
+          })]
+        : []),
+    ]);
 
     const state = await this.getOnboardingState(userId);
     return {
@@ -216,43 +229,34 @@ export class OnboardingService {
       existingProgress.map((record) => [record.subjectId, toTopicScores(record.topicScores)]),
     );
 
-    await this.prisma.$transaction(async (transaction) => {
-      for (const result of subjectResults) {
-        const ratio = result.totalQuestions === 0 ? 0.5 : result.score / result.totalQuestions;
-        const nextTopicScores = {
-          ...existingProgressBySubjectId.get(result.subjectId),
-          [FIRST_LOOK_BASELINE_KEY]: ratio,
-        };
-
-        await transaction.subjectProgress.upsert({
-          where: {
-            userId_subjectId: {
-              userId,
-              subjectId: result.subjectId,
-            },
-          },
-          update: {
-            strengthLevel: toPrismaStrengthLevel(result.strengthLevel),
-            topicScores: nextTopicScores as Prisma.InputJsonValue,
-          },
-          create: {
-            userId,
-            subjectId: result.subjectId,
-            strengthLevel: toPrismaStrengthLevel(result.strengthLevel),
-            topicScores: nextTopicScores as Prisma.InputJsonValue,
-          },
-        });
-      }
-
-      await transaction.user.update({
-        where: { id: userId },
-        data: {
-          firstLookComplete: true,
-          onboardingComplete: true,
-          lastActiveAt: new Date(),
+    const upsertOps = subjectResults.map((result) => {
+      const ratio = result.totalQuestions === 0 ? 0.5 : result.score / result.totalQuestions;
+      const nextTopicScores = {
+        ...existingProgressBySubjectId.get(result.subjectId),
+        [FIRST_LOOK_BASELINE_KEY]: ratio,
+      };
+      return this.prisma.subjectProgress.upsert({
+        where: { userId_subjectId: { userId, subjectId: result.subjectId } },
+        update: {
+          strengthLevel: toPrismaStrengthLevel(result.strengthLevel),
+          topicScores: nextTopicScores as Prisma.InputJsonValue,
+        },
+        create: {
+          userId,
+          subjectId: result.subjectId,
+          strengthLevel: toPrismaStrengthLevel(result.strengthLevel),
+          topicScores: nextTopicScores as Prisma.InputJsonValue,
         },
       });
     });
+
+    await this.prisma.$transaction([
+      ...upsertOps,
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { firstLookComplete: true, onboardingComplete: true, lastActiveAt: new Date() },
+      }),
+    ]);
 
     return {
       completed: true,
@@ -284,42 +288,38 @@ export class OnboardingService {
       existingProgress.map((record) => [record.subjectId, toTopicScores(record.topicScores)]),
     );
 
-    await this.prisma.$transaction(async (transaction) => {
-      for (const subject of subjects) {
-        const nextTopicScores = {
-          ...existingProgressBySubjectId.get(subject.subject.id),
-          [FIRST_LOOK_BASELINE_KEY]: 0.5,
-        };
-
-        await transaction.subjectProgress.upsert({
-          where: {
-            userId_subjectId: {
-              userId,
-              subjectId: subject.subject.id,
-            },
-          },
-          update: {
-            strengthLevel: 'DEVELOPING',
-            topicScores: nextTopicScores as Prisma.InputJsonValue,
-          },
-          create: {
+    const skipUpsertOps = subjects.map((subject) => {
+      const nextTopicScores = {
+        ...existingProgressBySubjectId.get(subject.subject.id),
+        [FIRST_LOOK_BASELINE_KEY]: 0.5,
+      };
+      return this.prisma.subjectProgress.upsert({
+        where: {
+          userId_subjectId: {
             userId,
             subjectId: subject.subject.id,
-            strengthLevel: 'DEVELOPING',
-            topicScores: nextTopicScores as Prisma.InputJsonValue,
           },
-        });
-      }
-
-      await transaction.user.update({
-        where: { id: userId },
-        data: {
-          firstLookComplete: true,
-          onboardingComplete: true,
-          lastActiveAt: new Date(),
+        },
+        update: {
+          strengthLevel: 'DEVELOPING',
+          topicScores: nextTopicScores as Prisma.InputJsonValue,
+        },
+        create: {
+          userId,
+          subjectId: subject.subject.id,
+          strengthLevel: 'DEVELOPING',
+          topicScores: nextTopicScores as Prisma.InputJsonValue,
         },
       });
     });
+
+    await this.prisma.$transaction([
+      ...skipUpsertOps,
+      this.prisma.user.update({
+        where: { id: userId },
+        data: { firstLookComplete: true, onboardingComplete: true, lastActiveAt: new Date() },
+      }),
+    ]);
 
     return {
       skipped: true,
@@ -328,25 +328,7 @@ export class OnboardingService {
     };
   }
 
-  private async replaceUserSubjects(
-    transaction: Prisma.TransactionClient,
-    userId: string,
-    subjects: Array<{ id: string; name: string }>,
-  ): Promise<void> {
-    await transaction.userSubject.deleteMany({ where: { userId } });
 
-    if (!subjects.length) {
-      return;
-    }
-
-    await transaction.userSubject.createMany({
-      data: subjects.map((subject, index) => ({
-        userId,
-        subjectId: subject.id,
-        priorityIndex: index,
-      })),
-    });
-  }
 
   private async ensureSubjects(
     subjectNames: string[],
