@@ -19,12 +19,12 @@ import { useAuthStore } from '@/store/store';
 
 const STUDENT_TABS = [
     { name: '(home)', label: 'Home', Icon: Home01Icon },
-    { name: '(learn)', label: 'Learn', Icon: BookOpen01Icon },
+    { name: 'learn/index', label: 'Learn', Icon: BookOpen01Icon },
     { name: '(chat)/index', label: 'Chat', Icon: Message01Icon },
 ] as const;
 
 const GUARDIAN_TABS = [
-    { name: 'guardian/index', label: 'Household', Icon: Home01Icon },
+    { name: 'guardian', label: 'Household', Icon: Home01Icon },
     { name: 'settings', label: 'Settings', Icon: Settings02Icon },
 ] as const;
 
