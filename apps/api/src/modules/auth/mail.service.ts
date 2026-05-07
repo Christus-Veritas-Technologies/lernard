@@ -48,6 +48,21 @@ export class MailService {
     });
   }
 
+  async sendAdminSignupNotification(userName: string, userEmail: string, date: Date): Promise<void> {
+    const dateStr = date.toLocaleString('en-US', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }) + ' UTC';
+    if (!this.transporter) {
+      this.logger.log(`[ADMIN] New signup: ${userName} <${userEmail}> at ${dateStr}`);
+      return;
+    }
+    const from = this.configService.get<string>('SMTP_FROM') ?? 'Lernard <noreply@lernard.app>';
+    await this.transporter.sendMail({
+      from,
+      to: 'kinzinzombe07@gmail.com',
+      subject: `New Lernard signup: ${userName}`,
+      text: `${userName} signed up with ${userEmail} on ${dateStr}.`,
+    });
+  }
+
   private buildHtml(link: string, otp: string): string {
     return `
 <!DOCTYPE html>

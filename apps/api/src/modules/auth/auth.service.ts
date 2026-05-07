@@ -117,13 +117,19 @@ export class AuthService {
       if (existing.deletedAt) throw new UnauthorizedException('Account not found.');
       return existing;
     }
-    return this.prisma.user.create({
+    const newUser = await this.prisma.user.create({
       data: {
         email,
         name: email.split('@')[0],
         role: 'STUDENT',
       },
     });
+    void this.mailService.sendAdminSignupNotification(
+      newUser.name ?? newUser.email,
+      newUser.email,
+      new Date(),
+    );
+    return newUser;
   }
 
   // ─── Google OAuth ──────────────────────────────────────────────────────────
