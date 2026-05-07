@@ -4,7 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
-import type { Conversation } from '@lernard/shared-types';
+import type { ConversationListItem } from '@lernard/shared-types';
 
 import { Text } from '@rnr/text';
 
@@ -14,9 +14,29 @@ import { formatRelativeDate } from '@/lib/formatters';
 import { NativeAuthError, nativeApiFetch } from '@/lib/native-api';
 
 interface ConversationsResponse {
-    conversations: Conversation[];
+    conversations: ConversationListItem[];
     cursor: string | null;
     hasMore: boolean;
+}
+
+function normalizeConversationsResponse(
+    value: ConversationsResponse | ConversationListItem[] | null | undefined,
+): ConversationsResponse {
+    if (Array.isArray(value)) {
+        return {
+            conversations: value,
+            cursor: null,
+            hasMore: false,
+        };
+    }
+
+    const conversations = Array.isArray(value?.conversations) ? value.conversations : [];
+
+    return {
+        conversations,
+        cursor: typeof value?.cursor === 'string' ? value.cursor : null,
+        hasMore: Boolean(value?.hasMore && typeof value?.cursor === 'string'),
+    };
 }
 
 export default function ChatListScreen() {
@@ -35,9 +55,9 @@ export default function ChatListScreen() {
             setError(null);
 
             try {
-                const initial = await nativeApiFetch<ConversationsResponse>(ROUTES.CHAT.CONVERSATIONS);
+                const initial = await nativeApiFetch<ConversationsResponse | ConversationListItem[]>(ROUTES.CHAT.CONVERSATIONS);
                 if (cancelled) return;
-                setData(initial);
+                setData(normalizeConversationsResponse(initial));
             } catch (loadError) {
                 if (cancelled) return;
                 setData(null);
@@ -60,7 +80,8 @@ export default function ChatListScreen() {
 
         setLoadingMore(true);
         try {
-            const next = await nativeApiFetch<ConversationsResponse>(`${ROUTES.CHAT.CONVERSATIONS}?cursor=${encodeURIComponent(data.cursor)}`);
+            const nextRaw = await nativeApiFetch<ConversationsResponse | ConversationListItem[]>(`${ROUTES.CHAT.CONVERSATIONS}?cursor=${encodeURIComponent(data.cursor)}`);
+            const next = normalizeConversationsResponse(nextRaw);
             setData((current) => {
                 if (!current) return next;
 
