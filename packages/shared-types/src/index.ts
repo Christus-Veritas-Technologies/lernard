@@ -60,6 +60,8 @@ export type {
   QuizCardProps,
   ConceptBreakdownProps,
   ProgressNudgeProps,
+  LessonRefCardProps,
+  QuizRefCardProps,
 } from './payloads/chat'
 export type {
   GuardianDashboardContent,

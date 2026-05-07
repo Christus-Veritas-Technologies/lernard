@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import type {
   ChatAttachment,
   ChatAttachmentInput,
@@ -6,12 +7,16 @@ import type {
   ChatLessonAttachmentOption,
   ChatMessageBlock,
   ConversationListItem,
+  LessonRefCardProps,
+  QuizRefCardProps,
 } from '@lernard/shared-types';
 import type { User } from '@prisma/client';
 import { Observable } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MastraService } from '../../mastra/mastra.service';
+import { MastraService, type ChatToolExecutor } from '../../mastra/mastra.service';
 import { R2Service } from '../../r2/r2.service';
+import { LessonsService } from '../lessons/lessons.service';
+import { QuizzesService } from '../quizzes/quizzes.service';
 import { storeChatUpload, chatUploadExists, readChatPromptUpload } from './chat-uploads';
 import type { ChatPromptUpload, ChatUploadFile } from './chat-uploads';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -22,6 +27,8 @@ export class ChatService {
     private readonly prisma: PrismaService,
     private readonly mastraService: MastraService,
     private readonly r2: R2Service,
+    private readonly lessonsService: LessonsService,
+    private readonly quizzesService: QuizzesService,
   ) {}
 
   async getConversations(user: User): Promise<ConversationListItem[]> {
@@ -123,6 +130,7 @@ export class ChatService {
       message: buildPromptMessage(dto.message, attachments),
       history: historyWithMemory,
       attachments: promptUploads,
+      toolExecutor: this.buildToolExecutor(user, conversation.id),
     })) {
       assistantBlocks.push(block);
     }
@@ -192,6 +200,7 @@ export class ChatService {
       message: buildPromptMessage(dto.message, attachments),
       history: historyWithMemory,
       attachments: promptUploads,
+      toolExecutor: this.buildToolExecutor(user, conversation.id),
     })) {
       assistantBlocks.push(block);
       subscriber.next(new MessageEvent('message', { data: JSON.stringify(block) }));
@@ -300,6 +309,55 @@ export class ChatService {
   ): Promise<{ role: 'user' | 'assistant'; content: string } | null> {
     return null;
   }
+
+  private buildToolExecutor(user: User, conversationId: string): ChatToolExecutor {
+    return {
+      createLesson: async ({ topic, depth = 'standard', subject }) => {
+        const { lessonId } = await this.lessonsService.generate(user, {
+          topic,
+          depth,
+          subject,
+          idempotencyKey: randomUUID(),
+        });
+
+        const lesson = await (this.prisma as any).lesson.findUnique({
+          where: { id: lessonId },
+        });
+
+        const card: LessonRefCardProps = {
+          lessonId,
+          title: lesson?.topic ?? topic,
+          subjectName: lesson?.subjectName ?? undefined,
+          depth: normalizeDepth(lesson?.depth ?? depth),
+          estimatedMinutes: lesson?.estimatedMinutes ?? 12,
+        };
+
+        return card;
+      },
+      createQuiz: async ({ topic, questionCount = 8, subject }) => {
+        const { quizId } = await this.quizzesService.generate(user, {
+          topic,
+          questionCount,
+          subject,
+          idempotencyKey: randomUUID(),
+          fromConversationId: conversationId,
+        });
+
+        const quiz = await (this.prisma as any).quiz.findUnique({
+          where: { id: quizId },
+        });
+
+        const card: QuizRefCardProps = {
+          quizId,
+          title: quiz?.topic ?? topic,
+          subjectName: quiz?.subjectName ?? undefined,
+          totalQuestions: quiz?.totalQuestions ?? questionCount,
+        };
+
+        return card;
+      },
+    };
+  }
 }
 
 function normalizeAttachmentInputs(
@@ -379,15 +437,38 @@ function buildPromptFromBlocks(blocks: ChatMessageBlock[]): string {
       return [block.content.trim()];
     }
 
+    if (block.type === 'markdown') {
+      return [block.content.trim()];
+    }
+
     if (block.type === 'attachments') {
       const summary = summarizeAttachments(block.items);
       return summary ? [summary] : [];
+    }
+
+    if (block.type === 'LessonRefCard') {
+      const subject = block.props.subjectName ? ` (${block.props.subjectName})` : '';
+      return [`[lesson created: "${block.props.title}"${subject} — id ${block.props.lessonId}]`];
+    }
+
+    if (block.type === 'QuizRefCard') {
+      const subject = block.props.subjectName ? ` (${block.props.subjectName})` : '';
+      return [
+        `[quiz created: "${block.props.title}"${subject} — id ${block.props.quizId}, ${block.props.totalQuestions} questions]`,
+      ];
     }
 
     return [];
   });
 
   return parts.filter(Boolean).join('\n\n').trim();
+}
+
+function normalizeDepth(depth: string | undefined | null): 'quick' | 'standard' | 'deep' {
+  if (depth === 'quick' || depth === 'standard' || depth === 'deep') {
+    return depth;
+  }
+  return 'standard';
 }
 
 function buildPromptMessage(message: string, attachments: ChatAttachment[]): string {

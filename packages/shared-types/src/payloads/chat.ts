@@ -42,6 +42,21 @@ export interface ProgressNudgeProps {
   description: string
 }
 
+export interface LessonRefCardProps {
+  lessonId: string
+  title: string
+  subjectName?: string
+  depth: 'quick' | 'standard' | 'deep'
+  estimatedMinutes: number
+}
+
+export interface QuizRefCardProps {
+  quizId: string
+  title: string
+  subjectName?: string
+  totalQuestions: number
+}
+
 export type ChatUploadKind = 'image' | 'pdf'
 
 export interface UploadedChatAttachmentInput {
@@ -86,3 +101,5 @@ export type ChatMessageBlock =
   | { type: 'QuizCard'; props: QuizCardProps }
   | { type: 'ConceptBreakdown'; props: ConceptBreakdownProps }
   | { type: 'ProgressNudge'; props: ProgressNudgeProps }
+  | { type: 'LessonRefCard'; props: LessonRefCardProps }
+  | { type: 'QuizRefCard'; props: QuizRefCardProps }
