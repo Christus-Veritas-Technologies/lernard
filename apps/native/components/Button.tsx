@@ -1,5 +1,8 @@
+import type { ReactNode } from 'react';
+
 import { Button as PrimitiveButton, type ButtonProps as PrimitiveButtonProps } from '@rnr/button';
 import { Text } from '@rnr/text';
+import { View } from 'react-native';
 
 import { cn } from '@/lib/cn';
 
@@ -7,15 +10,21 @@ interface ButtonProps extends PrimitiveButtonProps {
   title: string;
   variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
   textClassName?: string;
+  iconLeft?: ReactNode;
+  iconRight?: ReactNode;
 }
 
-export function Button({ title, variant = 'primary', textClassName, disabled, ...buttonProps }: ButtonProps) {
+export function Button({ title, variant = 'primary', textClassName, disabled, iconLeft, iconRight, ...buttonProps }: ButtonProps) {
   return (
     <PrimitiveButton
       {...buttonProps}
       disabled={disabled}
       className={cn(styles.button, buttonVariants[variant], disabled ? 'opacity-60' : undefined, buttonProps.className)}>
-      <Text className={cn(buttonTextVariants[variant], textClassName)}>{title}</Text>
+      <View className="flex-row items-center gap-2">
+        {iconLeft}
+        <Text className={cn(buttonTextVariants[variant], textClassName)}>{title}</Text>
+        {iconRight}
+      </View>
     </PrimitiveButton>
   );
 }

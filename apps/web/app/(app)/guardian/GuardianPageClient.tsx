@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { GuardianEmptyVisual } from "@/components/guardian/GuardianEmptyVisual";
 import {
     Dialog,
     DialogContent,
@@ -194,7 +195,7 @@ export function GuardianPageClient() {
                                 <div>
                                     <CardTitle className="text-3xl text-white">A calm overview of your household learning</CardTitle>
                                     <CardDescription className="mt-2 max-w-2xl text-base text-white/80">
-                                        Keep every child in view, spot who needs a nudge, and handle invites or companion controls without digging through settings.
+                                        Spot activity, manage invites, and open controls quickly.
                                     </CardDescription>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
@@ -248,39 +249,54 @@ export function GuardianPageClient() {
                     <Card className="border-0 bg-[linear-gradient(160deg,#eef2ff_0%,#ffffff_100%)] shadow-sm">
                         <CardHeader>
                             <CardTitle>Invite a child</CardTitle>
-                            <CardDescription>Create a fresh invite when you want to link another child account to your Household.</CardDescription>
+                            <CardDescription>Link a new child account.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <p className="text-sm leading-6 text-text-secondary">Use this when a learner already has their own login or email address.</p>
                             <div className="flex flex-wrap gap-2">
-                                <Button onClick={() => setInviteDialogOpen(true)}>Send invite</Button>
-                                <Button onClick={copyLatestInviteCode} variant="ghost">Copy invite code</Button>
+                                <Button onClick={() => setInviteDialogOpen(true)}>
+                                    <UserGroupIcon size={16} strokeWidth={1.8} />
+                                    Send invite
+                                </Button>
+                                <Button onClick={copyLatestInviteCode} variant="ghost">
+                                    <Settings02Icon size={16} strokeWidth={1.8} />
+                                    Copy invite code
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>
                     <Card className="border-0 bg-[linear-gradient(160deg,#eff8ff_0%,#ffffff_100%)] shadow-sm">
                         <CardHeader>
                             <CardTitle>Review progress</CardTitle>
-                            <CardDescription>Open any child profile to review Lernard&apos;s Read on You, recent sessions, and growth areas.</CardDescription>
+                            <CardDescription>Open any child profile for progress signals.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <p className="text-sm leading-6 text-text-secondary">Best for checking progress before companion controls need changing.</p>
                             <div className="flex flex-wrap gap-2">
-                                <Button onClick={openFirstChildOverview}>Open overview</Button>
-                                <Button onClick={scrollToChildrenOverview} variant="secondary">See all children</Button>
+                                <Button onClick={openFirstChildOverview}>
+                                    <ChartBarLineIcon size={16} strokeWidth={1.8} />
+                                    Open overview
+                                </Button>
+                                <Button onClick={scrollToChildrenOverview} variant="secondary">
+                                    <ArrowRight02Icon size={16} strokeWidth={1.8} />
+                                    See all children
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>
                     <Card className="border-0 bg-[linear-gradient(160deg,#fff7ed_0%,#ffffff_100%)] shadow-sm">
                         <CardHeader>
                             <CardTitle>Change companion controls</CardTitle>
-                            <CardDescription>Tighten or relax help settings per child so support matches the moment.</CardDescription>
+                            <CardDescription>Adjust support settings per child.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            <p className="text-sm leading-6 text-text-secondary">Use this before homework-heavy weeks or revision sessions.</p>
                             <div className="flex flex-wrap gap-2">
-                                <Button onClick={openFirstChildControls} variant="secondary">Adjust controls</Button>
-                                <Button onClick={() => router.push("/settings")} variant="ghost">Review defaults</Button>
+                                <Button onClick={openFirstChildControls} variant="secondary">
+                                    <Settings02Icon size={16} strokeWidth={1.8} />
+                                    Adjust controls
+                                </Button>
+                                <Button onClick={() => router.push("/settings")} variant="ghost">
+                                    <SchoolBell01Icon size={16} strokeWidth={1.8} />
+                                    Review defaults
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>
@@ -353,9 +369,10 @@ export function GuardianPageClient() {
                                         </Table>
                                     </div>
                                 ) : (
-                                    <div className="rounded-2xl border border-dashed border-border bg-background/60 p-4 text-sm leading-6 text-text-secondary">
-                                        No linked children yet. When a guardian invite is accepted, each learner will appear here with real streaks, activity, and subject signals.
-                                    </div>
+                                    <GuardianEmptyVisual
+                                        subtitle="Accepted invites will populate this table with activity and strength signals."
+                                        title="No linked children yet"
+                                    />
                                 )}
                             </section>
                         </CardContent>
@@ -431,9 +448,10 @@ export function GuardianPageClient() {
                                             </div>
                                         ))
                                     ) : (
-                                        <p className="text-sm leading-6 text-text-secondary">
-                                            You don&apos;t have any pending invites right now.
-                                        </p>
+                                        <GuardianEmptyVisual
+                                            subtitle="Resend and cancel controls will appear here for active invites."
+                                            title="Invite queue is empty"
+                                        />
                                     )}
                                 </CardContent>
                             </Card>

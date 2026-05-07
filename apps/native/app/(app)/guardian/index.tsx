@@ -2,7 +2,15 @@ import { useRouter } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ChartBarLineIcon, Home01Icon, Settings02Icon } from 'hugeicons-react-native';
+import {
+    ArrowRight01Icon,
+    Bookmark01Icon,
+    ChartBarLineIcon,
+    Home01Icon,
+    Settings02Icon,
+    UserCircleIcon,
+    UserGroupIcon,
+} from 'hugeicons-react-native';
 
 import { can } from '@lernard/auth-core';
 import { ROUTES } from '@lernard/routes';
@@ -97,6 +105,72 @@ export default function GuardianDashboardScreen() {
                         <Text className="text-sm font-semibold uppercase tracking-[0.16em] text-amber-700">Pending invites</Text>
                         <Text className="mt-3 text-3xl font-semibold text-slate-900">{content.summary.pendingInvites}</Text>
                         <Text className="mt-2 text-sm leading-6 text-slate-600">Invites waiting to be accepted.</Text>
+                    </View>
+                </View>
+
+                <View className="gap-4">
+                    <View className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                        <Text className="text-lg font-semibold text-slate-900">Invite a child</Text>
+                        <Text className="mt-1 text-sm text-slate-600">Link a new child account.</Text>
+                        <View className="mt-4 flex-row flex-wrap gap-2">
+                            <Button
+                                iconLeft={<UserGroupIcon color="#FFFFFF" size={16} strokeWidth={1.8} />}
+                                onPress={() => router.push('/settings')}
+                                title="Send invite"
+                            />
+                            <Button
+                                iconLeft={<Bookmark01Icon color="#0F172A" size={16} strokeWidth={1.8} />}
+                                onPress={() => router.push('/settings')}
+                                title="Copy invite code"
+                                variant="secondary"
+                            />
+                        </View>
+                    </View>
+
+                    <View className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                        <Text className="text-lg font-semibold text-slate-900">Review progress</Text>
+                        <Text className="mt-1 text-sm text-slate-600">Open any child profile for progress signals.</Text>
+                        <View className="mt-4 flex-row flex-wrap gap-2">
+                            <Button
+                                iconLeft={<ChartBarLineIcon color="#FFFFFF" size={16} strokeWidth={1.8} />}
+                                onPress={() => {
+                                    const firstChild = content.children[0];
+                                    if (firstChild) {
+                                        router.push(`/guardian/${firstChild.studentId}`);
+                                    }
+                                }}
+                                title="Open overview"
+                            />
+                            <Button
+                                iconLeft={<ArrowRight01Icon color="#0F172A" size={16} strokeWidth={1.8} />}
+                                onPress={() => router.push('/guardian')}
+                                title="See all children"
+                                variant="secondary"
+                            />
+                        </View>
+                    </View>
+
+                    <View className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                        <Text className="text-lg font-semibold text-slate-900">Change companion controls</Text>
+                        <Text className="mt-1 text-sm text-slate-600">Adjust support settings per child.</Text>
+                        <View className="mt-4 flex-row flex-wrap gap-2">
+                            <Button
+                                iconLeft={<Settings02Icon color="#FFFFFF" size={16} strokeWidth={1.8} />}
+                                onPress={() => {
+                                    const firstEditableChild = content.children.find((child) => can(permissions, 'can_change_companion_controls', child.studentId));
+                                    if (firstEditableChild) {
+                                        router.push(`/guardian/${firstEditableChild.studentId}/companion`);
+                                    }
+                                }}
+                                title="Adjust controls"
+                            />
+                            <Button
+                                iconLeft={<UserCircleIcon color="#0F172A" size={16} strokeWidth={1.8} />}
+                                onPress={() => router.push('/settings/companion-controls')}
+                                title="Review defaults"
+                                variant="secondary"
+                            />
+                        </View>
                     </View>
                 </View>
 
