@@ -23,7 +23,8 @@ export default function PreferencesScreen() {
     const [statusMessage, setStatusMessage] = useState('');
 
     useEffect(() => {
-        if (!data?.content) {
+        if (!data?.content || data.content.roleView !== 'student') {
+            setSettings(null);
             return;
         }
 
@@ -67,7 +68,41 @@ export default function PreferencesScreen() {
         return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
-    if (!data?.content || !settings) {
+    if (!data?.content) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        actionTitle="Try again"
+                        badge="Preferences unavailable"
+                        description="The settings payload was empty for this request."
+                        onActionPress={refetch}
+                        title="Could not open preferences"
+                        tone="warning"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (data.content.roleView !== 'student') {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        actionTitle="Open Household settings"
+                        badge="Guardian view"
+                        description="Appearance and daily goal are student settings. Open household settings to manage linked children."
+                        onActionPress={() => router.push('/settings')}
+                        title="Preferences are student-only"
+                        tone="warm"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (!settings) {
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
                 <View className="flex-1 px-4 pb-24 pt-6">
