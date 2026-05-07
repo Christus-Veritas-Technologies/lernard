@@ -17,6 +17,7 @@ import { can } from '@lernard/auth-core';
 import { ROUTES } from '@lernard/routes';
 import {
     type CompanionControls,
+    type GuardianManagedChildSettings,
     type SettingsContent,
     type UserSettings,
 } from '@lernard/shared-types';
@@ -49,7 +50,12 @@ export default function SettingsScreen() {
     const [user, setUser] = useState<AuthUser | null>(null);
 
     useEffect(() => {
-        if (!data?.content) return;
+        if (!data?.content || data.content.roleView !== 'student') {
+            setSettings(null);
+            setLockedSettings([]);
+            return;
+        }
+
         setSettings(data.content.settings);
         setLockedSettings(data.content.lockedSettings);
     }, [data]);
@@ -94,7 +100,68 @@ export default function SettingsScreen() {
         return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
-    if (!data?.content || !settings) {
+    if (!data?.content) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        actionTitle="Try again"
+                        badge="Settings unavailable"
+                        description="The settings payload was empty for this request."
+                        onActionPress={refetch}
+                        title="Could not open settings"
+                        tone="warning"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (data.content.roleView === 'guardian') {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
+                    <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
+                        <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Guardian settings</Text>
+                        <Text className="mt-3 text-3xl font-semibold text-slate-900">Household controls</Text>
+                        <Text className="mt-3 text-base leading-7 text-slate-600">
+                            Manage linked children from one role-aware settings payload.
+                        </Text>
+                        <View className="mt-5 flex-row flex-wrap gap-2">
+                            <View className="rounded-full bg-indigo-100 px-3 py-1">
+                                <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">
+                                    {data.content.children.length} linked children
+                                </Text>
+                            </View>
+                        </View>
+                        <View className="mt-5 flex-row flex-wrap gap-2">
+                            <Button onPress={() => router.push('/guardian')} title="Open Household" />
+                        </View>
+                    </View>
+
+                    <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                        <Text className="text-2xl font-semibold text-slate-900">Children</Text>
+                        <View className="mt-5 gap-4">
+                            {data.content.children.length ? data.content.children.map((child) => (
+                                <GuardianChildRow
+                                    child={child}
+                                    key={child.studentId}
+                                    onOpenCompanion={() => router.push(`/guardian/${child.studentId}/companion`)}
+                                    onOpenProfile={() => router.push(`/guardian/${child.studentId}`)}
+                                />
+                            )) : (
+                                <Text className="text-base leading-7 text-slate-600">
+                                    No linked children yet. Invite a child from Household to start managing settings.
+                                </Text>
+                            )}
+                        </View>
+                    </View>
+                </ScrollView>
+            </SafeAreaView>
+        );
+    }
+
+    if (!settings) {
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
                 <View className="flex-1 px-4 pb-24 pt-6">
@@ -270,6 +337,39 @@ export default function SettingsScreen() {
             setSavingField(null);
         }
     }
+}
+
+function GuardianChildRow({
+    child,
+    onOpenCompanion,
+    onOpenProfile,
+}: {
+    child: GuardianManagedChildSettings;
+    onOpenCompanion: () => void;
+    onOpenProfile: () => void;
+}) {
+    return (
+        <View className="rounded-[24px] bg-slate-50 p-4">
+            <Text className="text-lg font-semibold text-slate-900">{child.name}</Text>
+            <Text className="mt-1 text-sm text-slate-600">{child.email ?? 'No email on file'}</Text>
+            <View className="mt-3 flex-row flex-wrap gap-2">
+                <View className="rounded-full bg-indigo-100 px-2.5 py-1">
+                    <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
+                        {child.settings.learningMode}
+                    </Text>
+                </View>
+                <View className="rounded-full bg-sky-100 px-2.5 py-1">
+                    <Text className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
+                        {child.settings.dailyGoal} sessions
+                    </Text>
+                </View>
+            </View>
+            <View className="mt-4 flex-row flex-wrap gap-2">
+                <Button onPress={onOpenProfile} title="View child" variant="secondary" />
+                <Button onPress={onOpenCompanion} title="Companion controls" />
+            </View>
+        </View>
+    );
 }
 
 function SectionHeader({ title }: { title: string }) {
