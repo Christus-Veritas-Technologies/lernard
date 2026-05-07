@@ -19,14 +19,25 @@ interface QuizScreenClientProps {
     quizId: string;
 }
 
+interface AnswerResult {
+    isCorrect: boolean;
+    feedback: string;
+    done: boolean;
+}
+
 export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     const router = useRouter();
     const [quiz, setQuiz] = useState<QuizContent | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
+
+    // single-value answer (most types)
     const [answer, setAnswer] = useState("");
+    // multi-value answer (multiple_select)
+    const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
+
     const [submitting, setSubmitting] = useState(false);
-    const [feedback, setFeedback] = useState<string | null>(null);
+    const [result, setResult] = useState<AnswerResult | null>(null);
 
     const loadQuiz = useCallback(async () => {
         setLoading(true);
@@ -34,6 +45,9 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
         try {
             const data = await browserApiFetch<QuizContent>(ROUTES.QUIZZES.GET(quizId));
             setQuiz(data);
+            setAnswer("");
+            setSelectedOptions([]);
+            setResult(null);
         } catch (err) {
             setError(err instanceof Error ? err : new Error("Unable to load quiz."));
         } finally {
@@ -46,6 +60,11 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     const progressValue = quiz
         ? ((quiz.currentQuestionIndex + 1) / Math.max(quiz.totalQuestions, 1)) * 100
         : 0;
+
+    const canSubmit =
+        quiz?.question.type === "multiple_select"
+            ? selectedOptions.length > 0
+            : answer.trim().length > 0;
 
     if (loading) return <div className="h-72 rounded-3xl bg-background-subtle" />;
 
@@ -63,36 +82,40 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
         );
     }
 
+    function toggleOption(option: string) {
+        setSelectedOptions((prev) =>
+            prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option],
+        );
+    }
+
     async function submitAnswer() {
-        if (!answer.trim()) return;
+        if (!canSubmit || submitting) return;
+
+        const submittedAnswer =
+            quiz!.question.type === "multiple_select"
+                ? JSON.stringify(selectedOptions)
+                : answer;
 
         setSubmitting(true);
         try {
-            const result = await browserApiFetch<{ isCorrect: boolean; feedback: string; done: boolean }>(
-                ROUTES.QUIZZES.ANSWER(quizId),
-                {
-                    method: "POST",
-                    body: JSON.stringify({
-                        questionIndex: quiz.currentQuestionIndex,
-                        answer,
-                    }),
-                },
-            );
-
-            setFeedback(result.feedback);
-            if (result.done) {
+            const res = await browserApiFetch<AnswerResult>(ROUTES.QUIZZES.ANSWER(quizId), {
+                method: "POST",
+                body: JSON.stringify({
+                    questionIndex: quiz!.currentQuestionIndex,
+                    answer: submittedAnswer,
+                }),
+            });
+            setResult(res);
+            if (res.done) {
                 router.push(`/quiz/${quizId}/results`);
-                return;
             }
-
-            setTimeout(() => {
-                setAnswer("");
-                setFeedback(null);
-                void loadQuiz();
-            }, 500);
         } finally {
             setSubmitting(false);
         }
+    }
+
+    function onNext() {
+        void loadQuiz();
     }
 
     return (
@@ -112,45 +135,115 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                     <CardTitle>{quiz.question.text}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {/* Multiple choice — radio */}
                     {quiz.question.type === "multiple_choice" && quiz.question.options ? (
                         <RadioGroup onValueChange={setAnswer} value={answer}>
                             {quiz.question.options.map((option) => (
-                                <label className="flex items-center gap-2" key={option}>
+                                <label className="flex cursor-pointer items-center gap-2" key={option}>
                                     <RadioGroupItem value={option} />
-                                    <span>{option}</span>
+                                    <span className="text-sm">{option}</span>
                                 </label>
                             ))}
                         </RadioGroup>
                     ) : null}
 
-                    {quiz.question.type === "true_false" ? (
-                        <div className="grid grid-cols-2 gap-3">
-                            <Button onClick={() => setAnswer("true")} variant="secondary">True</Button>
-                            <Button onClick={() => setAnswer("false")} variant="secondary">False</Button>
+                    {/* Multiple select — checkboxes */}
+                    {quiz.question.type === "multiple_select" && quiz.question.options ? (
+                        <div className="space-y-2">
+                            <p className="text-xs text-text-tertiary">Select all that apply</p>
+                            {quiz.question.options.map((option) => (
+                                <label
+                                    className="flex cursor-pointer items-center gap-2 rounded-xl border border-border p-3 hover:bg-background-subtle"
+                                    key={option}
+                                >
+                                    <input
+                                        checked={selectedOptions.includes(option)}
+                                        className="h-4 w-4 accent-primary-500"
+                                        onChange={() => toggleOption(option)}
+                                        type="checkbox"
+                                    />
+                                    <span className="text-sm">{option}</span>
+                                </label>
+                            ))}
                         </div>
                     ) : null}
 
+                    {/* True / False */}
+                    {quiz.question.type === "true_false" ? (
+                        <div className="grid grid-cols-2 gap-3">
+                            <Button
+                                onClick={() => setAnswer("true")}
+                                variant={answer === "true" ? "default" : "secondary"}
+                            >
+                                True
+                            </Button>
+                            <Button
+                                onClick={() => setAnswer("false")}
+                                variant={answer === "false" ? "default" : "secondary"}
+                            >
+                                False
+                            </Button>
+                        </div>
+                    ) : null}
+
+                    {/* Fill in the blank */}
                     {quiz.question.type === "fill_blank" ? (
-                        <Input onChange={(event) => setAnswer(event.target.value)} value={answer} />
+                        <Input
+                            onChange={(e) => setAnswer(e.target.value)}
+                            placeholder="Type your answer…"
+                            value={answer}
+                        />
                     ) : null}
 
+                    {/* Short answer / ordering */}
                     {quiz.question.type === "short_answer" || quiz.question.type === "ordering" ? (
-                        <Textarea onChange={(event) => setAnswer(event.target.value)} value={answer} />
+                        <Textarea
+                            onChange={(e) => setAnswer(e.target.value)}
+                            placeholder="Type your answer…"
+                            value={answer}
+                        />
                     ) : null}
 
-                    <div className="flex flex-wrap gap-3">
-                        <Button onClick={() => setAnswer("I am not sure") } variant="ghost">
-                            I&apos;m not sure
-                        </Button>
-                        <Button disabled={submitting || !answer.trim()} onClick={submitAnswer}>
-                            Submit
-                        </Button>
-                    </div>
+                    {/* Action buttons — hide while result shown */}
+                    {!result ? (
+                        <div className="flex flex-wrap gap-3">
+                            <Button
+                                onClick={() => {
+                                    if (quiz.question.type === "multiple_select") {
+                                        setSelectedOptions(["I am not sure"]);
+                                    } else {
+                                        setAnswer("I am not sure");
+                                    }
+                                }}
+                                variant="ghost"
+                            >
+                                I&apos;m not sure
+                            </Button>
+                            <Button disabled={submitting || !canSubmit} onClick={submitAnswer}>
+                                Submit
+                            </Button>
+                        </div>
+                    ) : null}
 
-                    {feedback ? (
-                        <Card className="border-primary-200 bg-primary-50 p-4 text-sm text-primary-700">
-                            {feedback}
-                        </Card>
+                    {/* Feedback */}
+                    {result ? (
+                        <div
+                            className={`rounded-2xl border p-4 ${
+                                result.isCorrect
+                                    ? "border-green-200 bg-green-50 text-green-800"
+                                    : "border-red-200 bg-red-50 text-red-800"
+                            }`}
+                        >
+                            <p className="mb-1 font-semibold">
+                                {result.isCorrect ? "✓ Correct" : "✗ Not quite"}
+                            </p>
+                            <p className="text-sm">{result.feedback}</p>
+                            {!result.done ? (
+                                <Button className="mt-3" onClick={onNext} size="sm">
+                                    Next question →
+                                </Button>
+                            ) : null}
+                        </div>
                     ) : null}
                 </CardContent>
             </Card>
