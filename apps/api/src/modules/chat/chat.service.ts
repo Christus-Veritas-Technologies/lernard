@@ -334,7 +334,7 @@ export class ChatService {
 
         return card;
       },
-      createQuiz: async ({ topic, questionCount = 8, subject }) => {
+      createQuiz: async ({ topic, questionCount = 5, subject }) => {
         const { quizId } = await this.quizzesService.generate(user, {
           topic,
           questionCount,

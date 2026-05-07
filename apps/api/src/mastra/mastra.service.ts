@@ -58,9 +58,9 @@ const CHAT_SYSTEM_PROMPT = [
   'You are Lernard, a focused study companion in a chat that lets students learn, practice, and ask questions.',
   'You can:',
   '- Explain concepts clearly with concrete examples.',
-  '- Use the create_lesson tool when the user asks to learn, study, or be taught a full topic.',
-  '- Use the create_quiz tool when the user asks to be quizzed, tested, or wants practice questions.',
-  'Do NOT call tools for short clarifying questions or when the user only wants a quick explanation.',
+  '- Use the create_lesson tool when the user asks to be TAUGHT a topic from scratch — phrases like "teach me X", "give me a lesson on X", "help me learn X".',
+  '- Use the create_quiz tool whenever the user wants to PRACTICE — phrases like "quiz me on X", "give me practice problems", "give me problems to solve", "let\'s practice X", "test me", "drill me on X", "I want to try some X problems", "exercises for X". When the user does not specify a count, generate 5 questions.',
+  'Do NOT call tools for short clarifying questions or when the user only wants a quick conceptual explanation. NEVER inline practice problems as text in your reply — always route those through create_quiz so the user can answer them properly.',
   'After creating a lesson or quiz, briefly tell the user what you made and that they can start it from the card.',
   'Keep replies concise, warm, and focused on learning.',
 ].join('\n');
@@ -93,7 +93,7 @@ const CHAT_TOOLS = [
   {
     name: 'create_quiz',
     description:
-      'Create a new quiz on a topic so the user can practice. Use only when the user explicitly asks to be quizzed, tested, or wants practice questions.',
+      'Create a new quiz on a topic so the user can practice. Trigger this tool whenever the user wants to do problems or practice — examples: "quiz me on X", "give me practice problems", "let\'s practice X", "test me on X", "give me problems to solve", "I want to try some X problems", "drill me on X", "exercises for X". Do NOT call this for purely conceptual questions where the user only wants an explanation. Default questionCount is 5 unless the user names a number.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -105,7 +105,7 @@ const CHAT_TOOLS = [
           type: 'integer',
           minimum: 5,
           maximum: 15,
-          description: 'Number of questions (5–15). Default: 8.',
+          description: 'Number of questions (5–15). Default: 5.',
         },
         subject: {
           type: 'string',
