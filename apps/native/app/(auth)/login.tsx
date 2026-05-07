@@ -55,11 +55,12 @@ export default function LoginScreen() {
                 keyboardShouldPersistTaps="handled"
             >
                 <AuthShell
-                    badge="Welcome"
-                    title="Sign in"
-                    description="Enter your email — we'll send a one-tap link straight to your inbox."
-                    cardTitle="Your sign-in link"
-                    cardSubtitle="No password needed. New accounts are created automatically."
+                    badge="Lernard"
+                    title="Your learning,
+your way"
+                    description="Adaptive lessons, bite-sized quizzes, and an AI guide that remembers your progress from day one."
+                    cardTitle="Get your sign-in link"
+                    cardSubtitle="No password needed. New to Lernard? Your account is created automatically."
                 >
                     {/* API error */}
                     {error ? (

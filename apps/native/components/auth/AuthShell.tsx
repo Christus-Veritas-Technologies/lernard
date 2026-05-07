@@ -50,7 +50,7 @@ export function AuthShell({
                 </View>
 
                 {/* Form card */}
-                <Card className="flex-1 rounded-[32px] border border-slate-200 bg-white p-6">
+                <Card className="rounded-[32px] border border-slate-200 bg-white p-6">
                     {(cardTitle || cardSubtitle) ? (
                         <CardHeader className="gap-1 pb-5">
                             {cardTitle ? <CardTitle className="text-xl">{cardTitle}</CardTitle> : null}
