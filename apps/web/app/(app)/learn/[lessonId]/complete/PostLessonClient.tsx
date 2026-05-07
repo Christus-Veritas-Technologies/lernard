@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
@@ -16,6 +16,8 @@ interface PostLessonClientProps {
 
 export function PostLessonClient({ lessonId }: PostLessonClientProps) {
     const router = useRouter();
+    const params = useSearchParams();
+    const topic = params.get("topic") ?? "";
     const [rating, setRating] = useState(3);
     const [saving, setSaving] = useState(false);
 
@@ -26,7 +28,8 @@ export function PostLessonClient({ lessonId }: PostLessonClientProps) {
                 method: "POST",
                 body: JSON.stringify({ confidenceRating: rating }),
             });
-            router.push(`/quiz?lessonId=${lessonId}`);
+            const quizUrl = `/quiz?lessonId=${lessonId}${topic ? `&topic=${encodeURIComponent(topic)}` : ""}`;
+            router.push(quizUrl);
         } finally {
             setSaving(false);
         }
