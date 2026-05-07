@@ -5,8 +5,11 @@ import {
     AlertCircleIcon,
     ArrowLeft01Icon,
     BookOpen01Icon,
+    HelpCircleIcon,
     Menu01Icon,
     Message01Icon,
+    PlayCircleIcon,
+    SchoolBell01Icon,
     SentIcon,
     SparklesIcon,
 } from "hugeicons-react";
@@ -61,7 +64,17 @@ export function ChatPageClient() {
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const deferredLessonQuery = useDeferredValue(lessonQuery);
+
+    function applySuggestedPrompt(prefill: string) {
+        setInput(prefill);
+        const textarea = textareaRef.current;
+        if (textarea) {
+            textarea.focus();
+            textarea.setSelectionRange(prefill.length, prefill.length);
+        }
+    }
 
     useEffect(() => {
         let isDisposed = false;
@@ -270,9 +283,9 @@ export function ChatPageClient() {
                         <SparklesIcon size={14} />
                         Lernard chat
                     </Badge>
-                    <CardTitle className="text-xl">Your thinking space</CardTitle>
+                    <CardTitle className="text-xl">Your learning space</CardTitle>
                     <CardDescription className="mt-1 max-w-sm text-sm text-text-secondary">
-                        Pick up an older conversation or open a fresh thread when you want a new lane.
+                        Pick up where you left off, or start a fresh thread to chat about a lesson, run a quiz, or learn something new.
                     </CardDescription>
                 </div>
 
@@ -456,15 +469,43 @@ export function ChatPageClient() {
                         <div className="space-y-4">
                             {messages.length === 0 && !loadingConversation ? (
                                 <div className="rounded-[28px] border border-dashed border-border bg-linear-to-br from-accent-cool-100/70 via-white to-accent-warm-100/70 p-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-500 text-white">
+                                    <div className="flex items-start gap-3">
+                                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary-500 text-white">
                                             <SparklesIcon size={20} strokeWidth={1.8} />
                                         </div>
-                                        <div>
-                                            <p className="text-base font-semibold text-text-primary">Build a sharper prompt</p>
-                                            <p className="text-sm leading-6 text-text-secondary">
-                                                Ask for a walkthrough, upload the worksheet you are stuck on, or attach a recent lesson so Lernard can stay on your exact track.
-                                            </p>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <p className="text-base font-semibold text-text-primary">What do you want to learn today?</p>
+                                                <p className="text-sm leading-6 text-text-secondary">
+                                                    Ask Lernard to teach you a topic, quiz you on a subject, or unpack a worksheet. Lernard will spin up a lesson or quiz right here in chat.
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button
+                                                    className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-white px-3 py-1.5 text-xs font-medium text-text-primary transition hover:border-primary-300 hover:bg-accent-cool-100/70"
+                                                    onClick={() => applySuggestedPrompt("Teach me about ")}
+                                                    type="button"
+                                                >
+                                                    <BookOpen01Icon size={14} strokeWidth={1.8} />
+                                                    Teach me…
+                                                </button>
+                                                <button
+                                                    className="inline-flex items-center gap-2 rounded-full border border-accent-warm-300 bg-white px-3 py-1.5 text-xs font-medium text-text-primary transition hover:border-accent-warm-400 hover:bg-accent-warm-100/60"
+                                                    onClick={() => applySuggestedPrompt("Quiz me on ")}
+                                                    type="button"
+                                                >
+                                                    <SchoolBell01Icon size={14} strokeWidth={1.8} />
+                                                    Quiz me on…
+                                                </button>
+                                                <button
+                                                    className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-1.5 text-xs font-medium text-text-primary transition hover:border-primary-200 hover:bg-background-subtle"
+                                                    onClick={() => applySuggestedPrompt("Explain ")}
+                                                    type="button"
+                                                >
+                                                    <HelpCircleIcon size={14} strokeWidth={1.8} />
+                                                    Explain…
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -553,7 +594,8 @@ export function ChatPageClient() {
                                     void onSend();
                                 }
                             }}
-                            placeholder="Ask for a walkthrough, bring in a worksheet, or ask Lernard to turn this into Set Work."
+                            placeholder="Try: 'Teach me photosynthesis', 'Quiz me on French verbs', or 'Explain the worksheet I attached.'"
+                            ref={textareaRef}
                             value={input}
                         />
 
@@ -679,6 +721,71 @@ function MessageBlock({ block, role }: { block: ChatMessageBlock; role: "user" |
                         <li key={item}>{item}</li>
                     ))}
                 </ul>
+            </div>
+        );
+    }
+
+    if (block.type === "LessonRefCard") {
+        const { lessonId, title, subjectName, depth, estimatedMinutes } = block.props;
+        return (
+            <div className="rounded-[22px] border border-primary-200 bg-white p-4 shadow-[0_18px_44px_-30px_rgba(36,52,88,0.35)]">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <Badge className="gap-1.5" tone="cool">
+                        <BookOpen01Icon size={12} strokeWidth={1.8} />
+                        Lesson · {depth}
+                    </Badge>
+                    <span className="text-xs text-text-secondary">{estimatedMinutes} min</span>
+                </div>
+                <p className="font-semibold text-text-primary">{title}</p>
+                {subjectName ? <p className="text-xs text-text-secondary">{subjectName}</p> : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                        className="inline-flex items-center gap-1.5 rounded-2xl bg-primary-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-600"
+                        href={`/learn/${lessonId}`}
+                    >
+                        <PlayCircleIcon size={14} strokeWidth={1.8} />
+                        Start lesson
+                    </Link>
+                    <Link
+                        className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-primary transition hover:bg-background-subtle"
+                        href={`/learn/${lessonId}`}
+                        target="_blank"
+                    >
+                        View lesson
+                    </Link>
+                </div>
+            </div>
+        );
+    }
+
+    if (block.type === "QuizRefCard") {
+        const { quizId, title, subjectName, totalQuestions } = block.props;
+        return (
+            <div className="rounded-[22px] border border-accent-warm-300 bg-white p-4 shadow-[0_18px_44px_-30px_rgba(232,147,127,0.35)]">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <Badge className="gap-1.5" tone="warm">
+                        <SchoolBell01Icon size={12} strokeWidth={1.8} />
+                        Quiz · {totalQuestions} questions
+                    </Badge>
+                </div>
+                <p className="font-semibold text-text-primary">{title}</p>
+                {subjectName ? <p className="text-xs text-text-secondary">{subjectName}</p> : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                    <Link
+                        className="inline-flex items-center gap-1.5 rounded-2xl bg-primary-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-600"
+                        href={`/quiz/${quizId}`}
+                    >
+                        <PlayCircleIcon size={14} strokeWidth={1.8} />
+                        Start quiz
+                    </Link>
+                    <Link
+                        className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-primary transition hover:bg-background-subtle"
+                        href={`/quiz/${quizId}`}
+                        target="_blank"
+                    >
+                        View quiz
+                    </Link>
+                </div>
             </div>
         );
     }
