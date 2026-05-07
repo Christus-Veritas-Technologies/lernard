@@ -295,6 +295,7 @@ model Lesson {
   estimatedMinutes Int              @default(10)
   sections         Json             @default("[]")
   sectionChecks    Json             @default("[]")
+  confidenceRating Int?
   completedAt      DateTime?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -320,6 +321,7 @@ model Quiz {
   fromConversationId String?
   currentIndex      Int              @default(0)
   score             Int              @default(0)
+  weakTopics        Json             @default("[]")
   completedAt       DateTime?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
