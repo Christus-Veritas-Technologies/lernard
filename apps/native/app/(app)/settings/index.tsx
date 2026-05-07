@@ -73,10 +73,6 @@ export default function SettingsScreen() {
         );
     }
 
-    if (loading || !settings) {
-        return <RoleFullScreenLoadingOverlay forceVisible />;
-    }
-
     if (error) {
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -87,6 +83,27 @@ export default function SettingsScreen() {
                         description={error.message}
                         onActionPress={refetch}
                         title="Settings could not load right now"
+                        tone="warning"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (loading) {
+        return <RoleFullScreenLoadingOverlay forceVisible />;
+    }
+
+    if (!data?.content || !settings) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        actionTitle="Back to Household"
+                        badge="Settings unavailable"
+                        description="This settings payload is not available for your current role yet."
+                        onActionPress={() => router.push('/guardian')}
+                        title="Could not open settings"
                         tone="warning"
                     />
                 </View>

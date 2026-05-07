@@ -115,7 +115,7 @@ export default function ProfileScreen() {
                         actionTitle={isAuthError ? 'Back to home' : 'Try again'}
                         badge={isAuthError ? 'Sign in required' : 'Profile failed to load'}
                         description={error?.message ?? 'Something interrupted profile loading.'}
-                        onActionPress={isAuthError ? () => router.push('/home') : () => setRequestVersion((v) => v + 1)}
+                        onActionPress={isAuthError ? () => router.push('/(app)/(home)') : () => setRequestVersion((v) => v + 1)}
                         title="Profile unavailable"
                         tone="warning"
                     />

@@ -68,7 +68,7 @@ export default function SubjectDetailScreen() {
                         actionTitle={isAuthError ? 'Back to home' : 'Try again'}
                         badge={isAuthError ? 'Sign in required' : 'Live data failed'}
                         description={error?.message ?? 'Something interrupted the subject request.'}
-                        onActionPress={isAuthError ? () => router.push('/home') : () => setRequestVersion((v) => v + 1)}
+                        onActionPress={isAuthError ? () => router.push('/(app)/(home)') : () => setRequestVersion((v) => v + 1)}
                         title="Subject detail could not load"
                         tone="warning"
                     />

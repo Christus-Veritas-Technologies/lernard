@@ -113,7 +113,7 @@ export default function ChatListScreen() {
                         actionTitle={isAuthError ? 'Back to home' : 'Try again'}
                         badge={isAuthError ? 'Sign in required' : 'Chat failed to load'}
                         description={error?.message ?? 'Something interrupted chat loading.'}
-                        onActionPress={isAuthError ? () => router.push('/home') : () => setRequestVersion((v) => v + 1)}
+                        onActionPress={isAuthError ? () => router.push('/(app)/(home)') : () => setRequestVersion((v) => v + 1)}
                         title="Chat is unavailable right now"
                         tone="warning"
                     />
@@ -133,7 +133,7 @@ export default function ChatListScreen() {
                     </Text>
                     <View className="mt-6 flex-row flex-wrap gap-3">
                         <Button onPress={() => router.push('/learn')} title="Start learning" />
-                        <Button onPress={() => router.push('/home')} title="Back to home" variant="secondary" />
+                        <Button onPress={() => router.push('/(app)/(home)')} title="Back to home" variant="secondary" />
                     </View>
                 </View>
 

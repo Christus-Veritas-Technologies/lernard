@@ -80,7 +80,7 @@ export default function SubjectsScreen() {
                         actionTitle={isAuthError ? 'Back to home' : 'Try again'}
                         badge={isAuthError ? 'Sign in required' : 'Subjects failed to load'}
                         description={error.message}
-                        onActionPress={isAuthError ? () => router.push('/home') : () => setRequestVersion((v) => v + 1)}
+                        onActionPress={isAuthError ? () => router.push('/(app)/(home)') : () => setRequestVersion((v) => v + 1)}
                         title="Subject settings unavailable"
                         tone="warning"
                     />

@@ -46,10 +46,6 @@ export default function CompanionControlsScreen() {
         );
     }
 
-    if (loading || !settings || !data) {
-        return <RoleFullScreenLoadingOverlay forceVisible />;
-    }
-
     if (error) {
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -60,6 +56,27 @@ export default function CompanionControlsScreen() {
                         description={error.message}
                         onActionPress={refetch}
                         title="Companion controls could not load"
+                        tone="warning"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (loading) {
+        return <RoleFullScreenLoadingOverlay forceVisible />;
+    }
+
+    if (!data?.content || !settings) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        actionTitle="Back to settings"
+                        badge="Controls unavailable"
+                        description="Companion controls are not available for your current role."
+                        onActionPress={() => router.push('/settings')}
+                        title="Could not open companion controls"
                         tone="warning"
                     />
                 </View>

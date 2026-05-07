@@ -47,10 +47,6 @@ export default function ModeScreen() {
         );
     }
 
-    if (loading || !settings || !data) {
-        return <RoleFullScreenLoadingOverlay forceVisible />;
-    }
-
     if (error) {
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -61,6 +57,27 @@ export default function ModeScreen() {
                         description={error.message}
                         onActionPress={refetch}
                         title="Mode settings could not load"
+                        tone="warning"
+                    />
+                </View>
+            </SafeAreaView>
+        );
+    }
+
+    if (loading) {
+        return <RoleFullScreenLoadingOverlay forceVisible />;
+    }
+
+    if (!data?.content || !settings) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        actionTitle="Back to settings"
+                        badge="Mode unavailable"
+                        description="Learning mode controls are not available for your current role."
+                        onActionPress={() => router.push('/settings')}
+                        title="Could not open mode"
                         tone="warning"
                     />
                 </View>
