@@ -5,7 +5,15 @@
       "Bash(git commit -m ' *)",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(bun run *)",
-      "Bash(bunx tsc *)"
+      "Bash(bunx tsc *)",
+      "Bash(bun add *)",
+      "Bash(bun install *)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(git push *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\kinzi\\\\Desktop\\\\lernard\" -Directory)",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\kinzi\\\\Desktop\\\\lernard\" -Force)",
+      "Bash(grep -E \"^[^\\(]*$\")"
     ],
     "defaultMode": "auto"
   },

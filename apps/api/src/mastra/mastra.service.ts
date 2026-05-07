@@ -41,6 +41,15 @@ type ClaudeToolResultContent = {
   is_error?: boolean;
 };
 
+interface GeneratedQuizQuestion {
+  type: string;
+  text: string;
+  options?: string[];
+  correctAnswer?: string;
+  correctAnswers?: string[];
+  explanation?: string;
+}
+
 export interface ChatToolExecutor {
   createLesson(input: {
     topic: string;
@@ -187,7 +196,7 @@ export class MastraService {
     questionCount: number;
     subjectName?: string;
     mode: 'guide' | 'companion';
-  }): Promise<{ topic: string; subjectName: string; mode: 'guide' | 'companion'; questions: QuizQuestion[] }> {
+  }): Promise<{ topic: string; subjectName: string; mode: 'guide' | 'companion'; questions: GeneratedQuizQuestion[] }> {
     const fallbackQuestions = buildFallbackQuizQuestions(input.topic, input.questionCount);
 
     if (!this.apiKey) {
@@ -201,24 +210,35 @@ export class MastraService {
 
     return completeWithRetry(async () => {
       const prompt = [
-        'Return JSON only with field questions.',
-        'questions must be array of {type,text,options}.',
-        'type one of: multiple_choice,true_false,fill_blank,short_answer,ordering.',
-        `Topic: ${input.topic}`,
-        `Question count: ${input.questionCount}`,
-        `Subject: ${input.subjectName ?? 'General'}`,
+        `Generate ${input.questionCount} quiz questions about: ${input.topic}`,
+        `Subject area: ${input.subjectName ?? 'General'}`,
+        '',
+        'Rules:',
+        '- Vary question types across: multiple_choice, multiple_select, true_false, fill_blank, short_answer',
+        '- Prefer multiple_choice and true_false; use fill_blank or short_answer for at most 1-2 questions',
+        '- For multiple_choice: provide exactly 4 distinct real answer options; set correctAnswer to the EXACT text of the correct option',
+        '- For multiple_select: provide 4-5 options; set correctAnswers as an array of all correct option texts (2+ correct)',
+        '- For true_false: no options array needed; set correctAnswer to exactly "true" or "false"',
+        '- For fill_blank/short_answer: no options; set correctAnswer to a concise expected answer (1-5 words)',
+        '- Every question must have a one-sentence "explanation" field explaining why the answer is correct',
+        '- Question text must be specific and educational — NEVER write generic text like "Which statement best describes X?"',
+        '- Do NOT number the question text (no "1." prefix)',
+        '',
+        'Return ONLY a JSON object:',
+        '{"questions":[{"type":"...","text":"...","options":["..."],"correctAnswer":"...","correctAnswers":["..."],"explanation":"..."}]}',
       ].join('\n');
 
       const text = await this.completeText({
         model: SONNET_MODEL,
-        maxTokens: 1200,
-        systemPrompt: 'You generate quiz questions as strict JSON.',
+        maxTokens: 4000,
+        systemPrompt:
+          'You are an expert quiz generator. Return ONLY valid JSON with no markdown fences. Generate real, educational quiz questions — not placeholder text.',
         messages: [{ role: 'user', content: prompt }],
       });
 
-      const parsed = safeJsonParse<{ questions?: QuizQuestion[] }>(text);
+      const parsed = safeJsonParse<{ questions?: GeneratedQuizQuestion[] }>(text);
       const questions = Array.isArray(parsed?.questions)
-        ? parsed.questions.slice(0, input.questionCount).map((q) => normalizeQuestion(q))
+        ? parsed.questions.slice(0, input.questionCount).map((q) => normalizeGeneratedQuestion(q))
         : fallbackQuestions;
 
       return {
@@ -534,17 +554,21 @@ function buildFallbackQuizQuestions(topic: string, questionCount: number): QuizQ
   }));
 }
 
-function normalizeQuestion(question: QuizQuestion): QuizQuestion {
+function normalizeGeneratedQuestion(question: GeneratedQuizQuestion): GeneratedQuizQuestion {
   return {
     type: normalizeQuestionType(question.type),
-    text: question.text,
-    options: question.options,
+    text: typeof question.text === 'string' ? question.text.trim() : String(question.text ?? ''),
+    options: Array.isArray(question.options) ? question.options : undefined,
+    correctAnswer: typeof question.correctAnswer === 'string' ? question.correctAnswer : undefined,
+    correctAnswers: Array.isArray(question.correctAnswers) ? question.correctAnswers : undefined,
+    explanation: typeof question.explanation === 'string' ? question.explanation : undefined,
   };
 }
 
-function normalizeQuestionType(type: QuizQuestionType | undefined): QuizQuestionType {
+function normalizeQuestionType(type: string | undefined): QuizQuestionType {
   switch (type) {
     case 'multiple_choice':
+    case 'multiple_select':
     case 'true_false':
     case 'fill_blank':
     case 'short_answer':

@@ -38,7 +38,12 @@ export class QuizzesService {
 
     for (let i = 0; i < generated.questions.length; i++) {
       const question = generated.questions[i];
-      const inferredAnswer = question.options?.[0] ?? 'Model answer';
+
+      // For multiple_select, store the array of correct answers as JSON
+      const correctAnswer =
+        question.type === 'multiple_select'
+          ? JSON.stringify(question.correctAnswers ?? [])
+          : (question.correctAnswer ?? question.options?.[0] ?? 'See explanation');
 
       await (this.prisma as any).quizQuestion.create({
         data: {
@@ -47,8 +52,8 @@ export class QuizzesService {
           type: toDbQuestionType(question.type),
           text: question.text,
           options: question.options ?? null,
-          correctAnswer: inferredAnswer,
-          explanation: 'Review this concept and compare your answer with the expected pattern.',
+          correctAnswer,
+          explanation: question.explanation ?? 'Review this concept and compare your answer with the expected pattern.',
         },
       });
     }
@@ -105,9 +110,7 @@ export class QuizzesService {
     }
 
     const question = quiz.questions[0];
-    const normalizedStudent = dto.answer.trim().toLowerCase();
-    const normalizedCorrect = String(question.correctAnswer).trim().toLowerCase();
-    const isCorrect = normalizedStudent === normalizedCorrect;
+    const isCorrect = checkAnswer(question.type, dto.answer, question.correctAnswer);
 
     await (this.prisma as any).quizAnswer.upsert({
       where: {
