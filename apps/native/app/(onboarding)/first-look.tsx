@@ -7,6 +7,7 @@ import { BookOpen01Icon, CheckmarkCircle02Icon } from 'hugeicons-react-native';
 
 import { Text } from '@rnr/text';
 
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import {
     useNativeFirstLookSkip,
     useNativeFirstLookStart,
@@ -62,15 +63,7 @@ export default function FirstLookScreen() {
 
     // Loading state
     if (startHook.isLoading) {
-        return (
-            <SafeAreaView className="flex-1 items-center justify-center bg-slate-50" edges={['top']}>
-                <View className="gap-4 px-8">
-                    {[0, 1, 2, 3].map((i) => (
-                        <View key={i} className="h-12 w-full animate-pulse rounded-2xl bg-slate-200" />
-                    ))}
-                </View>
-            </SafeAreaView>
-        );
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     // Error or no questions

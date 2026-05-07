@@ -9,6 +9,7 @@ import type { HomeContent } from '@lernard/shared-types';
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import GuardianDashboardScreen from '@/app/(app)/guardian';
 import { usePagePayload } from '@/hooks/usePagePayload';
@@ -84,17 +85,7 @@ export default function HomeScreen() {
     }
 
     if (roleLoading) {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
-                    <StateNotice
-                        badge="Loading"
-                        description="Confirming your account role before loading the correct live dashboard."
-                        title="Preparing Home"
-                    />
-                </View>
-            </SafeAreaView>
-        );
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     if (roleError) {
@@ -147,17 +138,7 @@ function StudentHomeDashboardScreen() {
     }
 
     if (loading) {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
-                    <StateNotice
-                        badge="Loading"
-                        description="Pulling your live dashboard, recent sessions, and subject priorities from the API."
-                        title="Building your dashboard"
-                    />
-                </View>
-            </SafeAreaView>
-        );
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     if (error || !data) {

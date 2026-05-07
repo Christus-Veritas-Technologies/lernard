@@ -2,6 +2,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BookOpen01Icon, ChartBarLineIcon, Message01Icon } from 'hugeicons-react-native';
+
 import { can } from '@lernard/auth-core';
 import { ROUTES } from '@lernard/routes';
 import type { ChildProfileContent } from '@lernard/shared-types';
@@ -9,6 +11,8 @@ import type { ChildProfileContent } from '@lernard/shared-types';
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { GuardianEmptyVisual } from '@/components/guardian/GuardianEmptyVisual';
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { usePagePayload } from '@/hooks/usePagePayload';
 import { formatMinutes, formatPercent, formatRelativeDate } from '@/lib/formatters';
@@ -36,17 +40,7 @@ export default function ChildProfileScreen() {
     }
 
     if (loading) {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
-                    <StateNotice
-                        badge="Loading"
-                        description="Pulling the child's subject progress, recent sessions, and live guardian controls."
-                        title="Building the child snapshot"
-                    />
-                </View>
-            </SafeAreaView>
-        );
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     if (error || !data) {
@@ -102,10 +96,10 @@ export default function ChildProfileScreen() {
                 </View>
 
                 <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <Text className="text-2xl font-semibold text-slate-900">Subject comparison</Text>
-                    <Text className="mt-2 text-base leading-7 text-slate-600">
-                        A quick read on the subjects with enough data to make the next support decision clearer.
-                    </Text>
+                    <View className="flex-row items-center gap-2">
+                        <ChartBarLineIcon color="#0F172A" size={20} strokeWidth={1.8} />
+                        <Text className="text-2xl font-semibold text-slate-900">Subject comparison</Text>
+                    </View>
                     <View className="mt-5 gap-4">
                         {content.progress.length ? content.progress.map((subject) => (
                             <View className="rounded-[28px] bg-slate-50 p-4" key={subject.subjectId}>
@@ -118,15 +112,19 @@ export default function ChildProfileScreen() {
                                 </Text>
                             </View>
                         )) : (
-                            <Text className="text-base leading-7 text-slate-600">
-                                No subject progress is available yet for this child. Once lessons or quizzes are completed, the live Read on You will fill in here.
-                            </Text>
+                            <GuardianEmptyVisual
+                                subtitle="Subject performance cards will appear once work is completed."
+                                title="No subject progress yet"
+                            />
                         )}
                     </View>
                 </View>
 
                 <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <Text className="text-2xl font-semibold text-slate-900">Lernard&apos;s Read on You</Text>
+                    <View className="flex-row items-center gap-2">
+                        <BookOpen01Icon color="#0F172A" size={20} strokeWidth={1.8} />
+                        <Text className="text-2xl font-semibold text-slate-900">Lernard&apos;s Read on You</Text>
+                    </View>
                     <View className="mt-5 gap-4">
                         <View className="rounded-[28px] bg-sky-50 p-4">
                             <Text className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-700">Strongest topic</Text>
@@ -144,10 +142,10 @@ export default function ChildProfileScreen() {
                 </View>
 
                 <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
-                    <Text className="text-2xl font-semibold text-slate-900">Recent sessions</Text>
-                    <Text className="mt-2 text-base leading-7 text-slate-600">
-                        The latest lesson and quiz activity, ready for a quick review.
-                    </Text>
+                    <View className="flex-row items-center gap-2">
+                        <Message01Icon color="#0F172A" size={20} strokeWidth={1.8} />
+                        <Text className="text-2xl font-semibold text-slate-900">Recent sessions</Text>
+                    </View>
                     <View className="mt-5 gap-4">
                         {content.recentSessions.length ? content.recentSessions.map((session) => (
                             <View className="rounded-[28px] bg-slate-50 p-4" key={session.id}>
@@ -162,9 +160,10 @@ export default function ChildProfileScreen() {
                                 </Text>
                             </View>
                         )) : (
-                            <Text className="text-base leading-7 text-slate-600">
-                                No session history is available yet for this child.
-                            </Text>
+                            <GuardianEmptyVisual
+                                subtitle="New lesson and quiz sessions will populate this timeline."
+                                title="No session history yet"
+                            />
                         )}
                     </View>
                 </View>

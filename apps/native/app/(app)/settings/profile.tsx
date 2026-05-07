@@ -10,6 +10,7 @@ import type { UserSettings } from '@lernard/shared-types';
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { capitalize, formatDepthLabel } from '@/lib/formatters';
 import { NativeAuthError, nativeApiFetch } from '@/lib/native-api';
@@ -101,17 +102,7 @@ export default function ProfileScreen() {
     }
 
     if (loading) {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
-                    <StateNotice
-                        badge="Loading"
-                        description="Pulling your account and session preference profile."
-                        title="Loading profile"
-                    />
-                </View>
-            </SafeAreaView>
-        );
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     if (error || !user || !settings) {

@@ -2,6 +2,8 @@ import { useLocalSearchParams } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Settings02Icon } from 'hugeicons-react-native';
+
 import { ROUTES } from '@lernard/routes';
 import type { ChildCompanionContent, CompanionControls } from '@lernard/shared-types';
 import { useEffect, useState } from 'react';
@@ -9,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { ToggleRow } from '@/components/ToggleRow';
 import { usePagePayload } from '@/hooks/usePagePayload';
@@ -51,17 +54,7 @@ export default function ChildCompanionScreen() {
     }
 
     if (loading || !controls || !data) {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
-                    <StateNotice
-                        badge="Loading"
-                        description="Pulling the current support settings for this learner from the live guardian endpoint."
-                        title="Loading companion controls"
-                    />
-                </View>
-            </SafeAreaView>
-        );
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     if (error) {
@@ -96,11 +89,12 @@ export default function ChildCompanionScreen() {
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
             <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
                 <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
-                    <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Companion controls</Text>
+                    <View className="flex-row items-center gap-2">
+                        <Settings02Icon color="#4F46E5" size={18} strokeWidth={1.8} />
+                        <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Companion controls</Text>
+                    </View>
                     <Text className="mt-3 text-3xl font-semibold text-slate-900">Adjust {childName}'s support settings</Text>
-                    <Text className="mt-3 text-base leading-7 text-slate-600">
-                        Tune how much help this learner receives during lessons and quizzes. Use these guardrails when you want support to feel calmer, firmer, or more independent.
-                    </Text>
+                    <Text className="mt-3 text-base leading-7 text-slate-600">Set the right support level for lessons and quizzes.</Text>
                     <View className="mt-5 flex-row flex-wrap gap-2">
                         <View className="rounded-full bg-indigo-100 px-3 py-1">
                             <Text className="text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">
@@ -126,19 +120,19 @@ export default function ChildCompanionScreen() {
                 <View className="gap-4">
                     <ToggleRow
                         checked={controls.showCorrectAnswers}
-                        description="Leave this on when you want quick reassurance after mistakes, or switch it off to keep reflection slower and more deliberate."
+                        description="Reveal answers after mistakes."
                         onCheckedChange={(value) => updateControl('showCorrectAnswers', value)}
                         title="Show correct answers"
                     />
                     <ToggleRow
                         checked={controls.allowHints}
-                        description="Hints give a prompt before the full answer. Good when confidence is low but persistence is still the goal."
+                        description="Allow prompts before full answers."
                         onCheckedChange={(value) => updateControl('allowHints', value)}
                         title="Allow hints"
                     />
                     <ToggleRow
                         checked={controls.allowSkip}
-                        description="Skipping can protect momentum, but locking it keeps learners sitting with the hard parts a little longer."
+                        description="Let the learner skip difficult questions."
                         onCheckedChange={(value) => updateControl('allowSkip', value)}
                         title="Allow skip"
                     />

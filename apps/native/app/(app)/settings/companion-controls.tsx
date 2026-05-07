@@ -9,6 +9,7 @@ import type { CompanionControls, SettingsContent, UserSettings } from '@lernard/
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { ToggleRow } from '@/components/ToggleRow';
 import { usePagePayload } from '@/hooks/usePagePayload';
@@ -46,17 +47,7 @@ export default function CompanionControlsScreen() {
     }
 
     if (loading || !settings || !data) {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
-                    <StateNotice
-                        badge="Loading"
-                        description="Pulling your companion defaults and lock state."
-                        title="Loading companion controls"
-                    />
-                </View>
-            </SafeAreaView>
-        );
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     if (error) {

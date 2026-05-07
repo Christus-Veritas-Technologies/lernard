@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, TextInput, TouchableOpacity, View } from 'react-native';
+import { TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
@@ -9,6 +9,7 @@ import type { QuizContent } from '@lernard/shared-types';
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { nativeApiFetch } from '@/lib/native-api';
 
 interface AnswerResult {
@@ -84,11 +85,7 @@ export default function QuizScreen() {
   }
 
   if (loading) {
-    return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#6366f1" />
-      </SafeAreaView>
-    );
+    return <RoleFullScreenLoadingOverlay forceVisible />;
   }
 
   if (error || !quiz) {

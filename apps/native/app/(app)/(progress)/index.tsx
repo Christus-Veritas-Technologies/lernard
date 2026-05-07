@@ -8,6 +8,7 @@ import type { ProgressContent } from '@lernard/shared-types';
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { usePagePayload } from '@/hooks/usePagePayload';
 import { formatPercent, formatRelativeDate } from '@/lib/formatters';
@@ -34,17 +35,7 @@ export default function ProgressScreen() {
     }
 
     if (loading) {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
-                    <StateNotice
-                        badge="Loading"
-                        description="Pulling your streak, level, subject trends, and session rhythm from live backend data."
-                        title="Building your Read on You"
-                    />
-                </View>
-            </SafeAreaView>
-        );
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     if (error || !data) {

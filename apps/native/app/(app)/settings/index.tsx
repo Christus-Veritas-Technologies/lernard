@@ -24,6 +24,7 @@ import {
 import { Switch } from '@rnr/switch';
 import { Text } from '@rnr/text';
 
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { usePagePayload } from '@/hooks/usePagePayload';
 import { capitalize } from '@/lib/formatters';
@@ -73,17 +74,7 @@ export default function SettingsScreen() {
     }
 
     if (loading || !settings) {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
-                    <StateNotice
-                        badge="Loading"
-                        description="Pulling your settings from the backend."
-                        title="Loading settings"
-                    />
-                </View>
-            </SafeAreaView>
-        );
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     if (error) {

@@ -9,6 +9,7 @@ import type { ConversationListItem } from '@lernard/shared-types';
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { formatRelativeDate } from '@/lib/formatters';
 import { NativeAuthError, nativeApiFetch } from '@/lib/native-api';
@@ -99,17 +100,7 @@ export default function ChatListScreen() {
     }
 
     if (loading) {
-        return (
-            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
-                    <StateNotice
-                        badge="Loading"
-                        description="Pulling your live Lernard conversation history."
-                        title="Building chat"
-                    />
-                </View>
-            </SafeAreaView>
-        );
+        return <RoleFullScreenLoadingOverlay forceVisible />;
     }
 
     if (error || !data) {

@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
@@ -9,6 +9,7 @@ import type { QuizCompletionResult } from '@lernard/shared-types';
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
+import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { nativeApiFetch } from '@/lib/native-api';
 
 export default function QuizResultsScreen() {
@@ -27,12 +28,7 @@ export default function QuizResultsScreen() {
   }, [quizId]);
 
   if (loading) {
-    return (
-      <SafeAreaView className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator size="large" color="#6366f1" />
-        <Text className="mt-3 text-sm text-slate-400">Calculating results…</Text>
-      </SafeAreaView>
-    );
+    return <RoleFullScreenLoadingOverlay forceVisible />;
   }
 
   if (error || !result) {
