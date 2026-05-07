@@ -1,10 +1,9 @@
 import { BadRequestException } from '@nestjs/common'
 import type { ChatAttachmentInput, ChatUploadKind } from '@lernard/shared-types'
 import { randomUUID } from 'node:crypto'
-import { access, mkdir, readFile, writeFile } from 'node:fs/promises'
-import { extname, join } from 'node:path'
+import { extname } from 'node:path'
+import type { R2Service } from '../../r2/r2.service'
 
-const CHAT_UPLOAD_DIRECTORY = join(process.cwd(), '.storage', 'chat-attachments')
 const MIME_KIND_MAP = {
   'application/pdf': 'pdf',
   'image/gif': 'image',
@@ -32,6 +31,7 @@ export interface ChatPromptUpload {
 }
 
 export async function storeChatUpload(
+  r2: R2Service,
   userId: string,
   file: ChatUploadFile | undefined,
 ): Promise<UploadedChatAttachmentInput> {
@@ -48,10 +48,8 @@ export async function storeChatUpload(
     throw new BadRequestException('The uploaded file was empty.')
   }
 
-  await mkdir(resolveChatUploadDirectory(userId), { recursive: true })
-
   const uploadId = `${randomUUID()}${getStoredExtension(file.originalname, file.mimetype)}`
-  await writeFile(resolveChatUploadPath(userId, uploadId), file.buffer)
+  await r2.upload(`chat-attachments/${userId}/${uploadId}`, file.buffer, file.mimetype)
 
   return {
     type: 'upload',
@@ -63,28 +61,22 @@ export async function storeChatUpload(
   }
 }
 
-export async function chatUploadExists(userId: string, uploadId: string): Promise<boolean> {
-  try {
-    await access(resolveChatUploadPath(userId, uploadId))
-    return true
-  } catch {
-    return false
-  }
+export async function chatUploadExists(r2: R2Service, userId: string, uploadId: string): Promise<boolean> {
+  return r2.exists(`chat-attachments/${userId}/${uploadId}`)
 }
 
 export async function readChatPromptUpload(
+  r2: R2Service,
   userId: string,
   attachment: UploadedChatAttachmentInput,
 ): Promise<ChatPromptUpload | null> {
-  if (!(await chatUploadExists(userId, attachment.uploadId))) {
-    return null
-  }
+  const buffer = await r2.getBuffer(`chat-attachments/${userId}/${attachment.uploadId}`)
+  if (!buffer) return null
 
-  const bytes = await readFile(resolveChatUploadPath(userId, attachment.uploadId))
   return {
     kind: attachment.kind,
     mimeType: attachment.mimeType,
-    data: bytes.toString('base64'),
+    data: buffer.toString('base64'),
     fileName: attachment.fileName,
   }
 }
@@ -113,12 +105,4 @@ function getStoredExtension(originalName: string, mimeType: string): string {
     default:
       return '.bin'
   }
-}
-
-function resolveChatUploadDirectory(userId: string): string {
-  return join(CHAT_UPLOAD_DIRECTORY, userId)
-}
-
-function resolveChatUploadPath(userId: string, uploadId: string): string {
-  return join(resolveChatUploadDirectory(userId), uploadId)
 }

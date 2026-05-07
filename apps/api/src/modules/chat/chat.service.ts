@@ -11,6 +11,7 @@ import type { User } from '@prisma/client';
 import { Observable } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MastraService } from '../../mastra/mastra.service';
+import { R2Service } from '../../r2/r2.service';
 import { storeChatUpload, chatUploadExists, readChatPromptUpload } from './chat-uploads';
 import type { ChatPromptUpload, ChatUploadFile } from './chat-uploads';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -20,6 +21,7 @@ export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mastraService: MastraService,
+    private readonly r2: R2Service,
   ) {}
 
   async getConversations(user: User): Promise<ConversationListItem[]> {
@@ -38,7 +40,7 @@ export class ChatService {
   }
 
   async uploadAttachment(user: User, file: ChatUploadFile | undefined) {
-    return storeChatUpload(user.id, file);
+    return storeChatUpload(this.r2, user.id, file);
   }
 
   async getConversation(user: User, conversationId: string): Promise<ChatConversationDetail> {
@@ -113,11 +115,13 @@ export class ChatService {
     });
 
     const historyMessages = buildHistoryMessages(history);
+    const memoryMessage = await this.buildCrossConversationMemoryMessage(user.id, conversation.id);
+    const historyWithMemory = memoryMessage ? [memoryMessage, ...historyMessages] : historyMessages;
     const assistantBlocks: ChatMessageBlock[] = [];
 
     for await (const block of this.mastraService.streamChat({
       message: buildPromptMessage(dto.message, attachments),
-      history: historyMessages,
+      history: historyWithMemory,
       attachments: promptUploads,
     })) {
       assistantBlocks.push(block);
@@ -131,15 +135,12 @@ export class ChatService {
       },
     });
 
-    const lastText = assistantBlocks.find(
-      (block): block is Extract<ChatMessageBlock, { type: 'text' }> => block.type === 'text',
-    );
+    const lastPreview = extractMessagePreview(assistantBlocks);
 
     await (this.prisma as any).conversation.update({
       where: { id: conversation.id },
       data: {
-        lastMessage:
-          typeof lastText?.content === 'string' ? lastText.content.slice(0, 140) : dto.message,
+        lastMessage: lastPreview ? lastPreview.slice(0, 140) : dto.message,
         title: conversation.title === 'New Chat' ? buildConversationTitle(dto.message) : conversation.title,
       },
     });
@@ -183,11 +184,13 @@ export class ChatService {
     });
 
     const historyMessages = buildHistoryMessages(history);
+    const memoryMessage = await this.buildCrossConversationMemoryMessage(user.id, conversation.id);
+    const historyWithMemory = memoryMessage ? [memoryMessage, ...historyMessages] : historyMessages;
     const assistantBlocks: ChatMessageBlock[] = [];
 
     for await (const block of this.mastraService.streamChat({
       message: buildPromptMessage(dto.message, attachments),
-      history: historyMessages,
+      history: historyWithMemory,
       attachments: promptUploads,
     })) {
       assistantBlocks.push(block);
@@ -202,14 +205,12 @@ export class ChatService {
       },
     });
 
-    const lastText = assistantBlocks.find(
-      (block): block is Extract<ChatMessageBlock, { type: 'text' }> => block.type === 'text',
-    );
+    const lastPreview = extractMessagePreview(assistantBlocks);
 
     await (this.prisma as any).conversation.update({
       where: { id: conversation.id },
       data: {
-        lastMessage: typeof lastText?.content === 'string' ? lastText.content.slice(0, 140) : dto.message,
+        lastMessage: lastPreview ? lastPreview.slice(0, 140) : dto.message,
         title: conversation.title === 'New Chat' ? buildConversationTitle(dto.message) : conversation.title,
       },
     });
@@ -264,7 +265,7 @@ export class ChatService {
         continue;
       }
 
-      if (!(await chatUploadExists(user.id, attachment.uploadId))) {
+      if (!(await chatUploadExists(this.r2, user.id, attachment.uploadId))) {
         continue;
       }
 
@@ -287,10 +288,17 @@ export class ChatService {
     );
 
     const promptUploads = await Promise.all(
-      uploads.map((attachment) => readChatPromptUpload(user.id, attachment)),
+      uploads.map((attachment) => readChatPromptUpload(this.r2, user.id, attachment)),
     );
 
     return promptUploads.filter((attachment): attachment is ChatPromptUpload => attachment !== null);
+  }
+
+  private async buildCrossConversationMemoryMessage(
+    _userId: string,
+    _currentConversationId: string,
+  ): Promise<{ role: 'user' | 'assistant'; content: string } | null> {
+    return null;
   }
 }
 
@@ -416,4 +424,14 @@ function formatFileSize(size: number): string {
   }
 
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function extractMessagePreview(blocks: ChatMessageBlock[]): string | null {
+  for (const block of blocks) {
+    if (block.type === 'text' || block.type === 'markdown') {
+      const content = block.content.trim();
+      if (content) return content;
+    }
+  }
+  return null;
 }
