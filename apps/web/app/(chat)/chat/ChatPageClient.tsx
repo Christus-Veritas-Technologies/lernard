@@ -31,7 +31,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/Card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { BrowserApiError, BrowserAuthError, browserApiFetch } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
@@ -257,16 +257,13 @@ export function ChatPageClient() {
     const sidebarBody = (
         <div className="flex h-full flex-col overflow-hidden">
             <div className="space-y-3 border-b border-border/60 p-4 pb-5">
-                <div className="flex items-center justify-between gap-2">
-                    <Link
-                        className="inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-background-subtle hover:text-text-primary"
-                        href="/home"
-                    >
-                        <ArrowLeft01Icon size={14} strokeWidth={2} />
-                        Back to home
-                    </Link>
-                    <SheetClose className="xl:hidden inline-flex h-8 w-8 items-center justify-center rounded-xl text-text-secondary transition hover:bg-background-subtle hover:text-text-primary focus:outline-none" />
-                </div>
+                <Link
+                    className="inline-flex items-center gap-1.5 self-start rounded-xl px-2 py-1.5 text-xs font-medium text-text-secondary transition hover:bg-background-subtle hover:text-text-primary"
+                    href="/home"
+                >
+                    <ArrowLeft01Icon size={14} strokeWidth={2} />
+                    Back to home
+                </Link>
 
                 <div>
                     <Badge className="gap-2 mb-2" tone="cool">
