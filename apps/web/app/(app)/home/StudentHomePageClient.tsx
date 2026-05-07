@@ -90,9 +90,9 @@ export function StudentHomePageClient() {
                             Your dashboard is built around momentum first: quick progress reads, subject health, and fast actions into lessons, quizzes, and chat.
                         </p>
                         <div className="flex flex-wrap gap-2">
-                            <Badge className="bg-emerald-300/16 text-white" tone="muted">{content.streak}-day streak</Badge>
+                            <Badge className="bg-emerald-100 text-emerald-900" tone="muted">{content.streak}-day streak</Badge>
                             <Badge className="bg-white/14 text-white" tone="muted">XP level {content.xpLevel}</Badge>
-                            <Badge className="bg-amber-300/18 text-white" tone="muted">Pass rate {content.passRate}%</Badge>
+                            <Badge className="bg-amber-100 text-amber-900" tone="muted">Pass rate {content.passRate}%</Badge>
                         </div>
                         <div className="flex flex-wrap gap-2 pt-2">
                             <Link href="/learn">

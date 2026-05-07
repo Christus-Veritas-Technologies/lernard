@@ -87,8 +87,8 @@ export function StudentSettingsPageClient({ content, permissions }: StudentSetti
                         </p>
                         <div className="flex flex-wrap gap-2">
                             <Badge className="bg-white/14 text-white" tone="muted">{formatTokenLabel(content.viewer.plan)}</Badge>
-                            <Badge className="bg-emerald-300/16 text-white" tone="muted">{formatSessionsLabel(settings.dailyGoal)} daily goal</Badge>
-                            <Badge className="bg-amber-300/18 text-white" tone="muted">{formatTokenLabel(settings.learningMode)} mode</Badge>
+                            <Badge className="bg-emerald-100 text-emerald-900" tone="muted">{formatSessionsLabel(settings.dailyGoal)} daily goal</Badge>
+                            <Badge className="bg-amber-100 text-amber-900" tone="muted">{formatTokenLabel(settings.learningMode)} mode</Badge>
                         </div>
                     </div>
 

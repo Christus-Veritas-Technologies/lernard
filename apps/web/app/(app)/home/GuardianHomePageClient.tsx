@@ -101,11 +101,11 @@ export function GuardianHomePageClient() {
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 <Badge className="bg-white/14 text-white" tone="muted">{content.summary.childrenCount} linked students</Badge>
-                                <Badge className="bg-emerald-300/16 text-white" tone="muted">{content.summary.activeThisWeek} active this week</Badge>
-                                <Badge className="bg-amber-300/18 text-white" tone="muted">{content.summary.pendingInvites} pending invites</Badge>
+                                <Badge className="bg-emerald-100 text-emerald-900" tone="muted">{content.summary.activeThisWeek} active this week</Badge>
+                                <Badge className="bg-amber-100 text-amber-900" tone="muted">{content.summary.pendingInvites} pending invites</Badge>
                             </div>
                             <div className="flex flex-wrap gap-2 pt-2">
-                                <Button className="bg-white text-sky-800 hover:bg-white/92" onClick={() => router.push("/guardian")}>
+                                <Button className="bg-white text-slate-900 hover:bg-slate-100" onClick={() => router.push("/guardian")}>
                                     Open guardian hub
                                     <ArrowRight02Icon size={16} strokeWidth={1.8} />
                                 </Button>

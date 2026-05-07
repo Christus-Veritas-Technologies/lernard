@@ -96,12 +96,12 @@ export function GuardianSettingsPageClient({ content, permissions }: GuardianSet
                             </p>
                             <div className="flex flex-wrap gap-2">
                                 <Badge className="bg-white/14 text-white" tone="muted">{formatTokenLabel(content.viewer.plan)}</Badge>
-                                <Badge className="bg-emerald-300/16 text-white" tone="muted">{children.length} linked children</Badge>
-                                <Badge className="bg-amber-300/18 text-white" tone="muted">{activeThisWeek} active this week</Badge>
+                                <Badge className="bg-emerald-100 text-emerald-900" tone="muted">{children.length} linked children</Badge>
+                                <Badge className="bg-amber-100 text-amber-900" tone="muted">{activeThisWeek} active this week</Badge>
                             </div>
                             <div className="flex flex-wrap gap-3 pt-2">
                                 <Link href="/guardian">
-                                    <Button className="bg-white text-sky-800 hover:bg-white/92">
+                                    <Button className="bg-white text-slate-900 hover:bg-slate-100">
                                         Open household hub
                                         <ArrowRight02Icon size={16} strokeWidth={1.8} />
                                     </Button>

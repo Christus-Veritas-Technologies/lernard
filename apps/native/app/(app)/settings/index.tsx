@@ -257,8 +257,8 @@ export default function SettingsScreen() {
 
 function SectionHeader({ title }: { title: string }) {
     return (
-        <Text className="px-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            {title}
+        <Text className="px-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-600">
+                {title}
         </Text>
     );
 }

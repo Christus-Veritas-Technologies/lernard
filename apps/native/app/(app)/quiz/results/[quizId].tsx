@@ -78,7 +78,7 @@ export default function QuizResultsScreen() {
               {q.correctAnswer ? (
                 <Text className="text-xs text-slate-500">Correct: {q.correctAnswer}</Text>
               ) : null}
-              <Text className="mt-1 text-xs text-slate-400">{q.explanation}</Text>
+              <Text className="mt-1 text-xs text-slate-600">{q.explanation}</Text>
             </View>
           ))}
         </View>

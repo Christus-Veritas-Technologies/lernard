@@ -66,7 +66,7 @@ export default function LessonReaderScreen() {
         <View className="rounded-full bg-indigo-100 px-3 py-1">
           <Text className="text-xs font-semibold text-indigo-700">{content.subjectName}</Text>
         </View>
-        <Text className="text-xs text-slate-400">~{content.estimatedMinutes} min</Text>
+        <Text className="text-xs text-slate-500">~{content.estimatedMinutes} min</Text>
       </View>
 
       {/* Lesson title */}
@@ -112,7 +112,7 @@ export default function LessonReaderScreen() {
           title="I'm done — Quiz me on this"
         />
         <TouchableOpacity className="mt-3 items-center" onPress={() => router.replace('/')}>
-          <Text className="text-sm text-slate-400">Back to home</Text>
+          <Text className="text-sm text-slate-600">Back to home</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

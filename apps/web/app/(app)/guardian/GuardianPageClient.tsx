@@ -200,11 +200,11 @@ export function GuardianPageClient() {
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                     <Badge className="bg-white/14 text-white" tone="muted">{dashboard.summary.childrenCount} linked children</Badge>
-                                    <Badge className="bg-emerald-300/16 text-white" tone="muted">{dashboard.summary.activeThisWeek} active this week</Badge>
-                                    <Badge className="bg-amber-300/18 text-white" tone="muted">Average streak {dashboard.summary.averageStreak} days</Badge>
+                                    <Badge className="bg-emerald-100 text-emerald-900" tone="muted">{dashboard.summary.activeThisWeek} active this week</Badge>
+                                    <Badge className="bg-amber-100 text-amber-900" tone="muted">Average streak {dashboard.summary.averageStreak} days</Badge>
                                 </div>
                                 <div className="flex flex-wrap gap-2 pt-2">
-                                    <Button className="bg-white text-sky-800 hover:bg-white/92" onClick={() => setInviteDialogOpen(true)}>
+                                    <Button className="bg-white text-slate-900 hover:bg-slate-100" onClick={() => setInviteDialogOpen(true)}>
                                         Invite child
                                         <ArrowRight02Icon size={16} strokeWidth={1.8} />
                                     </Button>

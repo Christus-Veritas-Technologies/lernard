@@ -110,7 +110,7 @@ export default function QuizScreen() {
             </Text>
           </View>
           <TouchableOpacity onPress={() => router.replace('/')}>
-            <Text className="text-sm text-slate-400">Exit</Text>
+            <Text className="text-sm text-slate-600">Exit</Text>
           </TouchableOpacity>
         </View>
         {/* Progress bar */}
@@ -143,7 +143,7 @@ export default function QuizScreen() {
         {/* Multiple select — checkboxes */}
         {quiz.question.type === 'multiple_select' && quiz.question.options ? (
           <View className="space-y-2">
-            <Text className="mb-1 text-xs text-slate-400">Select all that apply</Text>
+            <Text className="mb-1 text-xs text-slate-600">Select all that apply</Text>
             {quiz.question.options.map((option) => {
               const checked = selectedOptions.includes(option);
               return (
