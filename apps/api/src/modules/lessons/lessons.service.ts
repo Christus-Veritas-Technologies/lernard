@@ -189,6 +189,70 @@ export class LessonsService {
     return { ok: true };
   }
 
+  async reexplainSection(
+    user: User,
+    lessonId: string,
+    sectionIndex: number,
+  ): Promise<{ sectionIndex: number; section: LessonContent['sections'][number] }> {
+    const lesson = await (this.prisma as any).lesson.findFirst({
+      where: { id: lessonId, userId: user.id },
+      select: {
+        id: true,
+        topic: true,
+        subjectName: true,
+        depth: true,
+        sections: true,
+      },
+    });
+
+    if (!lesson) {
+      throw new NotFoundException('Lesson not found');
+    }
+
+    const sections = Array.isArray(lesson.sections)
+      ? (lesson.sections as LessonContent['sections'])
+      : [];
+
+    if (sectionIndex < 0 || sectionIndex >= sections.length) {
+      throw new NotFoundException('Section not found');
+    }
+
+    const section = sections[sectionIndex];
+    const studentContext = await this.studentContextBuilder.buildForUser(
+      user.id,
+    );
+
+    const replacementBody = await this.mastraService.reexplainLessonSection({
+      topic: lesson.topic,
+      subjectName: lesson.subjectName ?? 'General',
+      depth: normalizeDepth(lesson.depth),
+      sectionType: section.type,
+      sectionHeading: section.heading,
+      originalBody: section.body,
+      studentContext,
+    });
+
+    const updatedSections = sections.map((item, idx) =>
+      idx === sectionIndex
+        ? {
+            ...item,
+            body: replacementBody,
+            heading: item.heading ?? 'Another way to look at it',
+          }
+        : item,
+    );
+
+    await (this.prisma as any).lesson.update({
+      where: { id: lessonId },
+      data: { sections: updatedSections },
+    });
+
+    return {
+      sectionIndex,
+      section: updatedSections[sectionIndex],
+    };
+  }
+
   async complete(
     user: User,
     lessonId: string,

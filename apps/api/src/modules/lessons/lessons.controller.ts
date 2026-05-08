@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
@@ -48,6 +57,16 @@ export class LessonsController {
     @Body() dto: SectionCheckDto,
   ) {
     return this.lessonsService.sectionCheck(user, lessonId, dto);
+  }
+
+  @ProtectedRoute()
+  @Post(':lessonId/reexplain')
+  async reexplainSection(
+    @CurrentUser() user: User,
+    @Param('lessonId') lessonId: string,
+    @Query('sectionIndex', ParseIntPipe) sectionIndex: number,
+  ) {
+    return this.lessonsService.reexplainSection(user, lessonId, sectionIndex);
   }
 
   @ProtectedRoute()

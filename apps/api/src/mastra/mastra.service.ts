@@ -300,6 +300,72 @@ export class MastraService {
     });
   }
 
+  async reexplainLessonSection(input: {
+    topic: string;
+    subjectName: string;
+    depth: 'quick' | 'standard' | 'deep';
+    sectionType: 'hook' | 'concept' | 'examples' | 'recap';
+    sectionHeading: string | null;
+    originalBody: string;
+    studentContext: StudentContext;
+  }): Promise<string> {
+    if (this.devMode) {
+      return [
+        `Another way to approach **${input.topic}** is to start from a concrete scenario and build upward from there.`,
+        '',
+        '1. Identify the key objects and values involved.',
+        '2. Describe how each value changes from one step to the next.',
+        '3. Check the result against a quick reality check so it makes intuitive sense.',
+        '',
+        'If this clicks better, keep this sequence as your default method and apply it to one fresh example.',
+      ].join('\n');
+    }
+
+    const systemPrompt = buildSystemPrompt(input.studentContext, {
+      kind: 'lesson',
+      topic: input.topic,
+      subjectName: input.subjectName,
+      depth: input.depth,
+    });
+
+    const userPrompt = [
+      `Rewrite one lesson section for ${input.studentContext.name} using a different teaching approach.`,
+      `Topic: ${input.topic}`,
+      `Subject: ${input.subjectName}`,
+      `Section type: ${input.sectionType}`,
+      `Current heading: ${input.sectionHeading ?? '(none)'}`,
+      '',
+      'Original section body:',
+      input.originalBody,
+      '',
+      'Requirements:',
+      '- Keep the same underlying concept, but use a different analogy, example, and explanation path.',
+      '- Write in markdown only (no JSON).',
+      '- Use short paragraphs and concrete detail specific to the topic.',
+      '- Use bullet points or numbered steps when structure helps.',
+      '- For code snippets, always use fenced code blocks with language names.',
+      '- Do not mention that this is a rewrite or alternative.',
+      '',
+      'Return only the new section body markdown text.',
+    ].join('\n');
+
+    return this.runWithRetry(async () => {
+      const text = await this.completeText({
+        model: SONNET_MODEL,
+        maxTokens: 1600,
+        systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+
+      const body = text.trim();
+      if (!body) {
+        throw new ContentValidationError('Reexplain returned empty text');
+      }
+
+      return body;
+    });
+  }
+
   async *streamChat(input: {
     message: string;
     history: ClaudeMessage[];
@@ -743,13 +809,25 @@ function buildFallbackLesson(
       {
         type: 'hook',
         heading: 'Why this matters',
-        body: `Understanding ${topic} is a valuable skill that opens up new ways of thinking and solving problems. When you grasp the core ideas behind ${topic}, you gain the ability to connect concepts across different subjects and apply your knowledge in practical, real-world situations. Many learners find that mastering ${topic} builds confidence and makes related topics easier to approach.`,
+        body: `When ${topic} clicks, everyday tasks become easier because you can explain what is happening instead of guessing. This matters in school, in exams, and in practical work where decisions depend on clear reasoning. By the end of this lesson, you should be able to describe ${topic} in plain language, spot it in a real scenario, and apply it step by step with confidence.`,
         terms: [],
       },
       {
         type: 'concept',
         heading: `Core idea of ${topic}`,
-        body: `${topic} can be understood by breaking it into smaller, manageable steps and recognising the patterns that appear throughout. The key is to focus on the underlying principles rather than trying to memorise every detail. Once you understand why things work the way they do in ${topic}, the specific facts and procedures start to make much more sense and become easier to remember.`,
+        body: `A **${topic}** model explains a specific mechanism, not a vague idea.
+
+Every strong explanation includes:
+- **Definition**: what ${topic} means in this subject.
+- **Mechanism**: what changes first, what changes next, and why.
+- **Constraint**: when the rule no longer applies.
+
+### Practical reading strategy
+1. Identify the main variables or entities.
+2. Track how one variable affects another.
+3. Test the result against one concrete scenario with real values.
+
+Use this sequence each time and your answers stay precise, testable, and easier to revise later.`,
         terms: [
           {
             term: topic,
@@ -760,13 +838,35 @@ function buildFallbackLesson(
       {
         type: 'examples',
         heading: 'Worked example',
-        body: `Consider a simple, concrete case involving ${topic}. Start with a straightforward scenario: identify the key components, apply the relevant rule or method from step 1 through to the final answer, and check that the result makes sense. For instance, if ${topic} involves a process, trace through that process with specific values like 10, 25, or 100 to see the pattern in action. Practising with at least two or three examples like this will solidify your understanding.`,
+        body: `**Step 1 — Define values**
+Use explicit values so each operation can be checked.
+
+\`\`\`text
+inputA = 10
+inputB = 25
+inputC = 100
+\`\`\`
+
+**Step 2 — Apply the rule for ${topic}**
+Run the core transformation in order, without skipping intermediate states.
+
+\`\`\`text
+intermediate = rule(inputA, inputB)
+finalResult = combine(intermediate, inputC)
+\`\`\`
+
+**Step 3 — Validate the result**
+Check whether the final value matches the expected direction and scale. If it does not, inspect each intermediate step and verify units, assumptions, and signs.`,
         terms: [],
       },
       {
         type: 'recap',
         heading: 'Quick recap',
-        body: `In this lesson you explored what ${topic} is and why it matters, identified the core principles that make it work, and saw how to apply those principles in a worked example. The most important takeaway is that ${topic} follows consistent patterns you can rely on. In your next session, try applying what you learned here to a new problem or a slightly different context to reinforce your understanding.`,
+        body: `- ${topic} has a clear definition, a mechanism, and a limit where the rule stops working.
+- You can solve ${topic} questions by identifying variables, applying the rule in sequence, and validating the output.
+- Concrete values (like 10, 25, and 100) make each step auditable and easier to debug.
+- Intermediate states are essential evidence; skipping them increases mistakes and weakens explanations.
+- A strong final answer states both the result and the reason the result is logically consistent with the model.`,
         terms: [],
       },
     ],
