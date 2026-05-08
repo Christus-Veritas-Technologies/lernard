@@ -44,7 +44,11 @@ export const ROUTES = {
     SUBJECTS: '/v1/progress/subjects',
     SUBJECT: (subjectId: string) => `/v1/progress/subjects/${subjectId}` as const,
     GROWTH_AREAS: '/v1/progress/growth-areas',
+    DISMISS_GROWTH_AREA: (subjectId: string, topic: string) =>
+      `/v1/progress/growth-areas/${encodeURIComponent(subjectId)}/${encodeURIComponent(topic)}` as const,
     HISTORY: '/v1/progress/history',
+    SUMMARY: '/v1/progress/summary',
+    RESET: '/v1/progress/reset',
   },
 
   LESSONS: {
@@ -79,11 +83,18 @@ export const ROUTES = {
     APPEARANCE: '/v1/settings/appearance',
     DAILY_GOAL: '/v1/settings/daily-goal',
     AVATAR_UPLOAD: '/v1/settings/avatar',
+    PROFILE: '/v1/settings/profile',
+    STUDY: '/v1/settings/study',
+    NOTIFICATIONS: '/v1/settings/notifications',
+    UNLINK_GUARDIAN: '/v1/settings/unlink-guardian',
+    DELETE_ACCOUNT: '/v1/settings/account',
   },
 
   GUARDIAN: {
     CHILDREN: '/v1/guardian/children',
     DASHBOARD_PAYLOAD: '/v1/guardian/children/payload',
+    SETTINGS_PROFILE: '/v1/guardian/settings/profile',
+    SETTINGS_NOTIFICATIONS: '/v1/guardian/settings/notifications',
     INVITE: '/v1/guardian/children/invite',
     ACCEPT_INVITE: '/v1/guardian/children/accept-invite',
     DECLINE_INVITE: '/v1/guardian/children/decline-invite',

@@ -1,4 +1,5 @@
 import type { UserSubject } from '../entities/user'
+import type { PlanUsage } from './progress'
 
 export interface HomeContent {
   greeting: string
@@ -16,6 +17,7 @@ export interface HomeContent {
   subjectTopics: SubjectTopicBreakdown[]
   recentActivity: DayActivity[]
   recentSessions: RecentSession[]
+  planUsage: PlanUsage
 }
 
 export interface DayActivity {

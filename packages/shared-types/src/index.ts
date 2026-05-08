@@ -13,7 +13,7 @@ export {
 // Entities
 export type { User, Student, Guardian, GuestUser, GuardianChild, UserSubject } from './entities/user'
 export type { SubjectProgress, TopicStrength, SkillEntry } from './entities/progress'
-export type { UserSettings, CompanionControls } from './entities/settings'
+export type { UserSettings, CompanionControls, StudentProfileFields, GuardianProfileSettings } from './entities/settings'
 
 // Contracts
 export type {
@@ -38,10 +38,15 @@ export type {
   SubjectDetailContent,
   HistorySessionItem,
   PaginatedHistoryResponse,
+  GrowthAreaItem,
+  PlanUsage,
+  ProgressSummary,
+  PlanLimitError,
 } from './payloads/progress'
 export type {
   SettingsContent,
   SettingsViewerSummary,
+  GuardianViewerSummary,
   GuardianManagedChildSettings,
   StudentSettingsContent,
   GuardianSettingsContent,
