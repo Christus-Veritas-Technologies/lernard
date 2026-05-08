@@ -69,6 +69,9 @@ interface GeneratedQuizQuestion {
   correctAnswers?: string[];
   explanation?: string;
   subtopic?: string;
+  // Structured questions
+  parts?: unknown[];
+  totalMarks?: number;
 }
 
 interface LessonSectionInput {
@@ -242,6 +245,7 @@ export class MastraService {
     questionCount: number;
     subjectName?: string;
     mode: 'guide' | 'companion';
+    style?: 'standard' | 'zimsec';
     studentContext: StudentContext;
     lessonSections?: LessonSectionInput[];
     confidenceRating?: number | null;
@@ -272,6 +276,7 @@ export class MastraService {
       subjectName: input.subjectName,
       questionCount: input.questionCount,
       mode: input.mode,
+      style: input.style,
       lessonSections: input.lessonSections,
       confidenceRating: input.confidenceRating,
     });
@@ -279,7 +284,7 @@ export class MastraService {
     return this.runWithRetry(async () => {
       const text = await this.completeText({
         model: SONNET_MODEL,
-        maxTokens: quizMaxTokens(input.questionCount),
+        maxTokens: quizMaxTokens(input.questionCount, input.style),
         systemPrompt,
         messages: [{ role: 'user', content: userPrompt }],
       });
@@ -336,6 +341,7 @@ export class MastraService {
     mimeType: string;
     questionCount: number;
     mode: 'guide' | 'companion';
+    style?: 'standard' | 'zimsec';
     studentContext: StudentContext;
   }): Promise<{
     topic: string;
@@ -392,7 +398,7 @@ export class MastraService {
     return this.runWithRetry(async () => {
       const text = await this.completeText({
         model: SONNET_MODEL,
-        maxTokens: quizMaxTokens(input.questionCount),
+        maxTokens: quizMaxTokens(input.questionCount, input.style),
         systemPrompt,
         messages: [{ role: 'user', content: [fileBlock, textBlock] }],
       });
@@ -484,6 +490,65 @@ export class MastraService {
     }
     return {
       result: 'incorrect',
+      feedback: 'Unable to evaluate — please compare your answer with the model answer.',
+    };
+  }
+
+  async evaluateStructuredPart(input: {
+    stem: string;
+    partText: string;
+    command: string;
+    marks: number;
+    markingPoints: string[];
+    modelAnswer: string;
+    studentAnswer: string;
+    studentContext: Pick<StudentContext, 'name' | 'grade' | 'ageGroup'>;
+  }): Promise<{ marksEarned: number; feedback: string }> {
+    const level = input.studentContext.grade ?? input.studentContext.ageGroup ?? 'student';
+    const userMessage = [
+      `You are a ZIMSEC examiner marking a structured question sub-part.`,
+      ``,
+      `Context (stem): ${input.stem}`,
+      `Sub-question: ${input.partText}`,
+      `Command word: ${input.command}`,
+      `Available marks: ${input.marks}`,
+      ``,
+      `Marking scheme:`,
+      input.markingPoints.map((mp, i) => `  ${i + 1}. ${mp}`).join('\n'),
+      ``,
+      `Model answer: ${input.modelAnswer}`,
+      ``,
+      `Student answer: ${input.studentAnswer}`,
+      `Student level: ${level}`,
+      ``,
+      `Award marks strictly according to the marking scheme.`,
+      `Each marking point is worth one mark. Award partial credit for partially correct answers.`,
+      `Maximum marks to award: ${input.marks}`,
+      ``,
+      `Return ONLY valid JSON:`,
+      `{"marksEarned":<integer 0–${input.marks}>,"feedback":"one sentence telling the student specifically what they earned or missed — reference the marking scheme"}`,
+    ].join('\n');
+
+    try {
+      const text = await this.completeText({
+        model: HAIKU_MODEL,
+        maxTokens: 300,
+        systemPrompt: 'You are a ZIMSEC examiner. Award marks accurately from marking schemes. Return ONLY valid JSON.',
+        messages: [{ role: 'user', content: userMessage }],
+      });
+      const parsed = safeJsonParse<{ marksEarned?: number; feedback?: string }>(text);
+      if (typeof parsed?.marksEarned === 'number') {
+        const marksEarned = Math.min(
+          Math.max(Math.round(parsed.marksEarned), 0),
+          input.marks,
+        );
+        return { marksEarned, feedback: parsed?.feedback ?? '' };
+      }
+    } catch {
+      // fall through to default
+    }
+    return {
+      marksEarned: 0,
       feedback: 'Unable to evaluate — please compare your answer with the model answer.',
     };
   }
@@ -970,10 +1035,12 @@ function lessonMaxTokens(depth: 'quick' | 'standard' | 'deep'): number {
   return 3500;
 }
 
-function quizMaxTokens(questionCount: number): number {
-  if (questionCount >= 15) return 6000;
-  if (questionCount >= 10) return 4500;
-  return 2500;
+function quizMaxTokens(questionCount: number, style?: 'standard' | 'zimsec'): number {
+  // ZIMSEC structured questions are much more verbose (parts, marking points, model answers)
+  const multiplier = style === 'zimsec' ? 2.5 : 1;
+  if (questionCount >= 15) return Math.round(6000 * multiplier);
+  if (questionCount >= 10) return Math.round(4500 * multiplier);
+  return Math.round(2500 * multiplier);
 }
 
 function isResponseTruncated(text: string): boolean {
@@ -1214,6 +1281,10 @@ function normalizeGeneratedQuestion(
       typeof question.subtopic === 'string'
         ? question.subtopic.trim()
         : undefined,
+    // Preserve parts for structured questions
+    ...(question.type === 'structured' && Array.isArray(question.parts)
+      ? { parts: question.parts, totalMarks: question.totalMarks ?? 0, correctAnswer: 'structured' }
+      : {}),
   };
 }
 
@@ -1263,6 +1334,10 @@ function isUsableGeneratedQuestion(question: GeneratedQuizQuestion): boolean {
     case 'short_answer':
     case 'ordering': {
       return Boolean(question.correctAnswer);
+    }
+    case 'structured': {
+      // Validation is handled by assertQuizContentValid — basic usability check here
+      return Boolean(question.text) && Array.isArray(question.parts) && (question.parts as unknown[]).length > 0;
     }
     default:
       return false;
@@ -1343,6 +1418,7 @@ function normalizeQuestionType(type: string | undefined): QuizQuestionType {
     case 'fill_blank':
     case 'short_answer':
     case 'ordering':
+    case 'structured':
       return type;
     default:
       return 'multiple_choice';
