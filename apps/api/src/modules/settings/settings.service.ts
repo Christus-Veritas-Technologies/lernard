@@ -300,208 +300,6 @@ export class SettingsService {
         deletedAt: null,
       },
       select: {
-        async updateProfile(
-          userId: string,
-          dto: {
-            name?: string;
-            ageGroup?: string | null;
-            grade?: string | null;
-            timezone?: string;
-            learningGoal?: string | null;
-          },
-        ): Promise<UserSettings> {
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-              ...(dto.name !== undefined && { name: dto.name }),
-              ...(dto.ageGroup !== undefined && { ageGroup: dto.ageGroup as any }),
-              ...(dto.grade !== undefined && { grade: dto.grade }),
-              ...(dto.timezone !== undefined && { timezone: dto.timezone }),
-              ...(dto.learningGoal !== undefined && { learningGoal: dto.learningGoal as any }),
-            },
-          });
-          return this.get(userId);
-        }
-
-        async updateStudy(
-          userId: string,
-          dto: {
-            learningMode?: 'guide' | 'companion';
-            answerRevealTiming?: 'after_quiz' | 'immediate';
-            quizPassThreshold?: number;
-            sessionLength?: number;
-            preferredDepth?: string;
-            dailyGoal?: number;
-            supportLevel?: 'minimal' | 'moderate' | 'full';
-          },
-        ): Promise<{ settings: UserSettings; lockedFields: string[] }> {
-          const userRecord = await this.prisma.user.findUniqueOrThrow({
-            where: { id: userId },
-            select: { lockedSettings: true },
-          });
-          const lockedSettings = userRecord.lockedSettings;
-          const lockedFields: string[] = [];
-
-          if (dto.learningMode !== undefined && lockedSettings.includes('mode')) {
-            lockedFields.push('learningMode');
-          }
-          if (
-            (dto.answerRevealTiming !== undefined || dto.quizPassThreshold !== undefined) &&
-            lockedSettings.includes('companion-controls')
-          ) {
-            lockedFields.push('answerRevealTiming', 'quizPassThreshold');
-          }
-
-          if (lockedFields.length > 0) {
-            throw new ForbiddenException({ lockedFields });
-          }
-
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-              ...(dto.learningMode !== undefined && {
-                learningMode: toPrismaLearningMode(dto.learningMode),
-              }),
-              ...(dto.sessionLength !== undefined && { sessionLength: dto.sessionLength }),
-              ...(dto.preferredDepth !== undefined && { preferredDepth: dto.preferredDepth }),
-              ...(dto.dailyGoal !== undefined && { dailyGoal: dto.dailyGoal }),
-              ...(dto.supportLevel !== undefined && { supportLevel: dto.supportLevel }),
-            },
-          });
-
-          // Update companion controls separately if provided
-          if (dto.answerRevealTiming !== undefined || dto.quizPassThreshold !== undefined) {
-            const user = await this.prisma.user.findUniqueOrThrow({
-              where: { id: userId },
-              select: { name: true, controlledByGuardianId: true },
-            });
-            await (this.prisma.companionControls as any).upsert({
-              where: { studentId: userId },
-              update: {
-                ...(dto.answerRevealTiming !== undefined && {
-                  answerRevealTiming: dto.answerRevealTiming,
-                }),
-                ...(dto.quizPassThreshold !== undefined && {
-                  quizPassThreshold: dto.quizPassThreshold,
-                }),
-                lastChangedBy: user.name,
-              },
-              create: {
-                studentId: userId,
-                answerRevealTiming: dto.answerRevealTiming ?? 'after_quiz',
-                quizPassThreshold: dto.quizPassThreshold ?? 0.7,
-                lockedByGuardian: Boolean(user.controlledByGuardianId),
-                lastChangedBy: user.name,
-              },
-            });
-          }
-
-          return { settings: await this.get(userId), lockedFields: [] };
-        }
-
-        async updateNotifications(
-          userId: string,
-          dto: {
-            reminderEnabled?: boolean;
-            reminderTime?: string;
-            streakAlertEnabled?: boolean;
-            growthAreaNudgeEnabled?: boolean;
-            growthAreaNudgeFrequency?: string;
-            planLimitAlertEnabled?: boolean;
-            weeklyEmailEnabled?: boolean;
-          },
-        ): Promise<UserSettings> {
-          const userRecord = await this.prisma.user.findUniqueOrThrow({
-            where: { id: userId },
-            select: { plan: true },
-          });
-          const userPlan = userRecord.plan;
-          const data: Record<string, unknown> = {};
-
-          if (dto.reminderEnabled !== undefined) data.reminderEnabled = dto.reminderEnabled;
-          if (dto.reminderTime !== undefined) data.reminderTime = dto.reminderTime;
-          if (dto.streakAlertEnabled !== undefined) data.streakAlertEnabled = dto.streakAlertEnabled;
-          if (dto.growthAreaNudgeEnabled !== undefined) data.growthAreaNudgeEnabled = dto.growthAreaNudgeEnabled;
-          if (dto.growthAreaNudgeFrequency !== undefined) data.growthAreaNudgeFrequency = dto.growthAreaNudgeFrequency;
-          // Explorer cannot turn off plan limit alerts
-          if (dto.planLimitAlertEnabled !== undefined && userPlan !== 'EXPLORER') {
-            data.planLimitAlertEnabled = dto.planLimitAlertEnabled;
-          }
-          if (dto.weeklyEmailEnabled !== undefined) data.weeklyEmailEnabled = dto.weeklyEmailEnabled;
-
-          await this.prisma.user.update({ where: { id: userId }, data });
-          return this.get(userId);
-        }
-
-        async unlinkGuardian(
-          userId: string,
-          studentPassword: string,
-        ): Promise<{ message: string }> {
-          const user = await this.prisma.user.findUniqueOrThrow({
-            where: { id: userId },
-            select: { passwordHash: true, controlledByGuardianId: true },
-          });
-
-          if (!user.controlledByGuardianId) {
-            throw new BadRequestException('No linked guardian found.');
-          }
-
-          if (!user.passwordHash) {
-            throw new BadRequestException(
-              'Your account uses social login. You cannot unlink with a password.',
-            );
-          }
-
-          const bcrypt = await import('bcrypt');
-          const valid = await bcrypt.compare(studentPassword, user.passwordHash);
-          if (!valid) {
-            throw new UnauthorizedException('Incorrect password.');
-          }
-
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: {
-              controlledByGuardianId: null,
-              lockedSettings: [],
-            },
-          });
-
-          return { message: 'Guardian unlinked.' };
-        }
-
-        async deleteAccount(
-          userId: string,
-          password: string,
-        ): Promise<{ message: string }> {
-          const user = await this.prisma.user.findUniqueOrThrow({
-            where: { id: userId },
-            select: { passwordHash: true },
-          });
-
-          if (!user.passwordHash) {
-            throw new BadRequestException(
-              'Your account uses social login. Contact support to delete it.',
-            );
-          }
-
-          const bcrypt = await import('bcrypt');
-          const valid = await bcrypt.compare(password, user.passwordHash);
-          if (!valid) {
-            throw new UnauthorizedException('Incorrect password.');
-          }
-
-          // Revoke all refresh tokens
-          await this.prisma.refreshToken.deleteMany({ where: { userId } });
-
-          // Soft-delete
-          await this.prisma.user.update({
-            where: { id: userId },
-            data: { deletedAt: new Date() },
-          });
-
-          return { message: 'Account deleted.' };
-        }
-
         id: true,
         email: true,
         name: true,
@@ -545,6 +343,200 @@ export class SettingsService {
         ? mapCompanionControls(controlsByStudentId.get(child.id))
         : null,
     }));
+  }
+
+  async updateProfile(
+    userId: string,
+    dto: {
+      name?: string;
+      ageGroup?: string | null;
+      grade?: string | null;
+      timezone?: string;
+      learningGoal?: string | null;
+    },
+  ): Promise<UserSettings> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.ageGroup !== undefined && { ageGroup: dto.ageGroup as any }),
+        ...(dto.grade !== undefined && { grade: dto.grade }),
+        ...(dto.timezone !== undefined && { timezone: dto.timezone }),
+        ...(dto.learningGoal !== undefined && { learningGoal: dto.learningGoal as any }),
+      },
+    });
+    return this.get(userId);
+  }
+
+  async updateStudy(
+    userId: string,
+    dto: {
+      learningMode?: 'guide' | 'companion';
+      answerRevealTiming?: 'after_quiz' | 'immediate';
+      quizPassThreshold?: number;
+      sessionLength?: number;
+      preferredDepth?: string;
+      dailyGoal?: number;
+      supportLevel?: 'minimal' | 'moderate' | 'full';
+    },
+  ): Promise<{ settings: UserSettings; lockedFields: string[] }> {
+    const userRecord = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { lockedSettings: true },
+    });
+    const lockedSettings = userRecord.lockedSettings;
+    const lockedFields: string[] = [];
+
+    if (dto.learningMode !== undefined && lockedSettings.includes('mode')) {
+      lockedFields.push('learningMode');
+    }
+    if (
+      (dto.answerRevealTiming !== undefined || dto.quizPassThreshold !== undefined) &&
+      lockedSettings.includes('companion-controls')
+    ) {
+      lockedFields.push('answerRevealTiming', 'quizPassThreshold');
+    }
+
+    if (lockedFields.length > 0) {
+      throw new ForbiddenException({ lockedFields });
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.learningMode !== undefined && {
+          learningMode: toPrismaLearningMode(dto.learningMode),
+        }),
+        ...(dto.sessionLength !== undefined && { sessionLength: dto.sessionLength }),
+        ...(dto.preferredDepth !== undefined && { preferredDepth: dto.preferredDepth }),
+        ...(dto.dailyGoal !== undefined && { dailyGoal: dto.dailyGoal }),
+        ...(dto.supportLevel !== undefined && { supportLevel: dto.supportLevel }),
+      },
+    });
+
+    if (dto.answerRevealTiming !== undefined || dto.quizPassThreshold !== undefined) {
+      const user = await this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { name: true, controlledByGuardianId: true },
+      });
+      await (this.prisma.companionControls as any).upsert({
+        where: { studentId: userId },
+        update: {
+          ...(dto.answerRevealTiming !== undefined && {
+            answerRevealTiming: dto.answerRevealTiming,
+          }),
+          ...(dto.quizPassThreshold !== undefined && {
+            quizPassThreshold: dto.quizPassThreshold,
+          }),
+          lastChangedBy: user.name,
+        },
+        create: {
+          studentId: userId,
+          answerRevealTiming: dto.answerRevealTiming ?? 'after_quiz',
+          quizPassThreshold: dto.quizPassThreshold ?? 0.7,
+          lockedByGuardian: Boolean(user.controlledByGuardianId),
+          lastChangedBy: user.name,
+        },
+      });
+    }
+
+    return { settings: await this.get(userId), lockedFields: [] };
+  }
+
+  async updateNotifications(
+    userId: string,
+    dto: {
+      reminderEnabled?: boolean;
+      reminderTime?: string;
+      streakAlertEnabled?: boolean;
+      growthAreaNudgeEnabled?: boolean;
+      growthAreaNudgeFrequency?: string;
+      planLimitAlertEnabled?: boolean;
+      weeklyEmailEnabled?: boolean;
+    },
+  ): Promise<UserSettings> {
+    const userRecord = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { plan: true },
+    });
+    const userPlan = userRecord.plan;
+    const data: Record<string, unknown> = {};
+
+    if (dto.reminderEnabled !== undefined) data.reminderEnabled = dto.reminderEnabled;
+    if (dto.reminderTime !== undefined) data.reminderTime = dto.reminderTime;
+    if (dto.streakAlertEnabled !== undefined) data.streakAlertEnabled = dto.streakAlertEnabled;
+    if (dto.growthAreaNudgeEnabled !== undefined) data.growthAreaNudgeEnabled = dto.growthAreaNudgeEnabled;
+    if (dto.growthAreaNudgeFrequency !== undefined) data.growthAreaNudgeFrequency = dto.growthAreaNudgeFrequency;
+    if (dto.planLimitAlertEnabled !== undefined && userPlan !== 'EXPLORER') {
+      data.planLimitAlertEnabled = dto.planLimitAlertEnabled;
+    }
+    if (dto.weeklyEmailEnabled !== undefined) data.weeklyEmailEnabled = dto.weeklyEmailEnabled;
+
+    await this.prisma.user.update({ where: { id: userId }, data });
+    return this.get(userId);
+  }
+
+  async unlinkGuardian(
+    userId: string,
+    studentPassword: string,
+  ): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { passwordHash: true, controlledByGuardianId: true },
+    });
+
+    if (!user.controlledByGuardianId) {
+      throw new BadRequestException('No linked guardian found.');
+    }
+
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'Your account uses social login. You cannot unlink with a password.',
+      );
+    }
+
+    const bcrypt = await import('bcrypt');
+    const valid = await bcrypt.compare(studentPassword, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Incorrect password.');
+    }
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { controlledByGuardianId: null, lockedSettings: [] },
+    });
+
+    return { message: 'Guardian unlinked.' };
+  }
+
+  async deleteAccount(
+    userId: string,
+    password: string,
+  ): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { passwordHash: true },
+    });
+
+    if (!user.passwordHash) {
+      throw new BadRequestException(
+        'Your account uses social login. Contact support to delete it.',
+      );
+    }
+
+    const bcrypt = await import('bcrypt');
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      throw new UnauthorizedException('Incorrect password.');
+    }
+
+    await this.prisma.refreshToken.deleteMany({ where: { userId } });
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { deletedAt: new Date() },
+    });
+
+    return { message: 'Account deleted.' };
   }
 }
 
