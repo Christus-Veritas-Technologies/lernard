@@ -34,6 +34,8 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
     }
 
     const percentage = Math.round((result.score / Math.max(result.totalQuestions, 1)) * 100);
+    const reviewPrompt = "Help me review this quiz, explain my mistakes, and give me a short recovery plan.";
+    const chatReviewHref = `/chat?attachQuizId=${quizId}&prompt=${encodeURIComponent(reviewPrompt)}`;
 
     return (
         <div className="flex flex-col gap-6">
@@ -105,7 +107,10 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
                 </CardContent>
             </Card>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-3">
+                <Button onClick={() => router.push(chatReviewHref)} variant="secondary">
+                    Discuss with Lernard
+                </Button>
                 <Button onClick={() => router.push("/quiz")}>Drill the weak spots</Button>
                 <Button onClick={() => router.push("/home")} variant="secondary">
                     Back to Dashboard
