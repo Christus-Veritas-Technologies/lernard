@@ -293,6 +293,8 @@ export class MastraService {
           messages: [{ role: 'user', content: userPrompt }],
         });
 
+        text = stripJsonFences(text);
+
         if (!isResponseTruncated(text)) {
           break;
         }
@@ -417,6 +419,8 @@ export class MastraService {
           systemPrompt,
           messages: [{ role: 'user', content: [fileBlock, textBlock] }],
         });
+
+        text = stripJsonFences(text);
 
         if (!isResponseTruncated(text)) {
           break;
@@ -1067,6 +1071,22 @@ function quizMaxTokens(questionCount: number, style?: 'standard' | 'zimsec'): nu
   if (questionCount >= 15) return 10000;
   if (questionCount >= 10) return 7000;
   return 4500;
+}
+
+function stripJsonFences(text: string): string {
+  const t = text.trim();
+  // Strip ```json ... ``` or ``` ... ``` wrappers that Claude sometimes adds
+  const fenced = t.match(/^```(?:json)?\s*([\s\S]*?)```\s*$/i);
+  if (fenced) {
+    return (fenced[1] ?? '').trim();
+  }
+  // Fallback: extract outermost { ... } in case of leading/trailing prose
+  const first = t.indexOf('{');
+  const last = t.lastIndexOf('}');
+  if (first > 0 && last > first) {
+    return t.slice(first, last + 1);
+  }
+  return t;
 }
 
 function isResponseTruncated(text: string): boolean {
