@@ -354,19 +354,20 @@ export class ProgressService {
       historyCapDays: isExplorer ? HISTORY_CAP_DAYS_EXPLORER : null,
     };
   }
+
+  async resetProgress(userId: string): Promise<void> {
+    await Promise.all([
+      this.prisma.subjectProgress.deleteMany({ where: { userId } }),
+      this.prisma.lesson.deleteMany({ where: { userId } }),
+      this.prisma.quiz.deleteMany({ where: { userId } }),
+      this.prisma.session.deleteMany({ where: { userId } }),
+    ]);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { streakDays: 0, sessionCount: 0 },
+    });
+  }
 }
-    async resetProgress(userId: string): Promise<void> {
-      await Promise.all([
-        this.prisma.subjectProgress.deleteMany({ where: { userId } }),
-        this.prisma.lesson.deleteMany({ where: { userId } }),
-        this.prisma.quiz.deleteMany({ where: { userId } }),
-        this.prisma.session.deleteMany({ where: { userId } }),
-      ]);
-      await this.prisma.user.update({
-        where: { id: userId },
-        data: { streakDays: 0, sessionCount: 0 },
-      });
-    }
 
 function calculateXpLevel(sessionCount: number): number {
   return Math.max(1, Math.ceil(Math.max(sessionCount, 1) / 5));
@@ -478,24 +479,4 @@ function resolveFromDate(
   else if (dateFilter === 'month') d.setUTCMonth(d.getUTCMonth() - 1);
   else if (dateFilter === '3m') d.setUTCMonth(d.getUTCMonth() - 3);
   return d;
-}
-
-          score: normalizedScore,
-          lastTestedAt: updatedAt.toISOString(),
-        },
-      ];
-    })
-    .sort((left, right) => right.score - left.score);
-}
-
-function toTopicLevel(score: number): TopicStrength['level'] {
-  if (score >= 80) {
-    return 'confident';
-  }
-
-  if (score >= 60) {
-    return 'getting_there';
-  }
-
-  return 'needs_work';
 }

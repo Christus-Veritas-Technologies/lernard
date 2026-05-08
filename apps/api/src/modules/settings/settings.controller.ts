@@ -99,7 +99,7 @@ export class SettingsController {
   ) {
     return this.settingsService.uploadAvatar(user.id, file);
   }
-}
+
   @ProtectedRoute()
   @Patch('profile')
   async updateProfile(
@@ -146,4 +146,3 @@ export class SettingsController {
     return this.settingsService.deleteAccount(user.id, dto.password);
   }
 }
-  ) {
