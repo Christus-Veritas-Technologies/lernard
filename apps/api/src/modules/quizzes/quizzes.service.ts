@@ -14,6 +14,13 @@ import { R2Service } from '../../r2/r2.service';
 import { GenerateQuizDto, SubmitAnswerDto, AnswerPartDto } from './dto/quizzes.dto';
 import { deleteQuizUpload, readQuizUpload } from './quiz-uploads';
 
+type LessonSectionForQuiz = {
+  type: string;
+  heading: string | null;
+  body: string;
+  terms: Array<{ term: string; explanation: string }>;
+};
+
 @Injectable()
 export class QuizzesService {
   constructor(
@@ -70,12 +77,7 @@ export class QuizzesService {
       // Fire-and-forget: delete the temp upload after generation
       deleteQuizUpload(this.r2, user.id, dto.fromUploadId).catch(() => {});
     } else {
-      let lessonSections: Array<{
-        type: string;
-        heading: string | null;
-        body: string;
-        terms: Array<{ term: string; explanation: string }>;
-      }> | undefined;
+      let lessonSections: LessonSectionForQuiz[] | undefined;
       let confidenceRating: number | null = null;
 
       if (dto.fromLessonId) {
@@ -84,7 +86,9 @@ export class QuizzesService {
           select: { sections: true, confidenceRating: true },
         });
         if (lesson) {
-          lessonSections = lesson.sections as typeof lessonSections;
+          lessonSections = normalizeLessonSectionsForQuiz(
+            lesson.sections as unknown,
+          );
           confidenceRating = lesson.confidenceRating ?? null;
         }
       }
@@ -643,6 +647,60 @@ export class QuizzesService {
       },
     });
   }
+}
+
+function normalizeLessonSectionsForQuiz(value: unknown): LessonSectionForQuiz[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((raw) => {
+      const section = raw as {
+        type?: unknown;
+        heading?: unknown;
+        body?: unknown;
+        terms?: unknown;
+      };
+
+      const body = typeof section.body === 'string' ? section.body.trim() : '';
+      if (!body) {
+        return null;
+      }
+
+      const terms = Array.isArray(section.terms)
+        ? section.terms
+            .map((termRaw) => {
+              const term = termRaw as { term?: unknown; explanation?: unknown };
+              const termName = typeof term.term === 'string' ? term.term.trim() : '';
+              if (!termName) {
+                return null;
+              }
+              return {
+                term: termName,
+                explanation:
+                  typeof term.explanation === 'string'
+                    ? term.explanation.trim()
+                    : '',
+              };
+            })
+            .filter((term): term is { term: string; explanation: string } => Boolean(term))
+        : [];
+
+      return {
+        type:
+          typeof section.type === 'string' && section.type.trim().length > 0
+            ? section.type.trim()
+            : 'concept',
+        heading:
+          typeof section.heading === 'string' && section.heading.trim().length > 0
+            ? section.heading.trim()
+            : null,
+        body,
+        terms,
+      };
+    })
+    .filter((section): section is LessonSectionForQuiz => Boolean(section));
 }
 
 function summariseQuestionAsTopic(text: string): string {

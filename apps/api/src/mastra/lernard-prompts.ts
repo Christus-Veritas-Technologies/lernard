@@ -308,7 +308,7 @@ export function buildQuizUserPrompt(
       return [
         `  TYPE: ${s.type}`,
         s.heading ? `  HEADING: ${s.heading}` : null,
-        `  KEY POINTS: ${s.body.slice(0, 500)}`,
+        `  KEY POINTS: ${s.body}`,
         termsText ? `  ${termsText}` : null,
       ].filter(Boolean).join('\n');
     });
@@ -432,6 +432,7 @@ export function buildQuizUserPrompt(
     '',
     'A good question names specific terms, values, scenarios, or mechanisms from the topic.',
     'A bad question could apply to any topic by replacing the topic name.',
+    'Every question text must contain at least 15 words and include concrete topic detail.',
     '',
     `GOOD: "Which of the following correctly [does something specific to ${input.topic}]?"`,
     `BAD:  "Which statement best describes ${input.topic}?"`,
@@ -585,7 +586,7 @@ function buildZimsecQuizUserPrompt(
       return [
         `  TYPE: ${s.type}`,
         s.heading ? `  HEADING: ${s.heading}` : null,
-        `  KEY POINTS: ${s.body.slice(0, 500)}`,
+        `  KEY POINTS: ${s.body}`,
         termsText ? `  ${termsText}` : null,
       ].filter(Boolean).join('\n');
     });
