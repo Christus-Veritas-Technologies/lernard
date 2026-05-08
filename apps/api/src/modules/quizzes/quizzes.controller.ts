@@ -17,7 +17,7 @@ import {
   PlanLimitsGuard,
 } from '../../common/guards/plan-limits.guard';
 import { R2Service } from '../../r2/r2.service';
-import { EvaluateShortAnswerDto, GenerateQuizDto, SubmitAnswerDto } from './dto/quizzes.dto';
+import { EvaluateShortAnswerDto, GenerateQuizDto, SubmitAnswerDto, AnswerPartDto } from './dto/quizzes.dto';
 import {
   MAX_QUIZ_UPLOAD_SIZE,
   QuizUploadFile,
@@ -82,5 +82,15 @@ export class QuizzesController {
     @Body() dto: EvaluateShortAnswerDto,
   ) {
     return this.quizzesService.evaluateShortAnswer(user, quizId, dto);
+  }
+
+  @ProtectedRoute()
+  @Post(':quizId/answer-part')
+  async answerPart(
+    @CurrentUser() user: User,
+    @Param('quizId') quizId: string,
+    @Body() dto: AnswerPartDto,
+  ) {
+    return this.quizzesService.answerPart(user, quizId, dto);
   }
 }

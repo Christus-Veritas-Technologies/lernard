@@ -45,6 +45,10 @@ export class GenerateQuizDto {
   @IsOptional()
   @IsIn(['image', 'pdf'])
   fromUploadKind?: 'image' | 'pdf';
+
+  @IsOptional()
+  @IsIn(['standard', 'zimsec'])
+  style?: 'standard' | 'zimsec';
 }
 
 export class SubmitAnswerDto {
@@ -65,4 +69,18 @@ export class EvaluateShortAnswerDto {
   @IsString()
   @MaxLength(2000)
   studentAnswer!: string;
+}
+
+export class AnswerPartDto {
+  @IsInt()
+  @Min(0)
+  questionIndex!: number;
+
+  @IsString()
+  @MaxLength(50)
+  partLabel!: string;
+
+  @IsString()
+  @MaxLength(2000)
+  answer!: string;
 }

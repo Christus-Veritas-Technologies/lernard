@@ -3,6 +3,7 @@ import type {
   QuizCompletionResult,
   QuizContent,
   QuizQuestionReview,
+  StructuredPartEvaluation,
 } from '@lernard/shared-types';
 import type { User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -10,7 +11,7 @@ import { MastraService } from '../../mastra/mastra.service';
 import { StudentContextBuilder } from '../../mastra/student-context.builder';
 import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
 import { R2Service } from '../../r2/r2.service';
-import { GenerateQuizDto, SubmitAnswerDto } from './dto/quizzes.dto';
+import { GenerateQuizDto, SubmitAnswerDto, AnswerPartDto } from './dto/quizzes.dto';
 import { deleteQuizUpload, readQuizUpload } from './quiz-uploads';
 
 @Injectable()
@@ -63,6 +64,7 @@ export class QuizzesService {
         mimeType: upload.mimeType,
         questionCount: dto.questionCount,
         mode,
+        style: dto.style,
         studentContext,
       });
       // Fire-and-forget: delete the temp upload after generation
@@ -92,6 +94,7 @@ export class QuizzesService {
         questionCount: dto.questionCount,
         subjectName: dto.subject,
         mode,
+        style: dto.style,
         studentContext,
         lessonSections,
         confidenceRating,
@@ -129,8 +132,11 @@ export class QuizzesService {
           questionIndex: i,
           type: toDbQuestionType(question.type),
           text: question.text,
-          options: question.options ?? null,
-          correctAnswer,
+          // For structured questions: store parts array as the options JSON; correctAnswer is sentinel 'structured'
+          options: question.type === 'structured'
+            ? (Array.isArray((question as any).parts) ? (question as any).parts : null)
+            : (question.options ?? null),
+          correctAnswer: question.type === 'structured' ? 'structured' : serializeCorrectAnswer(question),
           explanation:
             question.explanation ??
             'Review this concept and compare your answer with the expected pattern.',
@@ -173,9 +179,19 @@ export class QuizzesService {
       question: {
         type: fromDbQuestionType(currentQuestion?.type),
         text: currentQuestion?.text ?? 'No question available',
-        options: Array.isArray(currentQuestion?.options)
-          ? currentQuestion.options
-          : undefined,
+        // For structured questions: options JSON stores the parts array
+        ...(fromDbQuestionType(currentQuestion?.type) === 'structured'
+          ? {
+              parts: Array.isArray(currentQuestion?.options) ? currentQuestion.options : [],
+              totalMarks: (currentQuestion?.options as any)?.[0]?.marks
+                ? (currentQuestion.options as any[]).reduce((sum: number, p: any) => sum + (p.marks ?? 0), 0)
+                : 0,
+            }
+          : {
+              options: Array.isArray(currentQuestion?.options)
+                ? currentQuestion.options
+                : undefined,
+            }),
       },
     };
   }
@@ -304,6 +320,147 @@ export class QuizzesService {
     });
 
     return evaluation;
+  }
+
+  async answerPart(
+    user: User,
+    quizId: string,
+    dto: AnswerPartDto,
+  ): Promise<StructuredPartEvaluation> {
+    const quiz = await (this.prisma as any).quiz.findFirst({
+      where: { id: quizId, userId: user.id },
+      include: {
+        questions: {
+          where: { questionIndex: dto.questionIndex },
+          take: 1,
+        },
+      },
+    });
+
+    if (!quiz || !quiz.questions[0]) {
+      throw new NotFoundException('Quiz question not found');
+    }
+
+    const question = quiz.questions[0];
+    if (question.type !== 'STRUCTURED') {
+      throw new BadRequestException('This endpoint is only for structured questions');
+    }
+
+    // Parts are stored in the options JSON field
+    const parts: Array<{
+      label: string;
+      text: string;
+      command: string;
+      marks: number;
+      tier: string;
+      answerType: string;
+      markingPoints: string[];
+      modelAnswer: string;
+      explanation?: string;
+    }> = Array.isArray(question.options) ? question.options as any[] : [];
+
+    const part = parts.find((p) => p.label === dto.partLabel);
+    if (!part) {
+      throw new BadRequestException(`Part "${dto.partLabel}" not found in this question`);
+    }
+
+    const studentContext = await this.studentContextBuilder.buildForUser(user.id);
+    const evaluation = await this.mastraService.evaluateStructuredPart({
+      stem: question.text,
+      partText: part.text,
+      command: part.command,
+      marks: part.marks,
+      markingPoints: part.markingPoints ?? [],
+      modelAnswer: part.modelAnswer,
+      studentAnswer: dto.answer,
+      studentContext: {
+        name: studentContext.name,
+        grade: studentContext.grade,
+        ageGroup: studentContext.ageGroup,
+      },
+    });
+
+    // Load existing QuizAnswer, merge in this sub-part's result
+    const existingAnswer = await (this.prisma as any).quizAnswer.findUnique({
+      where: { quizId_questionIndex: { quizId, questionIndex: dto.questionIndex } },
+    });
+
+    type PartAnswerMap = Record<string, {
+      text: string;
+      marksEarned: number;
+      feedback: string;
+      markingPoints: string[];
+      modelAnswer: string;
+    }>;
+
+    let partAnswerMap: PartAnswerMap = {};
+    if (existingAnswer?.answer) {
+      try {
+        partAnswerMap = JSON.parse(existingAnswer.answer) as PartAnswerMap;
+      } catch {
+        partAnswerMap = {};
+      }
+    }
+
+    partAnswerMap[dto.partLabel] = {
+      text: dto.answer,
+      marksEarned: evaluation.marksEarned,
+      feedback: evaluation.feedback,
+      markingPoints: part.markingPoints,
+      modelAnswer: part.modelAnswer,
+    };
+
+    const allPartsSubmitted = parts.every((p) => p.label in partAnswerMap);
+
+    // Calculate aggregate isCorrect when all parts are submitted
+    const totalMarks = parts.reduce((sum, p) => sum + p.marks, 0);
+    const earnedMarks = Object.values(partAnswerMap).reduce(
+      (sum, p) => sum + (p.marksEarned ?? 0),
+      0,
+    );
+    const aggregateIsCorrect = allPartsSubmitted
+      ? earnedMarks / totalMarks >= 0.5
+      : false;
+
+    const answerJson = JSON.stringify(partAnswerMap);
+
+    await (this.prisma as any).quizAnswer.upsert({
+      where: { quizId_questionIndex: { quizId, questionIndex: dto.questionIndex } },
+      update: {
+        answer: answerJson,
+        isCorrect: allPartsSubmitted ? aggregateIsCorrect : (existingAnswer?.isCorrect ?? false),
+        submittedAt: new Date(),
+      },
+      create: {
+        quizId,
+        userId: user.id,
+        questionIndex: dto.questionIndex,
+        answer: answerJson,
+        isCorrect: false,
+      },
+    });
+
+    // Advance currentIndex when all parts submitted
+    let done = false;
+    if (allPartsSubmitted) {
+      const nextIndex = dto.questionIndex + 1;
+      done = nextIndex >= quiz.totalQuestions;
+      await (this.prisma as any).quiz.update({
+        where: { id: quizId },
+        data: { currentIndex: done ? dto.questionIndex : nextIndex },
+      });
+    }
+
+    return {
+      partLabel: dto.partLabel,
+      marksEarned: evaluation.marksEarned,
+      totalMarks: part.marks,
+      feedback: evaluation.feedback,
+      markingPoints: part.markingPoints,
+      modelAnswer: part.modelAnswer,
+      allPartsSubmitted,
+      done,
+    };
   }
 
   async complete(user: User, quizId: string): Promise<QuizCompletionResult> {
@@ -522,6 +679,8 @@ function toDbQuestionType(type: string): string {
       return 'SHORT_ANSWER';
     case 'ordering':
       return 'ORDERING';
+    case 'structured':
+      return 'STRUCTURED';
     default:
       return 'MULTIPLE_CHOICE';
   }
@@ -535,7 +694,8 @@ function fromDbQuestionType(
   | 'true_false'
   | 'fill_blank'
   | 'short_answer'
-  | 'ordering' {
+  | 'ordering'
+  | 'structured' {
   switch (type) {
     case 'MULTIPLE_SELECT':
       return 'multiple_select';
@@ -547,6 +707,8 @@ function fromDbQuestionType(
       return 'short_answer';
     case 'ORDERING':
       return 'ordering';
+    case 'STRUCTURED':
+      return 'structured';
     default:
       return 'multiple_choice';
   }
@@ -573,6 +735,10 @@ function checkAnswer(
     case 'SHORT_ANSWER':
       // Short answers are evaluated via POST /:quizId/evaluate-short-answer (AI grading).
       // answer() just stores the response; isCorrect defaults false until evaluation updates it.
+      return false;
+    case 'STRUCTURED':
+      // Structured questions are evaluated per-sub-part via POST /:quizId/answer-part.
+      // This endpoint should not be called for STRUCTURED questions.
       return false;
     case 'FILL_BLANK':
     case 'ORDERING':
