@@ -60,7 +60,7 @@ export type {
   SubjectIconKey,
 } from './payloads/lessons'
 export { SECTION_COLORS, getSubjectIcon } from './payloads/lessons'
-export type { QuizQuestionType, QuizQuestion, QuizContent, QuizQuestionReview, QuizCompletionResult } from './payloads/quizzes'
+export type { QuizQuestionType, QuizQuestion, QuizStructuredPart, StructuredQuestion, QuizContent, StructuredPartEvaluation, QuizQuestionReview, QuizCompletionResult, ShortAnswerEvaluation } from './payloads/quizzes'
 export type {
   ConversationListItem,
   ChatAttachment,
