@@ -1,10 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
-import type { QuizContent } from '@lernard/shared-types';
+import type { QuizContent, ShortAnswerEvaluation, StructuredPartEvaluation, StructuredQuestion } from '@lernard/shared-types';
 
 import { Text } from '@rnr/text';
 
@@ -30,6 +30,12 @@ export default function QuizScreen() {
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<AnswerResult | null>(null);
+  const [shortAnswerEval, setShortAnswerEval] = useState<ShortAnswerEvaluation | null>(null);
+
+  // Structured question state
+  const [partInputs, setPartInputs] = useState<Record<string, string>>({});
+  const [partSubmitting, setPartSubmitting] = useState<Record<string, boolean>>({});
+  const [partResults, setPartResults] = useState<Record<string, StructuredPartEvaluation>>({});
 
   const loadQuiz = useCallback(async () => {
     setLoading(true);
@@ -40,6 +46,10 @@ export default function QuizScreen() {
       setAnswer('');
       setSelectedOptions([]);
       setResult(null);
+      setShortAnswerEval(null);
+      setPartInputs({});
+      setPartSubmitting({});
+      setPartResults({});
     } catch {
       setError('Could not load this question. Try again.');
     } finally {
@@ -74,6 +84,14 @@ export default function QuizScreen() {
         body: JSON.stringify({ questionIndex: quiz.currentQuestionIndex, answer: submittedAnswer }),
       });
       setResult(res);
+
+      if (quiz.question.type === 'short_answer') {
+        nativeApiFetch<ShortAnswerEvaluation>(ROUTES.QUIZZES.EVALUATE_SHORT_ANSWER(quizId), {
+          method: 'POST',
+          body: JSON.stringify({ questionIndex: quiz.currentQuestionIndex, studentAnswer: submittedAnswer }),
+        }).then(setShortAnswerEval).catch(() => {});
+      }
+
       if (res.done) {
         router.replace({ pathname: '/quiz/results/[quizId]', params: { quizId } });
       }
@@ -81,6 +99,35 @@ export default function QuizScreen() {
       setError('Failed to submit answer.');
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function submitPart(partLabel: string) {
+    if (!quiz || partSubmitting[partLabel]) return;
+    const partAnswer = (partInputs[partLabel] ?? '').trim();
+    if (!partAnswer) return;
+
+    setPartSubmitting((prev) => ({ ...prev, [partLabel]: true }));
+    try {
+      const res = await nativeApiFetch<StructuredPartEvaluation>(
+        ROUTES.QUIZZES.ANSWER_PART(quizId),
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            questionIndex: quiz.currentQuestionIndex,
+            partLabel,
+            answer: partAnswer,
+          }),
+        },
+      );
+      setPartResults((prev) => ({ ...prev, [partLabel]: res }));
+      if (res.done) {
+        router.replace({ pathname: '/quiz/results/[quizId]', params: { quizId } });
+      }
+    } catch {
+      setError('Failed to submit answer.');
+    } finally {
+      setPartSubmitting((prev) => ({ ...prev, [partLabel]: false }));
     }
   }
 
@@ -119,11 +166,147 @@ export default function QuizScreen() {
         </View>
       </View>
 
+      {/* Structured question — scrollable parts */}
+      {quiz.question.type === 'structured' ? (
+        <ScrollView className="flex-1 px-4" contentContainerStyle={{ paddingTop: 20, paddingBottom: 24 }}>
+          <Text className="mb-4 text-lg font-semibold text-slate-900">{quiz.question.text}</Text>
+          {(quiz.question as unknown as StructuredQuestion).parts?.map((part) => {
+            const submitted = Boolean(partResults[part.label]);
+            const res = partResults[part.label];
+            return (
+              <View className="mb-4 rounded-2xl border border-slate-200 bg-white p-4" key={part.label}>
+                {/* Part header */}
+                <View className="mb-3 flex-row items-start justify-between">
+                  <View className="flex-row items-center gap-2">
+                    <View className="h-6 w-6 items-center justify-center rounded-full bg-indigo-100">
+                      <Text className="text-xs font-bold text-indigo-700">{part.label}</Text>
+                    </View>
+                    <View className="rounded-md bg-slate-100 px-2 py-0.5">
+                      <Text className="text-xs font-medium text-slate-600">{part.command}</Text>
+                    </View>
+                  </View>
+                  <Text className="text-xs text-slate-400">
+                    [{part.marks} {part.marks === 1 ? 'mark' : 'marks'}]
+                  </Text>
+                </View>
+                <Text className="mb-3 text-sm text-slate-800">{part.text}</Text>
+
+                {/* Input — hidden after submission */}
+                {!submitted ? (
+                  <View>
+                    <TextInput
+                      className="mb-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900"
+                      multiline
+                      numberOfLines={part.answerType === 'written' ? 4 : 2}
+                      onChangeText={(text) =>
+                        setPartInputs((prev) => ({ ...prev, [part.label]: text }))
+                      }
+                      placeholder={
+                        part.answerType === 'numeric' ? 'Enter your calculation…' : 'Type your answer…'
+                      }
+                      placeholderTextColor="#94a3b8"
+                      value={partInputs[part.label] ?? ''}
+                    />
+                    <TouchableOpacity
+                      className={`self-start rounded-xl px-4 py-2 ${
+                        partSubmitting[part.label] || !(partInputs[part.label] ?? '').trim()
+                          ? 'bg-slate-200'
+                          : 'bg-indigo-500'
+                      }`}
+                      disabled={partSubmitting[part.label] || !(partInputs[part.label] ?? '').trim()}
+                      onPress={() => void submitPart(part.label)}
+                    >
+                      <Text
+                        className={`text-sm font-semibold ${
+                          partSubmitting[part.label] || !(partInputs[part.label] ?? '').trim()
+                            ? 'text-slate-400'
+                            : 'text-white'
+                        }`}
+                      >
+                        {partSubmitting[part.label] ? 'Marking…' : 'Submit'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
+                {/* Per-part evaluation result */}
+                {res ? (
+                  <View
+                    className={`mt-3 rounded-xl border p-3 ${
+                      res.marksEarned === res.totalMarks
+                        ? 'border-green-200 bg-green-50'
+                        : res.marksEarned > 0
+                          ? 'border-amber-200 bg-amber-50'
+                          : 'border-red-200 bg-red-50'
+                    }`}
+                  >
+                    <View className="mb-1.5 flex-row items-center justify-between">
+                      <Text
+                        className={`text-sm font-semibold ${
+                          res.marksEarned === res.totalMarks
+                            ? 'text-green-800'
+                            : res.marksEarned > 0
+                              ? 'text-amber-800'
+                              : 'text-red-800'
+                        }`}
+                      >
+                        {res.marksEarned === res.totalMarks
+                          ? '✓ Full marks'
+                          : res.marksEarned > 0
+                            ? `~ ${res.marksEarned}/${res.totalMarks} marks`
+                            : '✗ No marks'}
+                      </Text>
+                      <Text className="text-xs text-slate-400">
+                        {res.marksEarned}/{res.totalMarks}
+                      </Text>
+                    </View>
+                    <Text className="mb-2 text-sm text-slate-700">{res.feedback}</Text>
+                    {res.markingPoints.length > 0 ? (
+                      <View className="mb-2">
+                        <Text className="mb-1 text-xs font-medium text-slate-500">Marking scheme:</Text>
+                        {res.markingPoints.map((mp, i) => (
+                          <View className="mb-0.5 flex-row" key={i}>
+                            <Text className="mr-1.5 text-xs text-slate-400">•</Text>
+                            <Text className="flex-1 text-xs text-slate-600">{mp}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                    <Text className="mb-0.5 text-xs font-medium text-slate-500">Model answer:</Text>
+                    <Text className="text-sm text-slate-700">{res.modelAnswer}</Text>
+                  </View>
+                ) : null}
+              </View>
+            );
+          })}
+
+          {/* Next question — shown when all parts submitted */}
+          {(() => {
+            const sq = quiz.question as unknown as StructuredQuestion;
+            const allDone =
+              sq.parts?.length > 0 && sq.parts.every((p) => Boolean(partResults[p.label]));
+            const lastResult = sq.parts?.length > 0
+              ? partResults[sq.parts[sq.parts.length - 1]?.label ?? '']
+              : undefined;
+            if (!allDone || lastResult?.done) return null;
+            return (
+              <TouchableOpacity
+                className="mt-2 items-center rounded-2xl bg-indigo-500 py-4"
+                onPress={() => void loadQuiz()}
+              >
+                <Text className="font-semibold text-white">Next question →</Text>
+              </TouchableOpacity>
+            );
+          })()}
+        </ScrollView>
+      ) : null}
+
       {/* Question */}
+      {quiz.question.type !== 'structured' ? (
       <View className="flex-1 px-4 pt-5">
         <Text className="mb-5 text-lg font-semibold text-slate-900">{quiz.question.text}</Text>
 
-        {/* Multiple choice — radio */}
+        {/* Multiple choice — radio */
         {quiz.question.type === 'multiple_choice' && quiz.question.options ? (
           <View className="space-y-2">
             {quiz.question.options.map((option) => (
@@ -207,9 +390,55 @@ export default function QuizScreen() {
           />
         ) : null}
       </View>
+      ) : null}
 
-      {/* Feedback */}
-      {result ? (
+      {/* Feedback — short answer uses AI evaluation (non-structured only) */}
+      {quiz.question.type !== 'structured' && result && shortAnswerEval ? (
+        <View
+          className={`mx-4 mb-4 rounded-2xl border p-4 ${
+            shortAnswerEval.result === 'correct'
+              ? 'border-green-200 bg-green-50'
+              : shortAnswerEval.result === 'partial'
+                ? 'border-amber-200 bg-amber-50'
+                : 'border-red-200 bg-red-50'
+          }`}
+        >
+          <Text
+            className={`mb-1 font-semibold ${
+              shortAnswerEval.result === 'correct'
+                ? 'text-green-800'
+                : shortAnswerEval.result === 'partial'
+                  ? 'text-amber-800'
+                  : 'text-red-800'
+            }`}
+          >
+            {shortAnswerEval.result === 'correct'
+              ? '✓ Correct'
+              : shortAnswerEval.result === 'partial'
+                ? '~ Partially correct'
+                : '✗ Not quite'}
+          </Text>
+          <Text
+            className={`text-sm ${
+              shortAnswerEval.result === 'correct'
+                ? 'text-green-700'
+                : shortAnswerEval.result === 'partial'
+                  ? 'text-amber-700'
+                  : 'text-red-700'
+            }`}
+          >
+            {shortAnswerEval.feedback}
+          </Text>
+          {!result.done ? (
+            <TouchableOpacity
+              className="mt-3 self-start rounded-xl bg-indigo-500 px-4 py-2"
+              onPress={() => void loadQuiz()}
+            >
+              <Text className="text-sm font-semibold text-white">Next →</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : quiz.question.type !== 'structured' && result ? (
         <View
           className={`mx-4 mb-4 rounded-2xl border p-4 ${result.isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}
         >
@@ -230,8 +459,8 @@ export default function QuizScreen() {
         </View>
       ) : null}
 
-      {/* Submit area */}
-      {!result ? (
+      {/* Submit area — non-structured only */}
+      {quiz.question.type !== 'structured' && !result ? (
         <View className="flex-row gap-3 border-t border-slate-100 px-4 py-4">
           <TouchableOpacity
             className="flex-1 items-center rounded-xl border border-slate-200 py-3"
