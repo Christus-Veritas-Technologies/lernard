@@ -14,6 +14,8 @@ interface GeneratedQuizQuestionLike {
   options?: unknown;
   correctAnswer?: unknown;
   correctAnswers?: unknown;
+  parts?: unknown;
+  totalMarks?: unknown;
 }
 
 interface GeneratedLessonSectionLike {
@@ -31,6 +33,17 @@ const MIN_LESSON_BODY_WORDS = 60;
 const MIN_QUIZ_QUESTION_WORDS = 15;
 const PLACEHOLDER_PATTERN =
   /^which\s+(statement|option)\s+(best\s+)?describes/i;
+
+const HARD_REJECT_PATTERNS = [
+  /which\s+(statement|option)\s+(best\s+)?describes/i,
+  /gives\s+the\s+(clearest|most\s+accurate|best)\s+summary/i,
+  /becomes\s+easier\s+when\s+you\s+break\s+it\s+into/i,
+  /helping\s+you\s+practi[cs]e\s+___/i,
+  /can\s+be\s+understood\s+step\s+by\s+step/i,
+  /is\s+(only\s+)?a\s+random\s+guess/i,
+  /cannot\s+be\s+explained\s+or\s+practi[cs]ed/i,
+  /is\s+unrelated\s+to\s+problem.solving/i,
+];
 
 export async function validateGeneratedContent(
   content: unknown,
@@ -89,13 +102,15 @@ function validateQuizContent(content: unknown): void {
       );
     }
 
-    if (countWords(text) < MIN_QUIZ_QUESTION_WORDS) {
+    const isStructured = typeof question.type === 'string' && question.type === 'structured';
+
+    if (!isStructured && countWords(text) < MIN_QUIZ_QUESTION_WORDS) {
       throw new ContentValidationError(
         `Generated quiz question is too short (under ${MIN_QUIZ_QUESTION_WORDS} words): ${truncate(text)}`,
       );
     }
 
-    if (PLACEHOLDER_PATTERN.test(text)) {
+    if (PLACEHOLDER_PATTERN.test(text) || HARD_REJECT_PATTERNS.some((p) => p.test(text))) {
       throw new ContentValidationError(
         `Generated quiz question uses a placeholder pattern: ${truncate(text)}`,
       );
@@ -252,6 +267,57 @@ function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
         );
       }
       return;
+    case 'structured': {
+      const parts = Array.isArray((question as { parts?: unknown }).parts)
+        ? (question as { parts: unknown[] }).parts
+        : null;
+      if (!parts || parts.length === 0) {
+        throw new ContentValidationError(
+          'Structured questions require at least one part',
+        );
+      }
+      for (const part of parts) {
+        if (!isObject(part)) {
+          throw new ContentValidationError(
+            'Structured question part must be an object',
+          );
+        }
+        const p = part as Record<string, unknown>;
+        if (!p['label'] || typeof p['label'] !== 'string') {
+          throw new ContentValidationError(
+            'Structured question part is missing a label',
+          );
+        }
+        if (!p['text'] || typeof p['text'] !== 'string' || !String(p['text']).trim()) {
+          throw new ContentValidationError(
+            `Structured question part "${p['label']}" has blank text`,
+          );
+        }
+        if (typeof p['marks'] !== 'number' || p['marks'] <= 0) {
+          throw new ContentValidationError(
+            `Structured question part "${p['label']}" has invalid marks`,
+          );
+        }
+        const mp = Array.isArray(p['markingPoints']) ? p['markingPoints'] : [];
+        if (mp.length === 0) {
+          throw new ContentValidationError(
+            `Structured question part "${p['label']}" is missing marking points`,
+          );
+        }
+        if (!p['modelAnswer'] || typeof p['modelAnswer'] !== 'string' || !String(p['modelAnswer']).trim()) {
+          throw new ContentValidationError(
+            `Structured question part "${p['label']}" is missing a model answer`,
+          );
+        }
+      }
+      const totalMarks = (question as { totalMarks?: unknown }).totalMarks;
+      if (typeof totalMarks !== 'number' || totalMarks <= 0) {
+        throw new ContentValidationError(
+          'Structured questions require a positive totalMarks value',
+        );
+      }
+      return;
+    }
     default:
       throw new ContentValidationError(
         'Generated quiz contains an unsupported question type',
