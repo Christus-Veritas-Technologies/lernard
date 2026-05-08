@@ -51,7 +51,15 @@ export type {
   StudentSettingsContent,
   GuardianSettingsContent,
 } from './payloads/settings'
-export type { LessonContent, LessonSection, LessonTermDefinition, PostLessonResult } from './payloads/lessons'
+export type {
+  LessonContent,
+  LessonSection,
+  LessonTermDefinition,
+  PostLessonResult,
+  LessonSectionType,
+  SubjectIconKey,
+} from './payloads/lessons'
+export { SECTION_COLORS, getSubjectIcon } from './payloads/lessons'
 export type { QuizQuestionType, QuizQuestion, QuizContent, QuizQuestionReview, QuizCompletionResult } from './payloads/quizzes'
 export type {
   ConversationListItem,

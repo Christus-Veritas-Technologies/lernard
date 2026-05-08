@@ -56,6 +56,7 @@ export const ROUTES = {
     GENERATE: '/v1/lessons/generate',
     GET: (lessonId: string) => `/v1/lessons/${lessonId}` as const,
     SECTION_CHECK: (lessonId: string) => `/v1/lessons/${lessonId}/section-check` as const,
+    REEXPLAIN: (lessonId: string) => `/v1/lessons/${lessonId}/reexplain` as const,
     COMPLETE: (lessonId: string) => `/v1/lessons/${lessonId}/complete` as const,
   },
 
