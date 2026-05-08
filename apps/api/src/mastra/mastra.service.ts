@@ -81,6 +81,11 @@ interface LessonSectionInput {
   terms: Array<{ term: string; explanation: string }>;
 }
 
+interface RefinedQuizPrompt {
+  finalPrompt: string;
+  mustCover: string[];
+}
+
 export interface ChatToolExecutor {
   createLesson(input: {
     topic: string;
@@ -281,37 +286,51 @@ export class MastraService {
       confidenceRating: input.confidenceRating,
     });
 
+    const refinedPrompt = await this.buildLessonAwareQuizPrompt(
+      input,
+      userPrompt,
+    );
+
     return this.runWithRetry(async () => {
       let maxTokens = quizMaxTokens(input.questionCount, input.style);
-      let text = '';
+      let parsed: { questions?: GeneratedQuizQuestion[] } | null = null;
+      let lastText = '';
 
       for (let attempt = 1; attempt <= 3; attempt++) {
-        text = await this.completeText({
+        const text = await this.completeText({
           model: SONNET_MODEL,
           maxTokens,
           systemPrompt,
-          messages: [{ role: 'user', content: userPrompt }],
+          messages: [{ role: 'user', content: refinedPrompt }],
         });
 
-        text = stripJsonFences(text);
+        lastText = text;
+        const candidates = buildJsonCandidates(text);
+        const parseResult = parseQuizPayloadFromModelText(text);
+        const truncatedByHeuristic = isResponseTruncated(text);
 
-        if (!isResponseTruncated(text)) {
+        this.logger.log(
+          `[mastra.generateQuiz] attempt=${attempt} maxTokens=${maxTokens} textChars=${text.length} candidateCount=${candidates.length} parsed=${parseResult ? 'yes' : 'no'} truncatedHeuristic=${truncatedByHeuristic} tail="${truncateForLog(text.slice(Math.max(0, text.length - 220)).replace(/\s+/g, ' '), 220)}"`,
+        );
+
+        if (parseResult && Array.isArray(parseResult.questions)) {
+          parsed = parseResult;
           break;
         }
 
         if (attempt === 3) {
           throw new ContentValidationError(
-            'Quiz response was truncated — retry',
+            'Quiz generation returned malformed JSON after retries',
           );
         }
 
         maxTokens = Math.min(Math.round(maxTokens * 1.6), 28000);
       }
 
-      const parsed = safeJsonParse<{ questions?: GeneratedQuizQuestion[] }>(
-        text,
-      );
       if (!parsed || !Array.isArray(parsed.questions)) {
+        this.logger.error(
+          `[mastra.generateQuiz] parse_failed_after_retries textChars=${lastText.length} tail="${truncateForLog(lastText.slice(Math.max(0, lastText.length - 320)).replace(/\s+/g, ' '), 320)}"`,
+        );
         throw new ContentValidationError(
           'Quiz generation returned malformed JSON',
         );
@@ -330,13 +349,22 @@ export class MastraService {
         unique.push(question);
       }
 
-      if (unique.length < input.questionCount) {
+      const completed = await this.supplementMissingQuestions({
+        contextTag: 'generateQuiz',
+        systemPrompt,
+        baseUserContent: refinedPrompt,
+        targetCount: input.questionCount,
+        existingQuestions: unique,
+        baseMaxTokens: maxTokens,
+      });
+
+      if (completed.length < input.questionCount) {
         throw new ContentValidationError(
-          `Quiz generation returned ${unique.length} usable questions, expected ${input.questionCount}`,
+          `Quiz generation returned ${completed.length} usable questions, expected ${input.questionCount}`,
         );
       }
 
-      const finalQuestions = unique.slice(0, input.questionCount);
+      const finalQuestions = completed.slice(0, input.questionCount);
       assertQuizContentValid({ questions: finalQuestions });
 
       return {
@@ -346,6 +374,195 @@ export class MastraService {
         questions: finalQuestions,
       };
     });
+  }
+
+  private async buildLessonAwareQuizPrompt(
+    input: {
+      topic: string;
+      questionCount: number;
+      subjectName?: string;
+      mode: 'guide' | 'companion';
+      style?: 'standard' | 'zimsec';
+      studentContext: StudentContext;
+      lessonSections?: LessonSectionInput[];
+      confidenceRating?: number | null;
+    },
+    defaultPrompt: string,
+  ): Promise<string> {
+    if (!input.lessonSections || input.lessonSections.length === 0) {
+      return defaultPrompt;
+    }
+
+    const serializedSections = serializeLessonSections(input.lessonSections);
+
+    this.logger.log(
+      `[mastra.quizRefiner] start topic="${input.topic}" style=${input.style ?? 'standard'} sectionCount=${input.lessonSections.length} sectionChars=${serializedSections.length}`,
+    );
+
+    try {
+      const refined = await completeWithRetry(async () => {
+        const text = await this.completeText({
+          model: HAIKU_MODEL,
+          maxTokens: 1800,
+          systemPrompt:
+            'You rewrite quiz prompts for grounding and quality. Return ONLY valid JSON.',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                'You are an expert quiz prompt engineer for Lernard.',
+                'Rewrite the draft prompt so questions are highly specific to the lesson and still satisfy all output constraints.',
+                '',
+                'Hard requirements for your rewritten prompt:',
+                '- Preserve all JSON output constraints and format rules from the draft prompt.',
+                '- Preserve question count, style, and distribution constraints.',
+                '- Enforce specificity: each question text must be at least 15 words.',
+                '- Anchor questions to concrete lesson facts, terms, examples, and mechanisms.',
+                '- Keep the prompt actionable and concise.',
+                '',
+                'Return ONLY valid JSON in this shape:',
+                '{"finalPrompt":"...","mustCover":["...","..."]}',
+                '',
+                'Include 6 to 12 mustCover items listing concrete facts/terms from the lesson that the quiz must test.',
+                '',
+                `Topic: ${input.topic}`,
+                `Subject: ${input.subjectName ?? 'General'}`,
+                `Mode: ${input.mode}`,
+                `Style: ${input.style ?? 'standard'}`,
+                `Question count: ${input.questionCount}`,
+                `Confidence rating: ${input.confidenceRating ?? 'unknown'}`,
+                '',
+                'Full lesson content:',
+                serializedSections,
+                '',
+                'Draft prompt to refine:',
+                defaultPrompt,
+              ].join('\n'),
+            },
+          ],
+        });
+
+        const parsed = safeJsonParse<RefinedQuizPrompt>(text);
+        if (!parsed || typeof parsed.finalPrompt !== 'string') {
+          throw new ContentValidationError(
+            'Quiz prompt refiner returned malformed JSON',
+          );
+        }
+
+        const finalPrompt = parsed.finalPrompt.trim();
+        if (finalPrompt.length < 200) {
+          throw new ContentValidationError(
+            'Quiz prompt refiner returned an unusably short prompt',
+          );
+        }
+
+        const mustCover = Array.isArray(parsed.mustCover)
+          ? parsed.mustCover
+              .filter((item): item is string => typeof item === 'string')
+              .map((item) => item.trim())
+              .filter(Boolean)
+              .slice(0, 12)
+          : [];
+
+        return { finalPrompt, mustCover };
+      });
+
+      const checklist = refined.mustCover.length
+        ? [
+            '',
+            'Lesson grounding checklist (must cover):',
+            ...refined.mustCover.map((item, index) => `${index + 1}. ${item}`),
+          ].join('\n')
+        : '';
+
+      const promptWithChecklist = `${refined.finalPrompt}${checklist}`;
+      this.logger.log(
+        `[mastra.quizRefiner] success topic="${input.topic}" promptChars=${promptWithChecklist.length} mustCoverCount=${refined.mustCover.length}`,
+      );
+      return promptWithChecklist;
+    } catch (error) {
+      const message =
+        error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+      this.logger.warn(
+        `[mastra.quizRefiner] fallback_to_default topic="${input.topic}" error="${message}"`,
+      );
+      return defaultPrompt;
+    }
+  }
+
+  private async supplementMissingQuestions(input: {
+    contextTag: string;
+    systemPrompt: string;
+    baseUserContent: string | ClaudeContentBlock[];
+    targetCount: number;
+    existingQuestions: GeneratedQuizQuestion[];
+    baseMaxTokens: number;
+  }): Promise<GeneratedQuizQuestion[]> {
+    if (input.existingQuestions.length >= input.targetCount) {
+      return input.existingQuestions;
+    }
+
+    const missingCount = Math.max(input.targetCount - input.existingQuestions.length, 0);
+    if (missingCount === 0) {
+      return input.existingQuestions;
+    }
+
+    const existingKeys = new Set(
+      input.existingQuestions.map(
+        (question) => `${question.type}|${normalizeQuestionKey(question.text)}`,
+      ),
+    );
+
+    const supplementInstruction = [
+      `The previous output produced ${input.existingQuestions.length}/${input.targetCount} usable questions.`,
+      `Generate exactly ${missingCount} ADDITIONAL questions to fill the gap.`,
+      'Do not repeat or paraphrase existing questions.',
+      'Return ONLY valid JSON with this shape: {"questions":[...]}',
+      'Existing questions to avoid:',
+      ...input.existingQuestions.map((question, index) => `${index + 1}. [${question.type}] ${question.text}`),
+    ].join('\n');
+
+    const supplementMessage: ClaudeMessage = {
+      role: 'user',
+      content: Array.isArray(input.baseUserContent)
+        ? [
+            ...input.baseUserContent,
+            {
+              type: 'text',
+              text: supplementInstruction,
+            },
+          ]
+        : [input.baseUserContent, supplementInstruction].join('\n\n'),
+    };
+
+    const supplementText = await this.completeText({
+      model: SONNET_MODEL,
+      maxTokens: Math.min(Math.round(input.baseMaxTokens * 1.2), 28000),
+      systemPrompt: input.systemPrompt,
+      messages: [supplementMessage],
+    });
+
+    const parsed = parseQuizPayloadFromModelText(supplementText);
+    const supplementalQuestions = Array.isArray(parsed?.questions)
+      ? parsed.questions
+          .map((question) => normalizeGeneratedQuestion(question))
+          .filter(isUsableGeneratedQuestion)
+      : [];
+
+    const merged = [...input.existingQuestions];
+    for (const question of supplementalQuestions) {
+      const key = `${question.type}|${normalizeQuestionKey(question.text)}`;
+      if (existingKeys.has(key)) continue;
+      existingKeys.add(key);
+      merged.push(question);
+      if (merged.length >= input.targetCount) break;
+    }
+
+    this.logger.log(
+      `[mastra.${input.contextTag}] supplement missing=${missingCount} supplementalUsable=${supplementalQuestions.length} merged=${merged.length}/${input.targetCount}`,
+    );
+
+    return merged;
   }
 
   async generateQuizFromFile(input: {
@@ -397,50 +614,77 @@ export class MastraService {
             },
           };
 
+    const styleAwareQuizPrompt = buildQuizUserPrompt(input.studentContext, {
+      topic: 'the attached file content',
+      subjectName: 'General',
+      questionCount: input.questionCount,
+      mode: input.mode,
+      style: input.style,
+    });
+
     const textBlock: ClaudeContentBlock = {
       type: 'text',
       text: [
         `Generate exactly ${input.questionCount} quiz questions based on the content of this ${input.kind === 'pdf' ? 'document' : 'image'}.`,
-        'Also determine a concise topic name and subject area from the content.',
+        `Use the attached ${input.kind === 'pdf' ? 'document' : 'image'} as the source of truth for question content.`,
+        'Infer a concise topic name and subject from the file content itself.',
         'Return only valid JSON in this exact shape:',
         '{"topic":"<short topic name>","subjectName":"<subject>","questions":[...]}',
-        'Questions must follow the same format as a standard Lernard quiz.',
+        'Do not include markdown fences or extra prose.',
+        '',
+        'Apply these quiz-quality and format rules exactly:',
+        styleAwareQuizPrompt,
       ].join('\n'),
     };
 
     return this.runWithRetry(async () => {
       let maxTokens = quizMaxTokens(input.questionCount, input.style);
-      let text = '';
+      let parsed: {
+        topic?: string;
+        subjectName?: string;
+        questions?: GeneratedQuizQuestion[];
+      } | null = null;
+      let lastText = '';
 
       for (let attempt = 1; attempt <= 3; attempt++) {
-        text = await this.completeText({
+        const text = await this.completeText({
           model: SONNET_MODEL,
           maxTokens,
           systemPrompt,
           messages: [{ role: 'user', content: [fileBlock, textBlock] }],
         });
 
-        text = stripJsonFences(text);
+        lastText = text;
+        const candidates = buildJsonCandidates(text);
+        const parseResult = parseQuizPayloadFromModelText(text) as {
+          topic?: string;
+          subjectName?: string;
+          questions?: GeneratedQuizQuestion[];
+        } | null;
+        const truncatedByHeuristic = isResponseTruncated(text);
 
-        if (!isResponseTruncated(text)) {
+        this.logger.log(
+          `[mastra.generateQuizFromFile] attempt=${attempt} maxTokens=${maxTokens} textChars=${text.length} candidateCount=${candidates.length} parsed=${parseResult ? 'yes' : 'no'} truncatedHeuristic=${truncatedByHeuristic} tail="${truncateForLog(text.slice(Math.max(0, text.length - 220)).replace(/\s+/g, ' '), 220)}"`,
+        );
+
+        if (parseResult && Array.isArray(parseResult.questions)) {
+          parsed = parseResult;
           break;
         }
 
         if (attempt === 3) {
           throw new ContentValidationError(
-            'Quiz-from-file response was truncated — retry',
+            'Quiz-from-file generation returned malformed JSON after retries',
           );
         }
 
         maxTokens = Math.min(Math.round(maxTokens * 1.6), 28000);
       }
 
-      const parsed = safeJsonParse<{
-        topic?: string;
-        subjectName?: string;
-        questions?: GeneratedQuizQuestion[];
-      }>(text);
       if (!parsed || !Array.isArray(parsed.questions)) {
+        this.logger.error(
+          `[mastra.generateQuizFromFile] parse_failed_after_retries textChars=${lastText.length} tail="${truncateForLog(lastText.slice(Math.max(0, lastText.length - 320)).replace(/\s+/g, ' '), 320)}"`,
+        );
         throw new ContentValidationError(
           'Quiz-from-file generation returned malformed JSON',
         );
@@ -459,13 +703,22 @@ export class MastraService {
         unique.push(question);
       }
 
-      if (unique.length < input.questionCount) {
+      const completed = await this.supplementMissingQuestions({
+        contextTag: 'generateQuizFromFile',
+        systemPrompt,
+        baseUserContent: [fileBlock, textBlock],
+        targetCount: input.questionCount,
+        existingQuestions: unique,
+        baseMaxTokens: maxTokens,
+      });
+
+      if (completed.length < input.questionCount) {
         throw new ContentValidationError(
-          `Quiz-from-file returned ${unique.length} usable questions, expected ${input.questionCount}`,
+          `Quiz-from-file returned ${completed.length} usable questions, expected ${input.questionCount}`,
         );
       }
 
-      const finalQuestions = unique.slice(0, input.questionCount);
+      const finalQuestions = completed.slice(0, input.questionCount);
       assertQuizContentValid({ questions: finalQuestions });
 
       return {
@@ -1090,7 +1343,7 @@ function stripJsonFences(text: string): string {
 }
 
 function isResponseTruncated(text: string): boolean {
-  const t = text.trim();
+  const t = stripJsonFences(text).trim();
   return !t.endsWith('}') && !t.endsWith(']');
 }
 
@@ -1456,6 +1709,28 @@ function normalizeQuestionKey(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+function serializeLessonSections(sections: LessonSectionInput[]): string {
+  return sections
+    .map((section, index) => {
+      const headingLine = section.heading ? `Heading: ${section.heading}` : null;
+      const termsLine = section.terms.length > 0
+        ? `Terms: ${section.terms.map((term) => `${term.term}: ${term.explanation}`).join('; ')}`
+        : null;
+
+      return [
+        `Section ${index + 1}`,
+        `Type: ${section.type}`,
+        headingLine,
+        'Body:',
+        section.body,
+        termsLine,
+      ]
+        .filter((line): line is string => Boolean(line))
+        .join('\n');
+    })
+    .join('\n\n');
+}
+
 function normalizeQuestionType(type: string | undefined): QuizQuestionType {
   switch (type) {
     case 'multiple_choice':
@@ -1492,7 +1767,7 @@ function normalizeSectionType(
 
 function safeJsonParse<T>(value: string): T | null {
   try {
-    return JSON.parse(value) as T;
+    return JSON.parse(stripJsonFences(value)) as T;
   } catch {
     return null;
   }
@@ -1506,6 +1781,26 @@ function parseLessonContentFromModelText(
   for (const candidate of candidates) {
     const parsed = safeJsonParse<Partial<LessonContent>>(candidate);
     if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function parseQuizPayloadFromModelText(
+  value: string,
+): { topic?: string; subjectName?: string; questions?: GeneratedQuizQuestion[] } | null {
+  const candidates = buildJsonCandidates(value);
+
+  for (const candidate of candidates) {
+    const parsed = safeJsonParse<{
+      topic?: string;
+      subjectName?: string;
+      questions?: GeneratedQuizQuestion[];
+    }>(candidate);
+
+    if (parsed && Array.isArray(parsed.questions)) {
       return parsed;
     }
   }
