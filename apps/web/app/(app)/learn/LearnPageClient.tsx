@@ -3,7 +3,7 @@
 import { AlertCircleIcon, SparklesIcon } from "hugeicons-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
 import type { PagePayload, PlanUsage, ProgressContent } from "@lernard/shared-types";
@@ -28,11 +28,32 @@ export function LearnPageClient() {
     const [loading, setLoading] = useState(false);
     const [planUsage, setPlanUsage] = useState<PlanUsage | null>(null);
 
-    useEffect(() => {
-        browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW)
+    const loadPlanUsage = useCallback(() => {
+        void browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW)
             .then((data) => setPlanUsage(data.content.planUsage))
             .catch(() => { /* non-blocking */ });
     }, []);
+
+    useEffect(() => {
+        loadPlanUsage();
+
+        const onFocus = () => {
+            loadPlanUsage();
+        };
+        const onVisibility = () => {
+            if (document.visibilityState === "visible") {
+                loadPlanUsage();
+            }
+        };
+
+        window.addEventListener("focus", onFocus);
+        document.addEventListener("visibilitychange", onVisibility);
+
+        return () => {
+            window.removeEventListener("focus", onFocus);
+            document.removeEventListener("visibilitychange", onVisibility);
+        };
+    }, [loadPlanUsage]);
 
     const remaining = 300 - topic.length;
 
@@ -54,6 +75,14 @@ export function LearnPageClient() {
                     depth,
                     idempotencyKey: crypto.randomUUID(),
                 }),
+            });
+
+            setPlanUsage((current) => {
+                if (!current) return current;
+                return {
+                    ...current,
+                    lessonsUsed: Math.min(current.lessonsUsed + 1, current.lessonsLimit),
+                };
             });
 
             router.push(`/learn/${response.lessonId}/loading`);
