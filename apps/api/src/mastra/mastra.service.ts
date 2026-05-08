@@ -4,15 +4,26 @@ import type {
   ChatMessageBlock,
   LessonContent,
   LessonRefCardProps,
-  QuizContent,
-  QuizQuestion,
   QuizQuestionType,
   QuizRefCardProps,
 } from '@lernard/shared-types';
 import { completeWithRetry } from '../common/utils/complete-with-retry';
+import {
+  ContentValidationError,
+  assertLessonContentValid,
+  assertQuizContentValid,
+} from '../common/utils/validate-generated-content';
+import {
+  buildLessonUserPrompt,
+  buildQuizUserPrompt,
+  buildSystemPrompt,
+} from './lernard-prompts';
+import type { StudentContext } from './student-context.builder';
 
 const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+const LERNARD_OUTAGE_MESSAGE =
+  "I'm having a moment — try again in a few seconds.";
 
 type ClaudeContentBlock =
   | { type: 'text'; text: string }
@@ -27,12 +38,21 @@ type ClaudeContentBlock =
 
 interface ClaudeMessage {
   role: 'user' | 'assistant';
-  content: string | ClaudeContentBlock[] | ClaudeAssistantContentBlock[] | ClaudeToolResultContent[];
+  content:
+    | string
+    | ClaudeContentBlock[]
+    | ClaudeAssistantContentBlock[]
+    | ClaudeToolResultContent[];
 }
 
 type ClaudeAssistantContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> };
+  | {
+      type: 'tool_use';
+      id: string;
+      name: string;
+      input: Record<string, unknown>;
+    };
 
 type ClaudeToolResultContent = {
   type: 'tool_result';
@@ -63,17 +83,6 @@ export interface ChatToolExecutor {
   }): Promise<QuizRefCardProps>;
 }
 
-const CHAT_SYSTEM_PROMPT = [
-  'You are Lernard, a focused study companion in a chat that lets students learn, practice, and ask questions.',
-  'You can:',
-  '- Explain concepts clearly with concrete examples.',
-  '- Use the create_lesson tool when the user asks to be TAUGHT a topic from scratch — phrases like "teach me X", "give me a lesson on X", "help me learn X".',
-  '- Use the create_quiz tool whenever the user wants to PRACTICE — phrases like "quiz me on X", "give me practice problems", "give me problems to solve", "let\'s practice X", "test me", "drill me on X", "I want to try some X problems", "exercises for X". When the user does not specify a count, generate 5 questions.',
-  'Do NOT call tools for short clarifying questions or when the user only wants a quick conceptual explanation. NEVER inline practice problems as text in your reply — always route those through create_quiz so the user can answer them properly.',
-  'After creating a lesson or quiz, briefly tell the user what you made and that they can start it from the card.',
-  'Keep replies concise, warm, and focused on learning.',
-].join('\n');
-
 const CHAT_TOOLS = [
   {
     name: 'create_lesson',
@@ -84,7 +93,8 @@ const CHAT_TOOLS = [
       properties: {
         topic: {
           type: 'string',
-          description: 'The lesson topic, e.g. "Photosynthesis basics" or "Quadratic equations".',
+          description:
+            'The lesson topic, e.g. "Photosynthesis basics" or "Quadratic equations".',
         },
         depth: {
           type: 'string',
@@ -134,45 +144,57 @@ export class MastraService {
     this.apiKey = this.configService.get<string>('ANTHROPIC_API_KEY') ?? '';
   }
 
+  get devMode(): boolean {
+    return !this.apiKey;
+  }
+
   async generateLesson(input: {
     topic: string;
     depth: 'quick' | 'standard' | 'deep';
     subjectName?: string;
+    studentContext: StudentContext;
   }): Promise<LessonContent> {
-    const fallback = buildFallbackLesson(input.topic, input.subjectName, input.depth);
-
-    if (!this.apiKey) {
-      return fallback;
+    if (this.devMode) {
+      return buildFallbackLesson(input.topic, input.subjectName, input.depth);
     }
 
-    return completeWithRetry(async () => {
-      const prompt = [
-        'Return JSON only with fields: topic, subjectName, depth, estimatedMinutes, sections.',
-        'sections must be array of {type, heading, body, terms}.',
-        'types allowed: hook, concept, examples, recap.',
-        `Topic: ${input.topic}`,
-        `Depth: ${input.depth}`,
-        `Subject: ${input.subjectName ?? 'General'}`,
-      ].join('\n');
+    const systemPrompt = buildSystemPrompt(input.studentContext, {
+      kind: 'lesson',
+      topic: input.topic,
+      subjectName: input.subjectName,
+      depth: input.depth,
+    });
+    const userPrompt = buildLessonUserPrompt(input.studentContext, {
+      topic: input.topic,
+      subjectName: input.subjectName,
+      depth: input.depth,
+    });
 
+    const fallbackEstimatedMinutes = lessonMinutesForDepth(input.depth);
+
+    return this.runWithRetry(async () => {
       const text = await this.completeText({
         model: SONNET_MODEL,
-        maxTokens: 1400,
-        systemPrompt: 'You generate clear, accurate educational lesson JSON.',
-        messages: [{ role: 'user', content: prompt }],
+        maxTokens: lessonMaxTokens(input.depth),
+        systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
       });
 
       const parsed = safeJsonParse<Partial<LessonContent>>(text);
       if (!parsed || !Array.isArray(parsed.sections)) {
-        return fallback;
+        throw new ContentValidationError(
+          'Lesson generation returned malformed JSON',
+        );
       }
+
+      assertLessonContentValid(parsed);
 
       return {
         lessonId: 'generated',
         topic: parsed.topic ?? input.topic,
         subjectName: parsed.subjectName ?? input.subjectName ?? 'General',
         depth: parsed.depth ?? input.depth,
-        estimatedMinutes: parsed.estimatedMinutes ?? fallback.estimatedMinutes,
+        estimatedMinutes: parsed.estimatedMinutes ?? fallbackEstimatedMinutes,
         sections: parsed.sections.map((section, index) => ({
           type: normalizeSectionType(section?.type, index),
           heading: section?.heading ?? null,
@@ -183,7 +205,9 @@ export class MastraService {
                 .map((term) => ({
                   term: term.term,
                   explanation:
-                    typeof term.explanation === 'string' ? term.explanation : 'Definition unavailable.',
+                    typeof term.explanation === 'string'
+                      ? term.explanation
+                      : 'Definition unavailable.',
                 }))
             : [],
         })),
@@ -196,56 +220,80 @@ export class MastraService {
     questionCount: number;
     subjectName?: string;
     mode: 'guide' | 'companion';
-  }): Promise<{ topic: string; subjectName: string; mode: 'guide' | 'companion'; questions: GeneratedQuizQuestion[] }> {
-    const fallbackQuestions = buildFallbackQuizQuestions(input.topic, input.questionCount);
-
-    if (!this.apiKey) {
+    studentContext: StudentContext;
+  }): Promise<{
+    topic: string;
+    subjectName: string;
+    mode: 'guide' | 'companion';
+    questions: GeneratedQuizQuestion[];
+  }> {
+    if (this.devMode) {
       return {
         topic: input.topic,
         subjectName: input.subjectName ?? 'General',
         mode: input.mode,
-        questions: fallbackQuestions,
+        questions: buildFallbackQuizQuestions(input.topic, input.questionCount),
       };
     }
 
-    return completeWithRetry(async () => {
-      const prompt = [
-        `Generate ${input.questionCount} quiz questions about: ${input.topic}`,
-        `Subject area: ${input.subjectName ?? 'General'}`,
-        '',
-        'Rules:',
-        '- Vary question types across: multiple_choice, multiple_select, true_false, fill_blank, short_answer',
-        '- If generating 5 or more questions, include at least 1 multiple_select question and at least 1 free-response question (fill_blank or short_answer)',
-        '- Prefer multiple_choice and true_false; use fill_blank or short_answer for at most 1-2 questions',
-        '- For multiple_choice: provide exactly 4 distinct real answer options; set correctAnswer to the EXACT text of the correct option',
-        '- For multiple_select: provide 4-5 options; set correctAnswers as an array of all correct option texts (2+ correct)',
-        '- For true_false: no options array needed; set correctAnswer to exactly "true" or "false"',
-        '- For fill_blank/short_answer: no options; set correctAnswer to a concise expected answer (1-5 words)',
-        '- Every question must have a one-sentence "explanation" field explaining why the answer is correct',
-        '- Question text must be specific and educational — NEVER write generic text like "Which statement best describes X?"',
-        '- Do not repeat the same question pattern, wording, or concept framing in multiple questions',
-        '- Do NOT number the question text (no "1." prefix)',
-        '',
-        'Return ONLY a JSON object:',
-        '{"questions":[{"type":"...","text":"...","options":["..."],"correctAnswer":"...","correctAnswers":["..."],"explanation":"..."}]}',
-      ].join('\n');
+    const systemPrompt = buildSystemPrompt(input.studentContext, {
+      kind: 'quiz',
+      topic: input.topic,
+      subjectName: input.subjectName,
+      mode: input.mode,
+      questionCount: input.questionCount,
+    });
+    const userPrompt = buildQuizUserPrompt(input.studentContext, {
+      topic: input.topic,
+      subjectName: input.subjectName,
+      questionCount: input.questionCount,
+      mode: input.mode,
+    });
 
+    return this.runWithRetry(async () => {
       const text = await this.completeText({
         model: SONNET_MODEL,
-        maxTokens: 4000,
-        systemPrompt:
-          'You are an expert quiz generator. Return ONLY valid JSON with no markdown fences. Generate real, educational quiz questions — not placeholder text.',
-        messages: [{ role: 'user', content: prompt }],
+        maxTokens: quizMaxTokens(input.questionCount),
+        systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
       });
 
-      const parsed = safeJsonParse<{ questions?: GeneratedQuizQuestion[] }>(text);
-      const questions = buildQuizQuestionSet(parsed?.questions, input.topic, input.questionCount);
+      const parsed = safeJsonParse<{ questions?: GeneratedQuizQuestion[] }>(
+        text,
+      );
+      if (!parsed || !Array.isArray(parsed.questions)) {
+        throw new ContentValidationError(
+          'Quiz generation returned malformed JSON',
+        );
+      }
+
+      const normalized = parsed.questions
+        .map((question) => normalizeGeneratedQuestion(question))
+        .filter(isUsableGeneratedQuestion);
+
+      const seen = new Set<string>();
+      const unique: GeneratedQuizQuestion[] = [];
+      for (const question of normalized) {
+        const key = `${question.type}|${normalizeQuestionKey(question.text)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(question);
+      }
+
+      if (unique.length < input.questionCount) {
+        throw new ContentValidationError(
+          `Quiz generation returned ${unique.length} usable questions, expected ${input.questionCount}`,
+        );
+      }
+
+      const finalQuestions = unique.slice(0, input.questionCount);
+      assertQuizContentValid({ questions: finalQuestions });
 
       return {
         topic: input.topic,
         subjectName: input.subjectName ?? 'General',
         mode: input.mode,
-        questions,
+        questions: finalQuestions,
       };
     });
   }
@@ -253,20 +301,30 @@ export class MastraService {
   async *streamChat(input: {
     message: string;
     history: ClaudeMessage[];
-    attachments?: Array<{ kind: 'image' | 'pdf'; mimeType: string; data: string; fileName: string }>;
+    attachments?: Array<{
+      kind: 'image' | 'pdf';
+      mimeType: string;
+      data: string;
+      fileName: string;
+    }>;
     toolExecutor?: ChatToolExecutor;
+    studentContext: StudentContext;
   }): AsyncGenerator<ChatMessageBlock> {
-    if (!this.apiKey) {
+    if (this.devMode) {
       const attachmentNudge = input.attachments?.length
         ? ` I can also see ${input.attachments.length} attachment${input.attachments.length === 1 ? '' : 's'} on this turn.`
         : '';
 
       yield {
         type: 'markdown',
-        content: `I heard you: ${input.message}.${attachmentNudge} I can help break this down step by step.`,
+        content: `I heard you, ${input.studentContext.name}: ${input.message}.${attachmentNudge} I can help break this down step by step.`,
       };
       return;
     }
+
+    const systemPrompt = buildSystemPrompt(input.studentContext, {
+      kind: 'chat',
+    });
 
     const messages: ClaudeMessage[] = [
       ...input.history,
@@ -280,13 +338,13 @@ export class MastraService {
         this.completeMessage({
           model: SONNET_MODEL,
           maxTokens: 1200,
-          systemPrompt: CHAT_SYSTEM_PROMPT,
+          systemPrompt,
           messages,
           tools,
         }),
       );
 
-      const assistantBlocks = (response.content ?? []) as ClaudeAssistantContentBlock[];
+      const assistantBlocks = response.content ?? [];
 
       if (response.stop_reason === 'tool_use' && input.toolExecutor) {
         messages.push({ role: 'assistant', content: assistantBlocks });
@@ -298,7 +356,11 @@ export class MastraService {
 
           try {
             if (block.name === 'create_lesson') {
-              const args = block.input as { topic: string; depth?: 'quick' | 'standard' | 'deep'; subject?: string };
+              const args = block.input as {
+                topic: string;
+                depth?: 'quick' | 'standard' | 'deep';
+                subject?: string;
+              };
               const card = await input.toolExecutor.createLesson(args);
               toolResults.push({
                 type: 'tool_result',
@@ -310,7 +372,11 @@ export class MastraService {
             }
 
             if (block.name === 'create_quiz') {
-              const args = block.input as { topic: string; questionCount?: number; subject?: string };
+              const args = block.input as {
+                topic: string;
+                questionCount?: number;
+                subject?: string;
+              };
               const card = await input.toolExecutor.createQuiz(args);
               toolResults.push({
                 type: 'tool_result',
@@ -328,7 +394,8 @@ export class MastraService {
               is_error: true,
             });
           } catch (error) {
-            const message = error instanceof Error ? error.message : 'Tool execution failed';
+            const message =
+              error instanceof Error ? error.message : 'Tool execution failed';
             toolResults.push({
               type: 'tool_result',
               tool_use_id: block.id,
@@ -343,7 +410,10 @@ export class MastraService {
       }
 
       const finalText = assistantBlocks
-        .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
+        .filter(
+          (block): block is { type: 'text'; text: string } =>
+            block.type === 'text',
+        )
         .map((block) => block.text)
         .join('\n\n')
         .trim();
@@ -361,10 +431,11 @@ export class MastraService {
     slotType: string;
     context: Record<string, unknown>;
   }): Promise<{ title: string; description: string }> {
-    if (!this.apiKey) {
+    if (this.devMode) {
       return {
         title: 'Keep going',
-        description: 'You are building momentum. One more focused session helps.',
+        description:
+          'You are building momentum. One more focused session helps.',
       };
     }
 
@@ -377,17 +448,38 @@ export class MastraService {
         messages: [
           {
             role: 'user',
-            content: JSON.stringify({ slotType: input.slotType, context: input.context }),
+            content: JSON.stringify({
+              slotType: input.slotType,
+              context: input.context,
+            }),
           },
         ],
       }),
     );
 
-    const parsed = safeJsonParse<{ title?: string; description?: string }>(text);
+    const parsed = safeJsonParse<{ title?: string; description?: string }>(
+      text,
+    );
     return {
       title: parsed?.title ?? 'Keep going',
-      description: parsed?.description ?? 'A short focused session right now can move you forward.',
+      description:
+        parsed?.description ??
+        'A short focused session right now can move you forward.',
     };
+  }
+
+  private async runWithRetry<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await completeWithRetry(operation, {
+        maxAttempts: 3,
+        baseDelayMs: 400,
+      });
+    } catch (error) {
+      if (error instanceof ContentValidationError) {
+        throw new InternalServerErrorException(LERNARD_OUTAGE_MESSAGE);
+      }
+      throw error;
+    }
   }
 
   private async completeText(input: {
@@ -421,7 +513,9 @@ export class MastraService {
 
     const text = json.content?.find((block) => block.type === 'text')?.text;
     if (!text) {
-      throw new InternalServerErrorException('Claude completion returned empty text');
+      throw new InternalServerErrorException(
+        'Claude completion returned empty text',
+      );
     }
 
     return text;
@@ -433,7 +527,10 @@ export class MastraService {
     systemPrompt: string;
     messages: ClaudeMessage[];
     tools?: typeof CHAT_TOOLS;
-  }): Promise<{ stop_reason?: string; content?: ClaudeAssistantContentBlock[] }> {
+  }): Promise<{
+    stop_reason?: string;
+    content?: ClaudeAssistantContentBlock[];
+  }> {
     const body: Record<string, unknown> = {
       model: input.model,
       max_tokens: input.maxTokens,
@@ -466,9 +563,32 @@ export class MastraService {
   }
 }
 
+function lessonMaxTokens(depth: 'quick' | 'standard' | 'deep'): number {
+  if (depth === 'deep') return 5000;
+  if (depth === 'quick') return 2000;
+  return 3500;
+}
+
+function quizMaxTokens(questionCount: number): number {
+  if (questionCount >= 15) return 5000;
+  if (questionCount >= 10) return 4000;
+  return 2500;
+}
+
+function lessonMinutesForDepth(depth: 'quick' | 'standard' | 'deep'): number {
+  if (depth === 'quick') return 8;
+  if (depth === 'deep') return 20;
+  return 12;
+}
+
 function buildChatUserMessage(
   message: string,
-  attachments: Array<{ kind: 'image' | 'pdf'; mimeType: string; data: string; fileName: string }>,
+  attachments: Array<{
+    kind: 'image' | 'pdf';
+    mimeType: string;
+    data: string;
+    fileName: string;
+  }>,
 ): ClaudeMessage {
   if (attachments.length === 0) {
     return {
@@ -516,7 +636,7 @@ function buildFallbackLesson(
     topic,
     subjectName: subjectName ?? 'General',
     depth,
-    estimatedMinutes: depth === 'quick' ? 8 : depth === 'deep' ? 20 : 12,
+    estimatedMinutes: lessonMinutesForDepth(depth),
     sections: [
       {
         type: 'hook',
@@ -528,7 +648,12 @@ function buildFallbackLesson(
         type: 'concept',
         heading: `Core idea of ${topic}`,
         body: `${topic} can be understood by breaking it into smaller steps and patterns you can reuse.`,
-        terms: [{ term: topic, explanation: `${topic} is the key idea being studied in this lesson.` }],
+        terms: [
+          {
+            term: topic,
+            explanation: `${topic} is the key idea being studied in this lesson.`,
+          },
+        ],
       },
       {
         type: 'examples',
@@ -546,7 +671,10 @@ function buildFallbackLesson(
   };
 }
 
-function buildFallbackQuizQuestions(topic: string, questionCount: number): GeneratedQuizQuestion[] {
+function buildFallbackQuizQuestions(
+  topic: string,
+  questionCount: number,
+): GeneratedQuizQuestion[] {
   const normalizedTopic = topic.trim() || 'this topic';
 
   return Array.from({ length: questionCount }, (_, index) => {
@@ -613,61 +741,35 @@ function buildFallbackQuizQuestions(topic: string, questionCount: number): Gener
   });
 }
 
-function buildQuizQuestionSet(
-  generatedQuestions: GeneratedQuizQuestion[] | undefined,
-  topic: string,
-  questionCount: number,
-): GeneratedQuizQuestion[] {
-  const normalized = Array.isArray(generatedQuestions)
-    ? generatedQuestions.map((question) => normalizeGeneratedQuestion(question)).filter(isUsableGeneratedQuestion)
-    : [];
-  const uniqueQuestions: GeneratedQuizQuestion[] = [];
-  const seen = new Set<string>();
-
-  for (const question of normalized) {
-    const dedupeKey = `${question.type}|${normalizeQuestionKey(question.text)}`;
-    if (seen.has(dedupeKey)) {
-      continue;
-    }
-    seen.add(dedupeKey);
-    uniqueQuestions.push(question);
-
-  }
-
-  for (const fallbackQuestion of buildFallbackQuizQuestions(topic, questionCount * 2)) {
-    const dedupeKey = `${fallbackQuestion.type}|${normalizeQuestionKey(fallbackQuestion.text)}`;
-    if (seen.has(dedupeKey)) {
-      continue;
-    }
-    seen.add(dedupeKey);
-    uniqueQuestions.push(fallbackQuestion);
-
-    if (uniqueQuestions.length === questionCount) {
-      break;
-    }
-  }
-
-  return ensureMinimumQuizVariety(uniqueQuestions.slice(0, questionCount), topic, questionCount);
-}
-
-function normalizeGeneratedQuestion(question: GeneratedQuizQuestion): GeneratedQuizQuestion {
+function normalizeGeneratedQuestion(
+  question: GeneratedQuizQuestion,
+): GeneratedQuizQuestion {
   return {
     type: normalizeQuestionType(question.type),
-    text: typeof question.text === 'string' ? question.text.trim() : String(question.text ?? ''),
+    text:
+      typeof question.text === 'string'
+        ? question.text.trim()
+        : String(question.text ?? ''),
     options: Array.isArray(question.options)
       ? question.options
           .filter((option): option is string => typeof option === 'string')
           .map((option) => option.trim())
           .filter(Boolean)
       : undefined,
-    correctAnswer: typeof question.correctAnswer === 'string' ? question.correctAnswer.trim() : undefined,
+    correctAnswer:
+      typeof question.correctAnswer === 'string'
+        ? question.correctAnswer.trim()
+        : undefined,
     correctAnswers: Array.isArray(question.correctAnswers)
       ? question.correctAnswers
           .filter((answer): answer is string => typeof answer === 'string')
           .map((answer) => answer.trim())
           .filter(Boolean)
       : undefined,
-    explanation: typeof question.explanation === 'string' ? question.explanation.trim() : undefined,
+    explanation:
+      typeof question.explanation === 'string'
+        ? question.explanation.trim()
+        : undefined,
   };
 }
 
@@ -681,16 +783,27 @@ function isUsableGeneratedQuestion(question: GeneratedQuizQuestion): boolean {
       if (!hasDistinctOptions(question.options, 4)) {
         return false;
       }
-      return Boolean(question.correctAnswer && optionListIncludes(question.options, question.correctAnswer));
+      return Boolean(
+        question.correctAnswer &&
+        optionListIncludes(question.options, question.correctAnswer),
+      );
     }
     case 'multiple_select': {
-      if (!hasDistinctOptions(question.options, 4) || !Array.isArray(question.correctAnswers) || question.correctAnswers.length < 2) {
+      if (
+        !hasDistinctOptions(question.options, 4) ||
+        !Array.isArray(question.correctAnswers) ||
+        question.correctAnswers.length < 2
+      ) {
         return false;
       }
-      return question.correctAnswers.every((answer) => optionListIncludes(question.options, answer));
+      return question.correctAnswers.every((answer) =>
+        optionListIncludes(question.options, answer),
+      );
     }
     case 'true_false': {
-      return question.correctAnswer === 'true' || question.correctAnswer === 'false';
+      return (
+        question.correctAnswer === 'true' || question.correctAnswer === 'false'
+      );
     }
     case 'fill_blank':
     case 'short_answer':
@@ -702,96 +815,49 @@ function isUsableGeneratedQuestion(question: GeneratedQuizQuestion): boolean {
   }
 }
 
-function hasDistinctOptions(options: string[] | undefined, minCount: number): boolean {
+function hasDistinctOptions(
+  options: string[] | undefined,
+  minCount: number,
+): boolean {
   if (!Array.isArray(options) || options.length < minCount) {
     return false;
   }
 
-  return new Set(options.map((option) => option.trim().toLowerCase())).size === options.length;
+  return (
+    new Set(options.map((option) => option.trim().toLowerCase())).size ===
+    options.length
+  );
 }
 
-function optionListIncludes(options: string[] | undefined, candidate: string): boolean {
+function optionListIncludes(
+  options: string[] | undefined,
+  candidate: string,
+): boolean {
   if (!Array.isArray(options)) {
     return false;
   }
 
   const normalizedCandidate = candidate.trim().toLowerCase();
-  return options.some((option) => option.trim().toLowerCase() === normalizedCandidate);
+  return options.some(
+    (option) => option.trim().toLowerCase() === normalizedCandidate,
+  );
 }
 
 function isGenericQuestionText(text: string): boolean {
   const normalized = text.trim().toLowerCase();
 
-  return normalized.length < 12
-    || normalized.startsWith('which statement best describes')
-    || normalized.includes('definition a')
-    || normalized.includes('definition b')
-    || /^\d+\./.test(normalized);
+  return (
+    normalized.length < 12 ||
+    normalized.startsWith('which statement best describes') ||
+    normalized.startsWith('which option best describes') ||
+    normalized.includes('definition a') ||
+    normalized.includes('definition b') ||
+    /^\d+\./.test(normalized)
+  );
 }
 
 function normalizeQuestionKey(text: string): string {
   return text.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-function ensureMinimumQuizVariety(
-  questions: GeneratedQuizQuestion[],
-  topic: string,
-  questionCount: number,
-): GeneratedQuizQuestion[] {
-  if (questionCount < 5 || questions.length === 0) {
-    return questions.slice(0, questionCount);
-  }
-
-  const result = [...questions];
-  const fallbackPool = buildFallbackQuizQuestions(topic, questionCount * 2);
-
-  if (!result.some((question) => question.type === 'multiple_select')) {
-    const fallback = fallbackPool.find((question) => question.type === 'multiple_select');
-    if (fallback) {
-      result.push(fallback);
-    }
-  }
-
-  if (!result.some((question) => question.type === 'fill_blank' || question.type === 'short_answer')) {
-    const fallback = fallbackPool.find(
-      (question) => question.type === 'fill_blank' || question.type === 'short_answer',
-    );
-    if (fallback) {
-      result.push(fallback);
-    }
-  }
-
-  while (result.length > questionCount) {
-    const removableIndex = findRemovableQuestionIndex(result);
-    if (removableIndex === -1) {
-      break;
-    }
-    result.splice(removableIndex, 1);
-  }
-
-  return result.slice(0, questionCount);
-}
-
-function findRemovableQuestionIndex(questions: GeneratedQuizQuestion[]): number {
-  for (let index = questions.length - 1; index >= 0; index -= 1) {
-    const next = questions[index];
-    const typeCount = questions.filter((question) => question.type === next.type).length;
-    const freeResponseCount = questions.filter(
-      (question) => question.type === 'fill_blank' || question.type === 'short_answer',
-    ).length;
-
-    if (next.type === 'multiple_select' && typeCount <= 1) {
-      continue;
-    }
-
-    if ((next.type === 'fill_blank' || next.type === 'short_answer') && freeResponseCount <= 1) {
-      continue;
-    }
-
-    return index;
-  }
-
-  return -1;
 }
 
 function normalizeQuestionType(type: string | undefined): QuizQuestionType {
@@ -812,7 +878,12 @@ function normalizeSectionType(
   type: unknown,
   index: number,
 ): 'hook' | 'concept' | 'examples' | 'recap' {
-  if (type === 'hook' || type === 'concept' || type === 'examples' || type === 'recap') {
+  if (
+    type === 'hook' ||
+    type === 'concept' ||
+    type === 'examples' ||
+    type === 'recap'
+  ) {
     return type;
   }
 
