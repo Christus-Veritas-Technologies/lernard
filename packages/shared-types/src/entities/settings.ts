@@ -11,9 +11,8 @@ export interface UserSettings {
 }
 
 export interface CompanionControls {
-  showCorrectAnswers: boolean
-  allowHints: boolean
-  allowSkip: boolean
+  answerRevealTiming: 'after_quiz' | 'immediate'
+  quizPassThreshold: number
   lockedByGuardian: boolean
   lastChangedAt: string
   lastChangedBy: string
