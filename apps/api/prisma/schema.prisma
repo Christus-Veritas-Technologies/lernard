@@ -104,6 +104,20 @@ model User {
   dailyGoal      Int       @default(1)  // sessions per day
   notificationsEnabled Boolean @default(true)
 
+  // Study preferences (extended)
+  supportLevel         String  @default("moderate") // "minimal" | "moderate" | "full"
+  textSize             String  @default("medium")   // "small" | "medium" | "large" | "xl"
+  reducedMotion        Boolean @default(false)
+
+  // Notification preferences
+  reminderEnabled           Boolean @default(true)
+  reminderTime              String  @default("07:00") // "HH:MM"
+  streakAlertEnabled        Boolean @default(true)
+  growthAreaNudgeEnabled    Boolean @default(true)
+  growthAreaNudgeFrequency  String  @default("daily") // "daily" | "weekly" | "in_app_only"
+  planLimitAlertEnabled     Boolean @default(true)
+  weeklyEmailEnabled        Boolean @default(true)
+
   // Onboarding
   onboardingComplete Boolean @default(false)
   firstLookComplete  Boolean @default(false)
@@ -151,6 +165,11 @@ model Guardian {
   userId       String   @unique
   passwordHash String?  // optional — only set if guardian configures a parental-controls PIN
   createdAt    DateTime @default(now())
+
+  contactPreference  String @default("email")    // "email" | "push" | "both"
+  dashboardDefault   String @default("overview") // "overview" | "last_viewed" | "most_recent"
+    weeklyFamilySummary  Boolean @default(true)
+    unsubscribeAll       Boolean @default(false)
 
   children     User[]          @relation("GuardianStudents")
   invites      ChildInvite[]
