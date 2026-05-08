@@ -117,6 +117,12 @@ model User {
   stripeSubscriptionId    String?
   invalidatePermissionsAt DateTime?
 
+  // Account activation (for guardian-created child accounts)
+  accountStatus       String    @default("ACTIVE")   // "ACTIVE" | "PENDING_SETUP"
+  setupToken          String?   @unique
+  setupTokenExpiresAt DateTime?
+  setupReminderSentAt DateTime?
+
   // Guardian control
   controlledByGuardianId String?
   controlledBy           Guardian? @relation("GuardianStudents", fields: [controlledByGuardianId], references: [id])
@@ -158,9 +164,8 @@ model Guardian {
 model CompanionControls {
   id                 String   @id @default(cuid())
   studentId          String   @unique
-  showCorrectAnswers Boolean  @default(true)
-  allowHints         Boolean  @default(true)
-  allowSkip          Boolean  @default(false)
+  answerRevealTiming String   @default("after_quiz")  // "after_quiz" | "immediate"
+  quizPassThreshold  Float    @default(0.7)            // 0.5 | 0.6 | 0.7 | 0.8 | 0.9 | 1.0
   lockedByGuardian   Boolean  @default(false)
   lastChangedAt      DateTime @updatedAt
   lastChangedBy      String   @default("Lernard")
@@ -192,6 +197,9 @@ model ChildInvite {
   id         String   @id @default(cuid())
   guardianId String
   childEmail String?
+  childId    String?                              // populated for existing_account path
+  type       String   @default("existing_account") // "existing_account" | "new_account"
+  status     String   @default("pending")          // "pending" | "accepted" | "declined" | "cancelled"
   code       String   @unique // 6-digit
   expiresAt  DateTime
   usedAt     DateTime?
@@ -201,6 +209,7 @@ model ChildInvite {
 
   @@index([code])
   @@index([expiresAt])
+  @@index([guardianId, status])
 }
 
 // ─── Magic Link Token ─────────────────────────────────────────────────────────
