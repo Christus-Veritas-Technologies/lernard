@@ -13,11 +13,19 @@ import type {
 import type { User } from '@prisma/client';
 import { Observable } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MastraService, type ChatToolExecutor } from '../../mastra/mastra.service';
+import {
+  MastraService,
+  type ChatToolExecutor,
+} from '../../mastra/mastra.service';
+import { StudentContextBuilder } from '../../mastra/student-context.builder';
 import { R2Service } from '../../r2/r2.service';
 import { LessonsService } from '../lessons/lessons.service';
 import { QuizzesService } from '../quizzes/quizzes.service';
-import { storeChatUpload, chatUploadExists, readChatPromptUpload } from './chat-uploads';
+import {
+  storeChatUpload,
+  chatUploadExists,
+  readChatPromptUpload,
+} from './chat-uploads';
 import type { ChatPromptUpload, ChatUploadFile } from './chat-uploads';
 import { SendMessageDto } from './dto/send-message.dto';
 
@@ -26,6 +34,7 @@ export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mastraService: MastraService,
+    private readonly studentContextBuilder: StudentContextBuilder,
     private readonly r2: R2Service,
     private readonly lessonsService: LessonsService,
     private readonly quizzesService: QuizzesService,
@@ -50,7 +59,10 @@ export class ChatService {
     return storeChatUpload(this.r2, user.id, file);
   }
 
-  async getConversation(user: User, conversationId: string): Promise<ChatConversationDetail> {
+  async getConversation(
+    user: User,
+    conversationId: string,
+  ): Promise<ChatConversationDetail> {
     const conversation = await (this.prisma as any).conversation.findFirst({
       where: { id: conversationId, userId: user.id },
       select: { id: true, title: true },
@@ -71,13 +83,17 @@ export class ChatService {
       messages: messages.map((message: any) => ({
         id: message.id,
         role: message.role === 'ASSISTANT' ? 'assistant' : 'user',
-        blocks: Array.isArray(message.blocks) ? (message.blocks as ChatMessageBlock[]) : [],
+        blocks: Array.isArray(message.blocks)
+          ? (message.blocks as ChatMessageBlock[])
+          : [],
         createdAt: message.createdAt.toISOString(),
       })),
     };
   }
 
-  async getAttachableLessons(user: User): Promise<ChatLessonAttachmentOption[]> {
+  async getAttachableLessons(
+    user: User,
+  ): Promise<ChatLessonAttachmentOption[]> {
     const lessons = await (this.prisma as any).lesson.findMany({
       where: {
         userId: user.id,
@@ -101,9 +117,18 @@ export class ChatService {
     }));
   }
 
-  async sendMessage(user: User, dto: SendMessageDto): Promise<{ conversationId: string; blocks: ChatMessageBlock[] }> {
-    const conversation = await this.findOrCreateConversation(user, dto.conversationId);
-    const attachments = await this.resolveAttachments(user, normalizeAttachmentInputs(dto.attachments ?? []));
+  async sendMessage(
+    user: User,
+    dto: SendMessageDto,
+  ): Promise<{ conversationId: string; blocks: ChatMessageBlock[] }> {
+    const conversation = await this.findOrCreateConversation(
+      user,
+      dto.conversationId,
+    );
+    const attachments = await this.resolveAttachments(
+      user,
+      normalizeAttachmentInputs(dto.attachments ?? []),
+    );
     const promptUploads = await this.loadPromptUploads(user, attachments);
     const userBlocks = buildUserBlocks(dto.message, attachments);
 
@@ -122,15 +147,24 @@ export class ChatService {
     });
 
     const historyMessages = buildHistoryMessages(history);
-    const memoryMessage = await this.buildCrossConversationMemoryMessage(user.id, conversation.id);
-    const historyWithMemory = memoryMessage ? [memoryMessage, ...historyMessages] : historyMessages;
+    const memoryMessage = await this.buildCrossConversationMemoryMessage(
+      user.id,
+      conversation.id,
+    );
+    const historyWithMemory = memoryMessage
+      ? [memoryMessage, ...historyMessages]
+      : historyMessages;
     const assistantBlocks: ChatMessageBlock[] = [];
+    const studentContext = await this.studentContextBuilder.buildForUser(
+      user.id,
+    );
 
     for await (const block of this.mastraService.streamChat({
       message: buildPromptMessage(dto.message, attachments),
       history: historyWithMemory,
       attachments: promptUploads,
       toolExecutor: this.buildToolExecutor(user, conversation.id),
+      studentContext,
     })) {
       assistantBlocks.push(block);
     }
@@ -149,7 +183,10 @@ export class ChatService {
       where: { id: conversation.id },
       data: {
         lastMessage: lastPreview ? lastPreview.slice(0, 140) : dto.message,
-        title: conversation.title === 'New Chat' ? buildConversationTitle(dto.message) : conversation.title,
+        title:
+          conversation.title === 'New Chat'
+            ? buildConversationTitle(dto.message)
+            : conversation.title,
       },
     });
 
@@ -172,8 +209,14 @@ export class ChatService {
     dto: SendMessageDto,
     subscriber: { next: (value: MessageEvent) => void },
   ): Promise<void> {
-    const conversation = await this.findOrCreateConversation(user, dto.conversationId);
-    const attachments = await this.resolveAttachments(user, normalizeAttachmentInputs(dto.attachments ?? []));
+    const conversation = await this.findOrCreateConversation(
+      user,
+      dto.conversationId,
+    );
+    const attachments = await this.resolveAttachments(
+      user,
+      normalizeAttachmentInputs(dto.attachments ?? []),
+    );
     const promptUploads = await this.loadPromptUploads(user, attachments);
     const userBlocks = buildUserBlocks(dto.message, attachments);
 
@@ -192,18 +235,29 @@ export class ChatService {
     });
 
     const historyMessages = buildHistoryMessages(history);
-    const memoryMessage = await this.buildCrossConversationMemoryMessage(user.id, conversation.id);
-    const historyWithMemory = memoryMessage ? [memoryMessage, ...historyMessages] : historyMessages;
+    const memoryMessage = await this.buildCrossConversationMemoryMessage(
+      user.id,
+      conversation.id,
+    );
+    const historyWithMemory = memoryMessage
+      ? [memoryMessage, ...historyMessages]
+      : historyMessages;
     const assistantBlocks: ChatMessageBlock[] = [];
+    const studentContext = await this.studentContextBuilder.buildForUser(
+      user.id,
+    );
 
     for await (const block of this.mastraService.streamChat({
       message: buildPromptMessage(dto.message, attachments),
       history: historyWithMemory,
       attachments: promptUploads,
       toolExecutor: this.buildToolExecutor(user, conversation.id),
+      studentContext,
     })) {
       assistantBlocks.push(block);
-      subscriber.next(new MessageEvent('message', { data: JSON.stringify(block) }));
+      subscriber.next(
+        new MessageEvent('message', { data: JSON.stringify(block) }),
+      );
     }
 
     await (this.prisma as any).message.create({
@@ -220,7 +274,10 @@ export class ChatService {
       where: { id: conversation.id },
       data: {
         lastMessage: lastPreview ? lastPreview.slice(0, 140) : dto.message,
-        title: conversation.title === 'New Chat' ? buildConversationTitle(dto.message) : conversation.title,
+        title:
+          conversation.title === 'New Chat'
+            ? buildConversationTitle(dto.message)
+            : conversation.title,
       },
     });
   }
@@ -244,7 +301,10 @@ export class ChatService {
     });
   }
 
-  private async resolveAttachments(user: User, attachments: ChatAttachmentInput[]): Promise<ChatAttachment[]> {
+  private async resolveAttachments(
+    user: User,
+    attachments: ChatAttachmentInput[],
+  ): Promise<ChatAttachment[]> {
     const resolved: ChatAttachment[] = [];
 
     for (const attachment of attachments) {
@@ -291,16 +351,24 @@ export class ChatService {
     return resolved;
   }
 
-  private async loadPromptUploads(user: User, attachments: ChatAttachment[]): Promise<ChatPromptUpload[]> {
+  private async loadPromptUploads(
+    user: User,
+    attachments: ChatAttachment[],
+  ): Promise<ChatPromptUpload[]> {
     const uploads = attachments.filter(
-      (attachment): attachment is Extract<ChatAttachment, { type: 'upload' }> => attachment.type === 'upload',
+      (attachment): attachment is Extract<ChatAttachment, { type: 'upload' }> =>
+        attachment.type === 'upload',
     );
 
     const promptUploads = await Promise.all(
-      uploads.map((attachment) => readChatPromptUpload(this.r2, user.id, attachment)),
+      uploads.map((attachment) =>
+        readChatPromptUpload(this.r2, user.id, attachment),
+      ),
     );
 
-    return promptUploads.filter((attachment): attachment is ChatPromptUpload => attachment !== null);
+    return promptUploads.filter(
+      (attachment): attachment is ChatPromptUpload => attachment !== null,
+    );
   }
 
   private async buildCrossConversationMemoryMessage(
@@ -310,7 +378,10 @@ export class ChatService {
     return null;
   }
 
-  private buildToolExecutor(user: User, conversationId: string): ChatToolExecutor {
+  private buildToolExecutor(
+    user: User,
+    conversationId: string,
+  ): ChatToolExecutor {
     return {
       createLesson: async ({ topic, depth = 'standard', subject }) => {
         const { lessonId } = await this.lessonsService.generate(user, {
@@ -361,7 +432,15 @@ export class ChatService {
 }
 
 function normalizeAttachmentInputs(
-  attachments: Array<{ type: 'upload' | 'lesson'; uploadId?: string; kind?: 'image' | 'pdf'; fileName?: string; mimeType?: string; size?: number; lessonId?: string }>,
+  attachments: Array<{
+    type: 'upload' | 'lesson';
+    uploadId?: string;
+    kind?: 'image' | 'pdf';
+    fileName?: string;
+    mimeType?: string;
+    size?: number;
+    lessonId?: string;
+  }>,
 ): ChatAttachmentInput[] {
   const normalized: ChatAttachmentInput[] = [];
 
@@ -375,12 +454,12 @@ function normalizeAttachmentInputs(
     }
 
     if (
-      attachment.type === 'upload'
-      && attachment.uploadId
-      && attachment.kind
-      && attachment.fileName
-      && attachment.mimeType
-      && typeof attachment.size === 'number'
+      attachment.type === 'upload' &&
+      attachment.uploadId &&
+      attachment.kind &&
+      attachment.fileName &&
+      attachment.mimeType &&
+      typeof attachment.size === 'number'
     ) {
       normalized.push({
         type: 'upload',
@@ -402,7 +481,10 @@ function buildConversationTitle(message: string): string {
   return cleaned.length > 42 ? `${cleaned.slice(0, 39)}...` : cleaned;
 }
 
-function buildUserBlocks(message: string, attachments: ChatAttachment[]): ChatMessageBlock[] {
+function buildUserBlocks(
+  message: string,
+  attachments: ChatAttachment[],
+): ChatMessageBlock[] {
   const blocks: ChatMessageBlock[] = [{ type: 'text', content: message }];
 
   if (attachments.length > 0) {
@@ -415,19 +497,25 @@ function buildUserBlocks(message: string, attachments: ChatAttachment[]): ChatMe
   return blocks;
 }
 
-function buildHistoryMessages(history: Array<{ role: string; blocks: unknown }>): Array<{ role: 'assistant' | 'user'; content: string }> {
+function buildHistoryMessages(
+  history: Array<{ role: string; blocks: unknown }>,
+): Array<{ role: 'assistant' | 'user'; content: string }> {
   return history
     .filter((message) => Array.isArray(message.blocks))
     .flatMap((message) => {
-      const content = buildPromptFromBlocks(message.blocks as ChatMessageBlock[]);
+      const content = buildPromptFromBlocks(
+        message.blocks as ChatMessageBlock[],
+      );
       if (!content) {
         return [];
       }
 
-      return [{
-        role: message.role === 'ASSISTANT' ? 'assistant' : 'user',
-        content,
-      }];
+      return [
+        {
+          role: message.role === 'ASSISTANT' ? 'assistant' : 'user',
+          content,
+        },
+      ];
     });
 }
 
@@ -447,12 +535,18 @@ function buildPromptFromBlocks(blocks: ChatMessageBlock[]): string {
     }
 
     if (block.type === 'LessonRefCard') {
-      const subject = block.props.subjectName ? ` (${block.props.subjectName})` : '';
-      return [`[lesson created: "${block.props.title}"${subject} — id ${block.props.lessonId}]`];
+      const subject = block.props.subjectName
+        ? ` (${block.props.subjectName})`
+        : '';
+      return [
+        `[lesson created: "${block.props.title}"${subject} — id ${block.props.lessonId}]`,
+      ];
     }
 
     if (block.type === 'QuizRefCard') {
-      const subject = block.props.subjectName ? ` (${block.props.subjectName})` : '';
+      const subject = block.props.subjectName
+        ? ` (${block.props.subjectName})`
+        : '';
       return [
         `[quiz created: "${block.props.title}"${subject} — id ${block.props.quizId}, ${block.props.totalQuestions} questions]`,
       ];
@@ -464,19 +558,26 @@ function buildPromptFromBlocks(blocks: ChatMessageBlock[]): string {
   return parts.filter(Boolean).join('\n\n').trim();
 }
 
-function normalizeDepth(depth: string | undefined | null): 'quick' | 'standard' | 'deep' {
+function normalizeDepth(
+  depth: string | undefined | null,
+): 'quick' | 'standard' | 'deep' {
   if (depth === 'quick' || depth === 'standard' || depth === 'deep') {
     return depth;
   }
   return 'standard';
 }
 
-function buildPromptMessage(message: string, attachments: ChatAttachment[]): string {
+function buildPromptMessage(
+  message: string,
+  attachments: ChatAttachment[],
+): string {
   if (attachments.length === 0) {
     return message;
   }
 
-  return [message, summarizeAttachments(attachments)].filter(Boolean).join('\n\n');
+  return [message, summarizeAttachments(attachments)]
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 function summarizeAttachments(attachments: ChatAttachment[]): string {

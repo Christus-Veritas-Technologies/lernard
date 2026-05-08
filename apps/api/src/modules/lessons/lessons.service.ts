@@ -3,21 +3,34 @@ import type { LessonContent, PostLessonResult } from '@lernard/shared-types';
 import type { User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MastraService } from '../../mastra/mastra.service';
+import { StudentContextBuilder } from '../../mastra/student-context.builder';
 import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
-import { CompleteLessonDto, GenerateLessonDto, SectionCheckDto } from './dto/generate-lesson.dto';
+import {
+  CompleteLessonDto,
+  GenerateLessonDto,
+  SectionCheckDto,
+} from './dto/generate-lesson.dto';
 
 @Injectable()
 export class LessonsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mastraService: MastraService,
+    private readonly studentContextBuilder: StudentContextBuilder,
   ) {}
 
-  async generate(user: User, dto: GenerateLessonDto): Promise<{ lessonId: string; status: string }> {
+  async generate(
+    user: User,
+    dto: GenerateLessonDto,
+  ): Promise<{ lessonId: string; status: string }> {
+    const studentContext = await this.studentContextBuilder.buildForUser(
+      user.id,
+    );
     const generated = await this.mastraService.generateLesson({
       topic: dto.topic,
       depth: dto.depth,
       subjectName: dto.subject,
+      studentContext,
     });
 
     await validateGeneratedContent(generated, this.mastraService);
@@ -36,7 +49,14 @@ export class LessonsService {
     return { lessonId: lesson.id, status: 'ready' };
   }
 
-  async list(user: User): Promise<{ lessonId: string; topic: string; subjectName: string; completedAt: string | null }[]> {
+  async list(user: User): Promise<
+    {
+      lessonId: string;
+      topic: string;
+      subjectName: string;
+      completedAt: string | null;
+    }[]
+  > {
     const lessons = await (this.prisma as any).lesson.findMany({
       where: { userId: user.id, status: 'READY' },
       orderBy: { createdAt: 'desc' },
@@ -44,15 +64,25 @@ export class LessonsService {
       select: { id: true, topic: true, subjectName: true, completedAt: true },
     });
 
-    return lessons.map((l: { id: string; topic: string; subjectName: string | null; completedAt: Date | null }) => ({
-      lessonId: l.id,
-      topic: l.topic,
-      subjectName: l.subjectName ?? 'General',
-      completedAt: l.completedAt ? l.completedAt.toISOString() : null,
-    }));
+    return lessons.map(
+      (l: {
+        id: string;
+        topic: string;
+        subjectName: string | null;
+        completedAt: Date | null;
+      }) => ({
+        lessonId: l.id,
+        topic: l.topic,
+        subjectName: l.subjectName ?? 'General',
+        completedAt: l.completedAt ? l.completedAt.toISOString() : null,
+      }),
+    );
   }
 
-  async getLesson(user: User, lessonId: string): Promise<{ status: 'generating' | 'ready'; content?: LessonContent }> {
+  async getLesson(
+    user: User,
+    lessonId: string,
+  ): Promise<{ status: 'generating' | 'ready'; content?: LessonContent }> {
     const lesson = await (this.prisma as any).lesson.findFirst({
       where: { id: lessonId, userId: user.id },
     });
@@ -78,7 +108,11 @@ export class LessonsService {
     };
   }
 
-  async sectionCheck(user: User, lessonId: string, dto: SectionCheckDto): Promise<{ ok: true }> {
+  async sectionCheck(
+    user: User,
+    lessonId: string,
+    dto: SectionCheckDto,
+  ): Promise<{ ok: true }> {
     const lesson = await (this.prisma as any).lesson.findFirst({
       where: { id: lessonId, userId: user.id },
       select: { id: true },
@@ -104,7 +138,11 @@ export class LessonsService {
     return { ok: true };
   }
 
-  async complete(user: User, lessonId: string, dto: CompleteLessonDto): Promise<PostLessonResult> {
+  async complete(
+    user: User,
+    lessonId: string,
+    dto: CompleteLessonDto,
+  ): Promise<PostLessonResult> {
     const lesson = await (this.prisma as any).lesson.findFirst({
       where: { id: lessonId, userId: user.id },
     });
@@ -117,6 +155,7 @@ export class LessonsService {
       where: { id: lessonId },
       data: {
         completedAt: new Date(),
+        confidenceRating: dto.confidenceRating,
       },
     });
 
