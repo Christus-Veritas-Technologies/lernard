@@ -1,6 +1,13 @@
 import { BadRequestException } from '@nestjs/common';
 import type { MastraService } from '../../mastra/mastra.service';
 
+export class ContentValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ContentValidationError';
+  }
+}
+
 interface GeneratedQuizQuestionLike {
   type?: unknown;
   text?: unknown;
@@ -8,6 +15,22 @@ interface GeneratedQuizQuestionLike {
   correctAnswer?: unknown;
   correctAnswers?: unknown;
 }
+
+interface GeneratedLessonSectionLike {
+  type?: unknown;
+  heading?: unknown;
+  body?: unknown;
+}
+
+interface GeneratedLessonLike {
+  topic?: unknown;
+  sections?: unknown;
+}
+
+const MIN_LESSON_BODY_WORDS = 60;
+const MIN_QUIZ_QUESTION_WORDS = 15;
+const PLACEHOLDER_PATTERN =
+  /^which\s+(statement|option)\s+(best\s+)?describes/i;
 
 export async function validateGeneratedContent(
   content: unknown,
@@ -27,8 +50,24 @@ export async function validateGeneratedContent(
       throw new BadRequestException('Generated content is incomplete');
     }
 
-    validateQuizContent(content);
+    try {
+      validateQuizContent(content);
+      validateLessonContent(content);
+    } catch (error) {
+      if (error instanceof ContentValidationError) {
+        throw new BadRequestException(error.message);
+      }
+      throw error;
+    }
   }
+}
+
+export function assertQuizContentValid(content: unknown): void {
+  validateQuizContent(content);
+}
+
+export function assertLessonContentValid(content: unknown): void {
+  validateLessonContent(content);
 }
 
 function validateQuizContent(content: unknown): void {
@@ -37,7 +76,7 @@ function validateQuizContent(content: unknown): void {
   }
 
   if (content.questions.length === 0) {
-    throw new BadRequestException('Generated quiz is missing questions');
+    throw new ContentValidationError('Generated quiz is missing questions');
   }
 
   const seenTexts = new Set<string>();
@@ -45,83 +84,246 @@ function validateQuizContent(content: unknown): void {
   for (const question of content.questions) {
     const text = typeof question.text === 'string' ? question.text.trim() : '';
     if (!text) {
-      throw new BadRequestException('Generated quiz contains a blank question');
+      throw new ContentValidationError(
+        'Generated quiz contains a blank question',
+      );
+    }
+
+    if (countWords(text) < MIN_QUIZ_QUESTION_WORDS) {
+      throw new ContentValidationError(
+        `Generated quiz question is too short (under ${MIN_QUIZ_QUESTION_WORDS} words): ${truncate(text)}`,
+      );
+    }
+
+    if (PLACEHOLDER_PATTERN.test(text)) {
+      throw new ContentValidationError(
+        `Generated quiz question uses a placeholder pattern: ${truncate(text)}`,
+      );
     }
 
     const key = text.toLowerCase().replace(/\s+/g, ' ');
     if (seenTexts.has(key)) {
-      throw new BadRequestException('Generated quiz contains duplicate questions');
+      throw new ContentValidationError(
+        'Generated quiz contains duplicate questions',
+      );
     }
     seenTexts.add(key);
 
     if (isPlaceholderQuestion(text, question.options)) {
-      throw new BadRequestException('Generated quiz contains placeholder questions');
+      throw new ContentValidationError(
+        'Generated quiz contains placeholder questions',
+      );
     }
 
     validateQuestionStructure(question);
   }
 }
 
+function validateLessonContent(content: unknown): void {
+  if (!isLessonPayload(content)) return;
+
+  const sections = content.sections.filter(
+    isObject,
+  ) as GeneratedLessonSectionLike[];
+  if (sections.length < 4) {
+    throw new ContentValidationError(
+      'Generated lesson must contain at least 4 sections',
+    );
+  }
+
+  const topic = typeof content.topic === 'string' ? content.topic.trim() : '';
+
+  for (const section of sections) {
+    const body = typeof section.body === 'string' ? section.body.trim() : '';
+    if (!body) {
+      throw new ContentValidationError(
+        'Generated lesson contains a blank section',
+      );
+    }
+
+    if (countWords(body) < MIN_LESSON_BODY_WORDS) {
+      throw new ContentValidationError(
+        `Generated lesson section is too short (under ${MIN_LESSON_BODY_WORDS} words)`,
+      );
+    }
+
+    if (isMetaSentence(body)) {
+      throw new ContentValidationError(
+        'Generated lesson section reads like a meta-description rather than real content',
+      );
+    }
+  }
+
+  const hook = sections.find((s) => s.type === 'hook') ?? sections[0];
+  const hookBody = typeof hook?.body === 'string' ? hook.body : '';
+  if (topic && !hookBody.toLowerCase().includes(topic.toLowerCase())) {
+    throw new ContentValidationError(
+      'Generated lesson hook does not mention the topic by name',
+    );
+  }
+
+  const examples = sections.find((s) => s.type === 'examples');
+  if (examples) {
+    const examplesBody = typeof examples.body === 'string' ? examples.body : '';
+    if (!hasConcreteExampleSignal(examplesBody)) {
+      throw new ContentValidationError(
+        'Generated lesson examples section lacks concrete detail (no numbers or specific names)',
+      );
+    }
+  }
+}
+
 function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
   const type = typeof question.type === 'string' ? question.type : '';
   const options = Array.isArray(question.options)
-    ? question.options.filter((option): option is string => typeof option === 'string').map((option) => option.trim()).filter(Boolean)
+    ? question.options
+        .filter((option): option is string => typeof option === 'string')
+        .map((option) => option.trim())
+        .filter(Boolean)
     : [];
-  const correctAnswer = typeof question.correctAnswer === 'string' ? question.correctAnswer.trim() : '';
+  const correctAnswer =
+    typeof question.correctAnswer === 'string'
+      ? question.correctAnswer.trim()
+      : '';
   const correctAnswers = Array.isArray(question.correctAnswers)
-    ? question.correctAnswers.filter((answer): answer is string => typeof answer === 'string').map((answer) => answer.trim()).filter(Boolean)
+    ? question.correctAnswers
+        .filter((answer): answer is string => typeof answer === 'string')
+        .map((answer) => answer.trim())
+        .filter(Boolean)
     : [];
 
   switch (type) {
     case 'multiple_choice':
-      if (options.length !== 4 || new Set(options.map((option) => option.toLowerCase())).size !== 4) {
-        throw new BadRequestException('Multiple choice questions require 4 distinct options');
+      if (
+        options.length !== 4 ||
+        new Set(options.map((option) => option.toLowerCase())).size !== 4
+      ) {
+        throw new ContentValidationError(
+          'Multiple choice questions require 4 distinct options',
+        );
       }
-      if (!correctAnswer || !options.some((option) => option.toLowerCase() === correctAnswer.toLowerCase())) {
-        throw new BadRequestException('Multiple choice questions require a correct answer from the options');
+      if (
+        !correctAnswer ||
+        !options.some(
+          (option) => option.toLowerCase() === correctAnswer.toLowerCase(),
+        )
+      ) {
+        throw new ContentValidationError(
+          'Multiple choice questions require a correct answer from the options',
+        );
       }
       return;
     case 'multiple_select':
-      if (options.length < 4 || new Set(options.map((option) => option.toLowerCase())).size !== options.length) {
-        throw new BadRequestException('Multiple select questions require distinct options');
+      if (
+        options.length < 4 ||
+        new Set(options.map((option) => option.toLowerCase())).size !==
+          options.length
+      ) {
+        throw new ContentValidationError(
+          'Multiple select questions require distinct options',
+        );
       }
-      if (correctAnswers.length < 2 || !correctAnswers.every((answer) => options.some((option) => option.toLowerCase() === answer.toLowerCase()))) {
-        throw new BadRequestException('Multiple select questions require 2 or more correct answers from the options');
+      if (
+        correctAnswers.length < 2 ||
+        !correctAnswers.every((answer) =>
+          options.some(
+            (option) => option.toLowerCase() === answer.toLowerCase(),
+          ),
+        )
+      ) {
+        throw new ContentValidationError(
+          'Multiple select questions require 2 or more correct answers from the options',
+        );
       }
       return;
     case 'true_false':
       if (correctAnswer !== 'true' && correctAnswer !== 'false') {
-        throw new BadRequestException('True/false questions require correctAnswer to be true or false');
+        throw new ContentValidationError(
+          'True/false questions require correctAnswer to be true or false',
+        );
       }
       return;
     case 'fill_blank':
     case 'short_answer':
     case 'ordering':
       if (!correctAnswer) {
-        throw new BadRequestException('Free-response questions require a correct answer');
+        throw new ContentValidationError(
+          'Free-response questions require a correct answer',
+        );
       }
       return;
     default:
-      throw new BadRequestException('Generated quiz contains an unsupported question type');
+      throw new ContentValidationError(
+        'Generated quiz contains an unsupported question type',
+      );
   }
 }
 
 function isPlaceholderQuestion(text: string, options: unknown): boolean {
   const normalizedText = text.trim().toLowerCase();
   const normalizedOptions = Array.isArray(options)
-    ? options.filter((option): option is string => typeof option === 'string').map((option) => option.trim().toLowerCase())
+    ? options
+        .filter((option): option is string => typeof option === 'string')
+        .map((option) => option.trim().toLowerCase())
     : [];
 
-  return normalizedText.startsWith('which statement best describes')
-    || /^\d+\./.test(normalizedText)
-    || normalizedOptions.join('|') === 'definition a|definition b|definition c|definition d';
+  return (
+    normalizedText.startsWith('which statement best describes') ||
+    /^\d+\./.test(normalizedText) ||
+    normalizedOptions.join('|') ===
+      'definition a|definition b|definition c|definition d'
+  );
 }
 
-function isQuizPayload(content: unknown): content is { questions: GeneratedQuizQuestionLike[] } {
-  return Boolean(
-    content
-    && typeof content === 'object'
-    && 'questions' in content
-    && Array.isArray((content as { questions?: unknown }).questions),
+function isMetaSentence(body: string): boolean {
+  const lower = body.trim().toLowerCase();
+  return (
+    lower.startsWith('this section will') ||
+    lower.startsWith('in this section we will') ||
+    /\bcan be (understood|broken down) by breaking (it|them) into smaller (steps|ideas|patterns)\b/.test(
+      lower,
+    )
   );
+}
+
+function hasConcreteExampleSignal(body: string): boolean {
+  if (/\d/.test(body)) return true;
+  // Look for a capitalised proper-noun-like token of at least 3 characters,
+  // ignoring sentence starts. Two or more of these strongly suggests a real scenario.
+  const properNouns = body.match(/(?<![.!?]\s)\b[A-Z][a-zA-Z]{2,}\b/g) ?? [];
+  return properNouns.length >= 2;
+}
+
+function isQuizPayload(
+  content: unknown,
+): content is { questions: GeneratedQuizQuestionLike[] } {
+  return Boolean(
+    content &&
+    typeof content === 'object' &&
+    'questions' in content &&
+    Array.isArray((content as { questions?: unknown }).questions),
+  );
+}
+
+function isLessonPayload(
+  content: unknown,
+): content is GeneratedLessonLike & { sections: unknown[] } {
+  return Boolean(
+    content &&
+    typeof content === 'object' &&
+    'sections' in content &&
+    Array.isArray((content as { sections?: unknown }).sections),
+  );
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function truncate(text: string): string {
+  return text.length > 80 ? `${text.slice(0, 77)}…` : text;
 }
