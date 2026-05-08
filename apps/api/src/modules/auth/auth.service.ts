@@ -17,7 +17,10 @@ interface MagicLinkRecord {
   usedAt: Date | null;
 }
 import { PrismaService } from '../../prisma/prisma.service';
-import { toSharedPlan, toSharedRole } from '../../common/utils/shared-model-mappers';
+import {
+  toSharedPlan,
+  toSharedRole,
+} from '../../common/utils/shared-model-mappers';
 import { MailService } from './mail.service';
 
 const REFRESH_TOKEN_DAYS = 90;
@@ -81,7 +84,9 @@ export class AuthService {
 
   async verifyMagicLinkToken(token: string) {
     const tokenHash = this.hashToken(token);
-    const record = await this.prisma.magicLinkToken.findUnique({ where: { tokenHash } });
+    const record = await this.prisma.magicLinkToken.findUnique({
+      where: { tokenHash },
+    });
     return this.consumeMagicLink(record);
   }
 
@@ -95,10 +100,14 @@ export class AuthService {
 
   private async consumeMagicLink(record: MagicLinkRecord | null) {
     if (!record || record.usedAt) {
-      throw new UnauthorizedException('This link is invalid or has already been used.');
+      throw new UnauthorizedException(
+        'This link is invalid or has already been used.',
+      );
     }
     if (record.expiresAt < new Date()) {
-      throw new UnauthorizedException('This link has expired. Please request a new one.');
+      throw new UnauthorizedException(
+        'This link has expired. Please request a new one.',
+      );
     }
 
     await this.prisma.magicLinkToken.update({
@@ -114,7 +123,8 @@ export class AuthService {
   private async findOrCreateUserByEmail(email: string) {
     const existing = await this.prisma.user.findUnique({ where: { email } });
     if (existing) {
-      if (existing.deletedAt) throw new UnauthorizedException('Account not found.');
+      if (existing.deletedAt)
+        throw new UnauthorizedException('Account not found.');
       return existing;
     }
     const newUser = await this.prisma.user.create({
@@ -137,11 +147,15 @@ export class AuthService {
   async findOrCreateGoogleUser(profile: GoogleProfile) {
     const { googleId, name, email } = profile;
 
-    const byGoogleId = await this.prisma.user.findUnique({ where: { googleId } });
+    const byGoogleId = await this.prisma.user.findUnique({
+      where: { googleId },
+    });
     if (byGoogleId) return this.issueTokens(byGoogleId);
 
     if (email) {
-      const byEmail = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+      const byEmail = await this.prisma.user.findUnique({
+        where: { email: email.toLowerCase() },
+      });
       if (byEmail) {
         const linked = await this.prisma.user.update({
           where: { id: byEmail.id },
@@ -154,7 +168,9 @@ export class AuthService {
     const created = await this.prisma.user.create({
       data: {
         name,
-        email: email ? email.toLowerCase() : `google-${googleId}@placeholder.lernard`,
+        email: email
+          ? email.toLowerCase()
+          : `google-${googleId}@placeholder.lernard`,
         googleId,
         role: 'STUDENT',
       },
@@ -172,7 +188,9 @@ export class AuthService {
 
   async refresh(refreshTokenRaw: string) {
     const tokenHash = this.hashToken(refreshTokenRaw);
-    const stored = await this.prisma.refreshToken.findUnique({ where: { tokenHash } });
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+    });
 
     if (!stored) throw new UnauthorizedException('Invalid refresh token');
 
@@ -181,12 +199,17 @@ export class AuthService {
         where: { userId: stored.userId },
         data: { revoked: true },
       });
-      throw new UnauthorizedException('Token reuse detected — all sessions revoked');
+      throw new UnauthorizedException(
+        'Token reuse detected — all sessions revoked',
+      );
     }
 
-    if (stored.expiresAt < new Date()) throw new UnauthorizedException('Refresh token expired');
+    if (stored.expiresAt < new Date())
+      throw new UnauthorizedException('Refresh token expired');
 
-    const user = await this.prisma.user.findUnique({ where: { id: stored.userId } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: stored.userId },
+    });
     if (!user || user.deletedAt) throw new UnauthorizedException();
 
     const tokens = await this.issueTokens(user);
@@ -214,10 +237,14 @@ export class AuthService {
   // ─── Guardian PIN ──────────────────────────────────────────────────────────
 
   async guardianVerifyPassword(userId: string, password: string) {
-    const guardian = await this.prisma.guardian.findUnique({ where: { userId } });
+    const guardian = await this.prisma.guardian.findUnique({
+      where: { userId },
+    });
 
     if (!guardian || !guardian.passwordHash) {
-      throw new UnauthorizedException('No parental-controls PIN is set on this account.');
+      throw new UnauthorizedException(
+        'No parental-controls PIN is set on this account.',
+      );
     }
 
     const bcrypt = await import('bcrypt');
@@ -240,7 +267,9 @@ export class AuthService {
       data: {
         userId: user.id,
         tokenHash,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000),
+        expiresAt: new Date(
+          Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000,
+        ),
       },
     });
 
@@ -268,9 +297,13 @@ export class AuthService {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  private async exchangeGoogleCodeForAccessToken(code: string): Promise<string> {
+  private async exchangeGoogleCodeForAccessToken(
+    code: string,
+  ): Promise<string> {
     const clientId = this.configService.getOrThrow<string>('GOOGLE_CLIENT_ID');
-    const clientSecret = this.configService.getOrThrow<string>('GOOGLE_CLIENT_SECRET');
+    const clientSecret = this.configService.getOrThrow<string>(
+      'GOOGLE_CLIENT_SECRET',
+    );
 
     const params = new URLSearchParams({
       code,
@@ -286,23 +319,36 @@ export class AuthService {
       body: params,
     });
 
-    if (!response.ok) throw new UnauthorizedException('Google sign-in failed. Please try again.');
+    if (!response.ok)
+      throw new UnauthorizedException(
+        'Google sign-in failed. Please try again.',
+      );
 
     const json = (await response.json()) as GoogleTokenResponse;
-    if (!json.access_token) throw new UnauthorizedException('Google sign-in failed. Please try again.');
+    if (!json.access_token)
+      throw new UnauthorizedException(
+        'Google sign-in failed. Please try again.',
+      );
 
     return json.access_token;
   }
 
-  private async fetchGoogleProfile(accessToken: string): Promise<GoogleProfile> {
-    const response = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
+  private async fetchGoogleProfile(
+    accessToken: string,
+  ): Promise<GoogleProfile> {
+    const response = await fetch(
+      'https://openidconnect.googleapis.com/v1/userinfo',
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      },
+    );
 
-    if (!response.ok) throw new UnauthorizedException('Unable to read Google profile.');
+    if (!response.ok)
+      throw new UnauthorizedException('Unable to read Google profile.');
 
     const json = (await response.json()) as GoogleUserInfoResponse;
-    if (!json.sub || !json.name) throw new UnauthorizedException('Google profile was incomplete.');
+    if (!json.sub || !json.name)
+      throw new UnauthorizedException('Google profile was incomplete.');
 
     return { googleId: json.sub, name: json.name, email: json.email ?? null };
   }

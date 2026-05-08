@@ -49,7 +49,7 @@ export class AuthController {
 
     const result = dto.token
       ? await this.authService.verifyMagicLinkToken(dto.token)
-      : await this.authService.verifyMagicLinkOtp(dto.email!, dto.otp!);
+      : await this.authService.verifyMagicLinkOtp(dto.email, dto.otp);
 
     // Native: exchange for a short-lived session code so the web verify page
     // can deep-link back into the app without exposing tokens in the URL.
@@ -110,8 +110,12 @@ export class AuthController {
       };
 
       if (!tokens?.accessToken || !tokens?.refreshToken || !tokens?.user) {
-        console.error('Google callback: Missing tokens in req.user', { tokens });
-        return res.redirect(`${this.configService.get('WEB_APP_URL')}/login?error=auth_failed`);
+        console.error('Google callback: Missing tokens in req.user', {
+          tokens,
+        });
+        return res.redirect(
+          `${this.configService.get('WEB_APP_URL')}/login?error=auth_failed`,
+        );
       }
 
       const state = typeof req.query.state === 'string' ? req.query.state : '';
@@ -133,7 +137,9 @@ export class AuthController {
       return res.redirect(`${webAppUrl}/google/callback?code=${sessionCode}`);
     } catch (error) {
       console.error('Google callback error:', error);
-      return res.redirect(`${this.configService.get('WEB_APP_URL')}/login?error=server_error`);
+      return res.redirect(
+        `${this.configService.get('WEB_APP_URL')}/login?error=server_error`,
+      );
     }
   }
 

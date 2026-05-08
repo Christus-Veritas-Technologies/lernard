@@ -4,6 +4,7 @@ import { ROUTES } from "@lernard/routes";
 import type { ChildCompanionContent, CompanionControls } from "@lernard/shared-types";
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { ChartBarLineIcon, Settings02Icon } from "hugeicons-react";
 
 import { PageHero } from "@/components/dashboard/PageHero";
 import { ToggleCard } from "@/components/guardian/ToggleCard";
@@ -199,7 +200,7 @@ export function ChildCompanionClient({ childId }: ChildCompanionClientProps) {
                         />
                     </>
                 }
-                description={`Tune how much help ${childName} receives during lessons and quizzes. Use these guardrails when you want support to feel calmer, firmer, or more independent.`}
+                description={`Tune how much help ${childName} receives in lessons and quizzes.`}
                 eyebrow="Companion controls"
                 title={`Adjust ${childName}'s support settings`}
             >
@@ -238,29 +239,35 @@ export function ChildCompanionClient({ childId }: ChildCompanionClientProps) {
                 <div className="grid gap-6">
                     <Card>
                         <CardHeader>
-                            <CardTitle>Guardian notes</CardTitle>
+                            <CardTitle className="flex items-center gap-2">
+                                <ChartBarLineIcon size={18} strokeWidth={1.8} />
+                                Guardian notes
+                            </CardTitle>
                             <CardDescription>
-                                A quick summary of what the current mix of help is encouraging.
+                                Snapshot of the current support mix.
                             </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-3 text-sm leading-6 text-text-secondary">
-                            <p>
-                                Show correct answers is best kept on while English inference remains a growth area.
-                            </p>
-                            <p>
-                                Hints are still useful because recent science quizzes show effort, but not total fluency.
-                            </p>
-                            <p>
-                                Skip is off right now to encourage persistence before asking for a new prompt.
-                            </p>
+                        <CardContent className="space-y-2">
+                            <div className="rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-secondary">
+                                Correct answers: reassurance after mistakes
+                            </div>
+                            <div className="rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-secondary">
+                                Hints: prompts before full answers
+                            </div>
+                            <div className="rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text-secondary">
+                                Skip: locked to encourage persistence
+                            </div>
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader>
-                            <CardTitle>Update status</CardTitle>
+                            <CardTitle className="flex items-center gap-2">
+                                <Settings02Icon size={18} strokeWidth={1.8} />
+                                Update status
+                            </CardTitle>
                             <CardDescription>
-                                This panel now saves directly to the live guardian companion-controls endpoint.
+                                Saves directly to the live companion-controls endpoint.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">

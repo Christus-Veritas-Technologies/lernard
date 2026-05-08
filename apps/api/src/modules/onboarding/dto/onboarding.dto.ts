@@ -1,9 +1,5 @@
 import { Type } from 'class-transformer';
-import {
-  AgeGroup,
-  LearningGoal,
-  SessionDepth,
-} from '@lernard/shared-types';
+import { AgeGroup, LearningGoal, SessionDepth } from '@lernard/shared-types';
 import {
   ArrayMaxSize,
   ArrayMinSize,

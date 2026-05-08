@@ -98,7 +98,7 @@ export default function HomeScreen() {
                         description={roleError.message}
                         onActionPress={() => setRequestVersion((current) => current + 1)}
                         title="Home could not confirm your account"
-                        tone="warning"
+                        tone="warning"        
                     />
                 </View>
             </SafeAreaView>
@@ -208,7 +208,7 @@ function StudentHomeDashboardScreen() {
                             {content.dailyGoalProgress}/{content.dailyGoalTarget}
                         </Text>
                         <Text className="mt-2 text-sm leading-6 text-slate-600">
-                            Sessions completed toward today&apos;s target.
+                            Sessions completed toward today&apos;s target. 
                         </Text>
                     </View>
                     <View className="min-w-[160px] flex-1 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">

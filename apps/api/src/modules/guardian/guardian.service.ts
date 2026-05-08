@@ -46,7 +46,10 @@ export class GuardianService {
     });
   }
 
-  async inviteChild(userId: string, dto: InviteChildDto): Promise<PendingInvite> {
+  async inviteChild(
+    userId: string,
+    dto: InviteChildDto,
+  ): Promise<PendingInvite> {
     const guardian = await this.getGuardianByUserId(userId);
     const invite = await this.prisma.childInvite.create({
       data: {
@@ -152,7 +155,10 @@ export class GuardianService {
     return mapPendingInvite(updatedInvite);
   }
 
-  async getChild(userId: string, childId: string): Promise<GuardianChildOverview> {
+  async getChild(
+    userId: string,
+    childId: string,
+  ): Promise<GuardianChildOverview> {
     const content = await this.buildChildProfileContent(userId, childId);
     return content.child;
   }
@@ -195,7 +201,10 @@ export class GuardianService {
     return { removed: true };
   }
 
-  async getChildProgress(userId: string, childId: string): Promise<SubjectProgress[]> {
+  async getChildProgress(
+    userId: string,
+    childId: string,
+  ): Promise<SubjectProgress[]> {
     await this.getChildForGuardian(userId, childId);
     return this.buildSubjectProgress(childId);
   }
@@ -250,7 +259,10 @@ export class GuardianService {
     await this.prisma.user.update({
       where: { id: child.id },
       data: {
-        lockedSettings: ensureSettingLocked(child.lockedSettings, 'companion-controls'),
+        lockedSettings: ensureSettingLocked(
+          child.lockedSettings,
+          'companion-controls',
+        ),
       },
     });
 
@@ -290,7 +302,9 @@ export class GuardianService {
     return mapGuardianManagedChildSettings(updatedChild, companionControls);
   }
 
-  private async buildDashboardContent(userId: string): Promise<GuardianDashboardContent> {
+  private async buildDashboardContent(
+    userId: string,
+  ): Promise<GuardianDashboardContent> {
     const guardian = await this.getGuardianByUserId(userId);
     const [children, pendingInvites] = await Promise.all([
       this.listGuardianChildOverviews(guardian.id),
@@ -300,10 +314,17 @@ export class GuardianService {
     return {
       summary: {
         childrenCount: children.length,
-        activeThisWeek: children.filter((child) => isWithinLastDays(child.lastActiveAt, 7)).length,
-        pendingInvites: pendingInvites.filter((invite) => invite.status === 'Awaiting acceptance').length,
+        activeThisWeek: children.filter((child) =>
+          isWithinLastDays(child.lastActiveAt, 7),
+        ).length,
+        pendingInvites: pendingInvites.filter(
+          (invite) => invite.status === 'Awaiting acceptance',
+        ).length,
         averageStreak: children.length
-          ? Math.round(children.reduce((total, child) => total + child.streak, 0) / children.length)
+          ? Math.round(
+              children.reduce((total, child) => total + child.streak, 0) /
+                children.length,
+            )
           : 0,
       },
       children,
@@ -390,7 +411,11 @@ export class GuardianService {
   }
 
   private async listPendingInvites(userId: string): Promise<PendingInvite[]> {
-    const pendingInviteSnapshots = await listPendingInviteSnapshots(this.prisma, userId, 10);
+    const pendingInviteSnapshots = await listPendingInviteSnapshots(
+      this.prisma,
+      userId,
+      10,
+    );
     return pendingInviteSnapshots.map((pendingInviteSnapshot) => ({
       id: pendingInviteSnapshot.id,
       childEmail: pendingInviteSnapshot.childEmail,
@@ -399,12 +424,14 @@ export class GuardianService {
       status: pendingInviteSnapshot.usedAt
         ? 'Accepted'
         : new Date(pendingInviteSnapshot.expiresAt) < new Date()
-            ? 'Expired'
-            : 'Awaiting acceptance',
+          ? 'Expired'
+          : 'Awaiting acceptance',
     }));
   }
 
-  private async buildSubjectProgress(childId: string): Promise<SubjectProgress[]> {
+  private async buildSubjectProgress(
+    childId: string,
+  ): Promise<SubjectProgress[]> {
     const progressRecords = await this.prisma.subjectProgress.findMany({
       where: { userId: childId },
       include: { subject: true },
@@ -415,7 +442,10 @@ export class GuardianService {
       subjectId: progressRecord.subjectId,
       subjectName: progressRecord.subject.name,
       strengthLevel: toSharedStrengthLevel(progressRecord.strengthLevel),
-      topics: mapTopicStrengths(progressRecord.topicScores, progressRecord.updatedAt),
+      topics: mapTopicStrengths(
+        progressRecord.topicScores,
+        progressRecord.updatedAt,
+      ),
       lastActiveAt: progressRecord.updatedAt.toISOString(),
     }));
   }
@@ -462,8 +492,12 @@ export class GuardianService {
   }
 }
 
-function buildGuardianPermissions(children: GuardianChildOverview[]): ScopedPermission[] {
-  return children.flatMap((child) => buildGuardianChildPermissions(child.studentId));
+function buildGuardianPermissions(
+  children: GuardianChildOverview[],
+): ScopedPermission[] {
+  return children.flatMap((child) =>
+    buildGuardianChildPermissions(child.studentId),
+  );
 }
 
 function buildGuardianChildPermissions(childId: string): ScopedPermission[] {
@@ -519,8 +553,8 @@ function mapPendingInvite(invite: {
     status: invite.usedAt
       ? 'Accepted'
       : invite.expiresAt < new Date()
-          ? 'Expired'
-          : 'Awaiting acceptance',
+        ? 'Expired'
+        : 'Awaiting acceptance',
   };
 }
 
@@ -542,8 +576,15 @@ function mapCompanionControls(companionControls: {
   };
 }
 
-function mapTopicStrengths(topicScores: unknown, updatedAt: Date): TopicStrength[] {
-  if (!topicScores || typeof topicScores !== 'object' || Array.isArray(topicScores)) {
+function mapTopicStrengths(
+  topicScores: unknown,
+  updatedAt: Date,
+): TopicStrength[] {
+  if (
+    !topicScores ||
+    typeof topicScores !== 'object' ||
+    Array.isArray(topicScores)
+  ) {
     return [];
   }
 
@@ -553,14 +594,17 @@ function mapTopicStrengths(topicScores: unknown, updatedAt: Date): TopicStrength
         return [];
       }
 
-      const normalizedScore = rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
+      const normalizedScore =
+        rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
 
-      return [{
-        topic,
-        level: toTopicLevel(normalizedScore),
-        score: normalizedScore,
-        lastTestedAt: updatedAt.toISOString(),
-      }];
+      return [
+        {
+          topic,
+          level: toTopicLevel(normalizedScore),
+          score: normalizedScore,
+          lastTestedAt: updatedAt.toISOString(),
+        },
+      ];
     })
     .sort((left, right) => right.score - left.score);
 }
@@ -577,7 +621,10 @@ function toTopicLevel(score: number): TopicStrength['level'] {
   return 'needs_work';
 }
 
-function ensureSettingLocked(existingSettings: string[], settingKey: string): string[] {
+function ensureSettingLocked(
+  existingSettings: string[],
+  settingKey: string,
+): string[] {
   return existingSettings.includes(settingKey)
     ? existingSettings
     : [...existingSettings, settingKey];
@@ -618,6 +665,8 @@ function mapGuardianManagedChildSettings(
       notificationsEnabled: child.notificationsEnabled,
     },
     lockedSettings: child.lockedSettings,
-    companionControls: companionControls ? mapCompanionControls(companionControls) : null,
+    companionControls: companionControls
+      ? mapCompanionControls(companionControls)
+      : null,
   };
 }

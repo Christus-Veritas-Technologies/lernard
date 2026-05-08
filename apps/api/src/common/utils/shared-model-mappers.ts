@@ -60,7 +60,9 @@ export function toSharedStrengthLevel(
   }
 }
 
-export function toPrismaStrengthLevel(value: StrengthLevel): PrismaStrengthLevel {
+export function toPrismaStrengthLevel(
+  value: StrengthLevel,
+): PrismaStrengthLevel {
   switch (value) {
     case StrengthLevel.STRONG:
       return PrismaStrengthLevel.STRONG;
@@ -100,7 +102,9 @@ export function toPrismaLearningGoal(value: LearningGoal): PrismaLearningGoal {
   }
 }
 
-export function toSharedSessionDepth(value: string | null | undefined): SessionDepth {
+export function toSharedSessionDepth(
+  value: string | null | undefined,
+): SessionDepth {
   switch (value) {
     case SessionDepth.QUICK:
       return SessionDepth.QUICK;
@@ -112,7 +116,9 @@ export function toSharedSessionDepth(value: string | null | undefined): SessionD
   }
 }
 
-export function toSharedLearningMode(value: string | null | undefined): LearningMode {
+export function toSharedLearningMode(
+  value: string | null | undefined,
+): LearningMode {
   switch (value?.toLowerCase()) {
     case LearningMode.COMPANION:
       return LearningMode.COMPANION;
@@ -128,7 +134,9 @@ export function toPrismaLearningMode(
   return value === LearningMode.COMPANION ? 'COMPANION' : 'GUIDE';
 }
 
-export function toSharedAppearance(value: string | null | undefined): Appearance {
+export function toSharedAppearance(
+  value: string | null | undefined,
+): Appearance {
   switch (value?.toLowerCase()) {
     case Appearance.DARK:
       return Appearance.DARK;

@@ -10,7 +10,10 @@ import type {
   TopicSummary,
 } from '@lernard/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
-import { buildNullSlots, buildPagePayload } from '../../common/utils/build-page-payload';
+import {
+  buildNullSlots,
+  buildPagePayload,
+} from '../../common/utils/build-page-payload';
 import { toSharedStrengthLevel } from '../../common/utils/shared-model-mappers';
 
 const FIRST_LOOK_BASELINE_KEY = '__first_look__';
@@ -20,49 +23,52 @@ export class HomeService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getPayload(userId: string): Promise<PagePayload<HomeContent>> {
-    const [user, userSubjects, subjectProgress, recentSessions, sessionsToday] = await Promise.all([
-      this.prisma.user.findUniqueOrThrow({
-        where: { id: userId },
-        select: {
-          name: true,
-          streakDays: true,
-          lastActiveAt: true,
-          dailyGoal: true,
-          sessionCount: true,
-          firstLookComplete: true,
-        },
-      }),
-      this.prisma.userSubject.findMany({
-        where: { userId },
-        include: { subject: true },
-        orderBy: { priorityIndex: 'asc' },
-      }),
-      this.prisma.subjectProgress.findMany({
-        where: { userId },
-        select: {
-          subjectId: true,
-          strengthLevel: true,
-          updatedAt: true,
-          topicScores: true,
-          subject: { select: { name: true } },
-        },
-      }),
-      (this.prisma as any).session.findMany({
-        where: { userId },
-        orderBy: { completedAt: 'desc' },
-        take: 3,
-      }),
-      (this.prisma as any).session.count({
-        where: {
-          userId,
-          completedAt: {
-            gte: startOfTodayUtc(),
+    const [user, userSubjects, subjectProgress, recentSessions, sessionsToday] =
+      await Promise.all([
+        this.prisma.user.findUniqueOrThrow({
+          where: { id: userId },
+          select: {
+            name: true,
+            streakDays: true,
+            lastActiveAt: true,
+            dailyGoal: true,
+            sessionCount: true,
+            firstLookComplete: true,
           },
-        },
-      }),
-    ]);
+        }),
+        this.prisma.userSubject.findMany({
+          where: { userId },
+          include: { subject: true },
+          orderBy: { priorityIndex: 'asc' },
+        }),
+        this.prisma.subjectProgress.findMany({
+          where: { userId },
+          select: {
+            subjectId: true,
+            strengthLevel: true,
+            updatedAt: true,
+            topicScores: true,
+            subject: { select: { name: true } },
+          },
+        }),
+        (this.prisma as any).session.findMany({
+          where: { userId },
+          orderBy: { completedAt: 'desc' },
+          take: 3,
+        }),
+        (this.prisma as any).session.count({
+          where: {
+            userId,
+            completedAt: {
+              gte: startOfTodayUtc(),
+            },
+          },
+        }),
+      ]);
 
-    const trackedSubjectNames = userSubjects.map((userSubject) => userSubject.subject.name);
+    const trackedSubjectNames = userSubjects.map(
+      (userSubject) => userSubject.subject.name,
+    );
     const subjectSessionRows = trackedSubjectNames.length
       ? await (this.prisma as any).session.groupBy({
           by: ['subjectName'],
@@ -78,10 +84,12 @@ export class HomeService {
         })
       : [];
     const sessionCountBySubjectName = new Map<string, number>(
-      subjectSessionRows.map((row: { subjectName: string | null; _count: { _all: number } }) => [
-        row.subjectName ?? 'General',
-        row._count._all,
-      ]),
+      subjectSessionRows.map(
+        (row: { subjectName: string | null; _count: { _all: number } }) => [
+          row.subjectName ?? 'General',
+          row._count._all,
+        ],
+      ),
     );
 
     const subjectProgressById = new Map(
@@ -89,8 +97,16 @@ export class HomeService {
     );
 
     // Aggregate topic scores across all subjects
-    const allTopicScores: Array<{ topic: string; subjectName: string; score: number }> = [];
-    const strengthBreakdown: StrengthBreakdown = { strong: 0, developing: 0, needsWork: 0 };
+    const allTopicScores: Array<{
+      topic: string;
+      subjectName: string;
+      score: number;
+    }> = [];
+    const strengthBreakdown: StrengthBreakdown = {
+      strong: 0,
+      developing: 0,
+      needsWork: 0,
+    };
 
     for (const sp of subjectProgress) {
       const activityCount = sessionCountBySubjectName.get(sp.subject.name) ?? 0;
@@ -102,21 +118,29 @@ export class HomeService {
       for (const [topic, rawScore] of Object.entries(topicData)) {
         if (topic === FIRST_LOOK_BASELINE_KEY) continue;
         if (typeof rawScore !== 'number' || Number.isNaN(rawScore)) continue;
-        const score100 = rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
-        allTopicScores.push({ topic, subjectName: sp.subject.name, score: score100 });
+        const score100 =
+          rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
+        allTopicScores.push({
+          topic,
+          subjectName: sp.subject.name,
+          score: score100,
+        });
         if (rawScore >= 0.7) strengthBreakdown.strong++;
         else if (rawScore >= 0.4) strengthBreakdown.developing++;
         else strengthBreakdown.needsWork++;
       }
     }
 
-    const masteredTopicCount = allTopicScores.filter((t) => t.score >= 70).length;
+    const masteredTopicCount = allTopicScores.filter(
+      (t) => t.score >= 70,
+    ).length;
     const totalTopicCount = allTopicScores.length;
 
     const passRate =
       allTopicScores.length > 0
         ? Math.round(
-            allTopicScores.reduce((sum, t) => sum + t.score, 0) / allTopicScores.length,
+            allTopicScores.reduce((sum, t) => sum + t.score, 0) /
+              allTopicScores.length,
           )
         : 0;
 
@@ -154,19 +178,21 @@ export class HomeService {
       const nonBaselineScores = topicValues
         .filter(([topic]) => topic !== FIRST_LOOK_BASELINE_KEY)
         .map(([, score]) => score);
-      const readinessPercent = activityCount > 0 && nonBaselineScores.length
-        ? Math.round(
-            (nonBaselineScores.reduce((total, score) => total + score, 0)
-              / nonBaselineScores.length)
-              * 100,
-          )
-        : null;
+      const readinessPercent =
+        activityCount > 0 && nonBaselineScores.length
+          ? Math.round(
+              (nonBaselineScores.reduce((total, score) => total + score, 0) /
+                nonBaselineScores.length) *
+                100,
+            )
+          : null;
 
       return {
         subjectId: us.subjectId,
         subjectName: us.subject.name,
         strongCount: nonBaselineScores.filter((s) => s >= 0.7).length,
-        developingCount: nonBaselineScores.filter((s) => s >= 0.4 && s < 0.7).length,
+        developingCount: nonBaselineScores.filter((s) => s >= 0.4 && s < 0.7)
+          .length,
         needsWorkCount: nonBaselineScores.filter((s) => s < 0.4).length,
         readinessPercent,
         readinessState: readinessPercent === null ? 'baseline_only' : 'active',
@@ -188,7 +214,9 @@ export class HomeService {
           subjectProgressById.get(userSubject.subjectId)?.strengthLevel,
         ),
         lastActiveAt:
-          subjectProgressById.get(userSubject.subjectId)?.updatedAt.toISOString() ?? null,
+          subjectProgressById
+            .get(userSubject.subjectId)
+            ?.updatedAt.toISOString() ?? null,
       })),
       totalSessions: user.sessionCount,
       passRate,
@@ -228,7 +256,9 @@ function calculateXpLevel(sessionCount: number): number {
 
 function startOfTodayUtc(): Date {
   const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  return new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
+  );
 }
 
 function buildHomePermissions(): ScopedPermission[] {
@@ -254,7 +284,10 @@ function buildHomeSlots(firstLookComplete: boolean): SlotAssignments {
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
-function buildRecentActivity(lastActiveAt: Date | null, streakDays: number): DayActivity[] {
+function buildRecentActivity(
+  lastActiveAt: Date | null,
+  streakDays: number,
+): DayActivity[] {
   const anchor = lastActiveAt ?? new Date();
   const anchorDay = new Date(anchor);
   anchorDay.setHours(0, 0, 0, 0);

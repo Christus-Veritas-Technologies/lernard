@@ -65,7 +65,9 @@ export class RequestLoggingMiddleware implements NestMiddleware {
     }
 
     res.on('finish', () => {
-      const ms = (Number(process.hrtime.bigint() - start) / 1_000_000).toFixed(1);
+      const ms = (Number(process.hrtime.bigint() - start) / 1_000_000).toFixed(
+        1,
+      );
       const status = res.statusCode;
       const userId = req.user?.id ?? null;
       const level = status >= 500 ? 'error' : status >= 400 ? 'warn' : 'log';
@@ -73,7 +75,9 @@ export class RequestLoggingMiddleware implements NestMiddleware {
       if (this.isDev) {
         const statusStr = `${statusColor(status)}${c.bold}${status}${c.reset}`;
         const timeStr = `${c.gray}${ms}ms${c.reset}`;
-        const userStr = userId ? `${c.gray}user:${userId.slice(0, 8)}${c.reset}` : '';
+        const userStr = userId
+          ? `${c.gray}user:${userId.slice(0, 8)}${c.reset}`
+          : '';
         const parts = [statusStr, timeStr, userStr].filter(Boolean).join('  ');
         this.logger[level](
           `${c.bold}${methodColor(method)}${method}${c.reset} ${c.white}${path}${c.reset}  ${parts}`,
@@ -101,7 +105,14 @@ export class RequestLoggingMiddleware implements NestMiddleware {
   private summariseBody(body: unknown): string {
     if (!body || typeof body !== 'object' || Array.isArray(body)) return '';
 
-    const sensitive = new Set(['password', 'token', 'otp', 'refreshToken', 'accessToken', 'code']);
+    const sensitive = new Set([
+      'password',
+      'token',
+      'otp',
+      'refreshToken',
+      'accessToken',
+      'code',
+    ]);
     const redacted: Record<string, unknown> = {};
 
     for (const [k, v] of Object.entries(body as Record<string, unknown>)) {
@@ -120,7 +131,8 @@ export class RequestLoggingMiddleware implements NestMiddleware {
 
   private resolveIp(req: Request): string {
     const fwd = req.headers['x-forwarded-for'];
-    if (typeof fwd === 'string' && fwd.length) return fwd.split(',')[0]?.trim() ?? req.ip ?? 'unknown';
+    if (typeof fwd === 'string' && fwd.length)
+      return fwd.split(',')[0]?.trim() ?? req.ip ?? 'unknown';
     return req.ip ?? 'unknown';
   }
 }

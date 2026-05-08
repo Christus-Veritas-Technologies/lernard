@@ -1,9 +1,4 @@
-import {
-  Controller,
-  Get,
-  Param,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ProgressService } from './progress.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
@@ -27,7 +22,10 @@ export class ProgressController {
 
   @ProtectedRoute()
   @Get('subjects/:subjectId')
-  async getSubject(@CurrentUser() user: User, @Param('subjectId') subjectId: string) {
+  async getSubject(
+    @CurrentUser() user: User,
+    @Param('subjectId') subjectId: string,
+  ) {
     return this.progressService.getSubject(user.id, subjectId);
   }
 

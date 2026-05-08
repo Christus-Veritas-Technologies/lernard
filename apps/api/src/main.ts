@@ -42,7 +42,7 @@ async function bootstrap() {
       'http://localhost:4000',
       'http://localhost:8081',
       process.env.WEB_URL,
-    ].filter(Boolean) as string[],
+    ].filter(Boolean),
     credentials: true,
     allowedHeaders: [
       'Content-Type',

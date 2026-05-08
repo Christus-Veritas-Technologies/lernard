@@ -1,6 +1,10 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { OnboardingService } from './onboarding.service';
-import { AccountTypeDto, ProfileSetupDto, FirstLookSubmitDto } from './dto/onboarding.dto';
+import {
+  AccountTypeDto,
+  ProfileSetupDto,
+  FirstLookSubmitDto,
+} from './dto/onboarding.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
 import type { User } from '@prisma/client';
@@ -23,7 +27,10 @@ export class OnboardingController {
 
   @ProtectedRoute()
   @Post('subjects')
-  async subjects(@CurrentUser() user: User, @Body('subjects') subjects: string[]) {
+  async subjects(
+    @CurrentUser() user: User,
+    @Body('subjects') subjects: string[],
+  ) {
     return this.onboardingService.setSubjects(user.id, subjects);
   }
 
@@ -35,7 +42,10 @@ export class OnboardingController {
 
   @ProtectedRoute()
   @Post('first-look/submit')
-  async submitFirstLook(@CurrentUser() user: User, @Body() dto: FirstLookSubmitDto) {
+  async submitFirstLook(
+    @CurrentUser() user: User,
+    @Body() dto: FirstLookSubmitDto,
+  ) {
     return this.onboardingService.submitFirstLook(user.id, dto);
   }
 

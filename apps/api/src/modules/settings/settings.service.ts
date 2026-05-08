@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { extname } from 'node:path';
 import { R2Service } from '../../r2/r2.service';
@@ -29,7 +33,7 @@ const ALLOWED_AVATAR_TYPES: Record<string, string> = {
   'image/png': '.png',
   'image/webp': '.webp',
   'image/gif': '.gif',
-}
+};
 
 @Injectable()
 export class SettingsService {
@@ -97,7 +101,10 @@ export class SettingsService {
     );
   }
 
-  async updateMode(userId: string, mode: 'guide' | 'companion'): Promise<UserSettings> {
+  async updateMode(
+    userId: string,
+    mode: 'guide' | 'companion',
+  ): Promise<UserSettings> {
     await this.prisma.user.update({
       where: { id: userId },
       data: { learningMode: toPrismaLearningMode(mode) },
@@ -165,32 +172,39 @@ export class SettingsService {
     return this.get(userId);
   }
 
-  async uploadAvatar(userId: string, file: { buffer: Buffer; mimetype: string; originalname: string } | undefined): Promise<{ profilePictureUrl: string }> {
+  async uploadAvatar(
+    userId: string,
+    file:
+      | { buffer: Buffer; mimetype: string; originalname: string }
+      | undefined,
+  ): Promise<{ profilePictureUrl: string }> {
     if (!file) {
-      throw new BadRequestException('No file provided.')
+      throw new BadRequestException('No file provided.');
     }
 
-    const ext = ALLOWED_AVATAR_TYPES[file.mimetype]
+    const ext = ALLOWED_AVATAR_TYPES[file.mimetype];
     if (!ext) {
-      throw new BadRequestException('Only JPEG, PNG, WEBP, and GIF images are allowed.')
+      throw new BadRequestException(
+        'Only JPEG, PNG, WEBP, and GIF images are allowed.',
+      );
     }
 
     if (!file.buffer || file.buffer.length === 0) {
-      throw new BadRequestException('The uploaded file was empty.')
+      throw new BadRequestException('The uploaded file was empty.');
     }
 
-    const originalExt = extname(file.originalname).toLowerCase() || ext
-    const key = `profile-pictures/${userId}/${randomUUID()}${originalExt}`
-    await this.r2.upload(key, file.buffer, file.mimetype)
+    const originalExt = extname(file.originalname).toLowerCase() || ext;
+    const key = `profile-pictures/${userId}/${randomUUID()}${originalExt}`;
+    await this.r2.upload(key, file.buffer, file.mimetype);
 
-    const profilePictureUrl = this.r2.getPublicUrl(key)
+    const profilePictureUrl = this.r2.getPublicUrl(key);
 
     await this.prisma.user.update({
       where: { id: userId },
       data: { profilePictureUrl },
-    })
+    });
 
-    return { profilePictureUrl }
+    return { profilePictureUrl };
   }
 
   private async getUserSettings(userId: string): Promise<UserSettings> {
@@ -206,7 +220,9 @@ export class SettingsService {
           notificationsEnabled: true,
         },
       }),
-      this.prisma.companionControls.findUnique({ where: { studentId: userId } }),
+      this.prisma.companionControls.findUnique({
+        where: { studentId: userId },
+      }),
     ]);
 
     return {
@@ -216,7 +232,9 @@ export class SettingsService {
       dailyGoal: user.dailyGoal,
       preferredSessionLength: user.sessionLength,
       notificationsEnabled: user.notificationsEnabled,
-      companionControls: companionControls ? mapCompanionControls(companionControls) : null,
+      companionControls: companionControls
+        ? mapCompanionControls(companionControls)
+        : null,
     };
   }
 
@@ -269,13 +287,15 @@ export class SettingsService {
       },
       lockedSettings: child.lockedSettings,
       companionControls: controlsByStudentId.has(child.id)
-        ? mapCompanionControls(controlsByStudentId.get(child.id)!)
+        ? mapCompanionControls(controlsByStudentId.get(child.id))
         : null,
     }));
   }
 }
 
-function buildStudentSettingsPermissions(lockedSettings: string[]): ScopedPermission[] {
+function buildStudentSettingsPermissions(
+  lockedSettings: string[],
+): ScopedPermission[] {
   return lockedSettings.includes('mode') ? [] : [{ action: 'can_edit_mode' }];
 }
 

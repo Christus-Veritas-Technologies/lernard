@@ -51,12 +51,18 @@ export class ProgressService {
       subjectId: progressRecord.subjectId,
       subjectName: progressRecord.subject.name,
       strengthLevel: toSharedStrengthLevel(progressRecord.strengthLevel),
-      topics: mapTopicStrengths(progressRecord.topicScores, progressRecord.updatedAt),
+      topics: mapTopicStrengths(
+        progressRecord.topicScores,
+        progressRecord.updatedAt,
+      ),
       lastActiveAt: progressRecord.updatedAt.toISOString(),
     }));
   }
 
-  async getSubject(userId: string, subjectId: string): Promise<SubjectDetailContent> {
+  async getSubject(
+    userId: string,
+    subjectId: string,
+  ): Promise<SubjectDetailContent> {
     const subjects = await this.getSubjects(userId);
     const subject = subjects.find((entry) => entry.subjectId === subjectId);
 
@@ -108,7 +114,7 @@ export class ProgressService {
         completedAt: session.completedAt.toISOString(),
       })),
       hasMore,
-      nextCursor: hasMore ? page[page.length - 1]?.id ?? null : null,
+      nextCursor: hasMore ? (page[page.length - 1]?.id ?? null) : null,
     };
   }
 }
@@ -117,8 +123,15 @@ function calculateXpLevel(sessionCount: number): number {
   return Math.max(1, Math.ceil(Math.max(sessionCount, 1) / 5));
 }
 
-function mapTopicStrengths(topicScores: unknown, updatedAt: Date): TopicStrength[] {
-  if (!topicScores || typeof topicScores !== 'object' || Array.isArray(topicScores)) {
+function mapTopicStrengths(
+  topicScores: unknown,
+  updatedAt: Date,
+): TopicStrength[] {
+  if (
+    !topicScores ||
+    typeof topicScores !== 'object' ||
+    Array.isArray(topicScores)
+  ) {
     return [];
   }
 
@@ -128,14 +141,17 @@ function mapTopicStrengths(topicScores: unknown, updatedAt: Date): TopicStrength
         return [];
       }
 
-      const normalizedScore = rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
+      const normalizedScore =
+        rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
 
-      return [{
-        topic,
-        level: toTopicLevel(normalizedScore),
-        score: normalizedScore,
-        lastTestedAt: updatedAt.toISOString(),
-      }];
+      return [
+        {
+          topic,
+          level: toTopicLevel(normalizedScore),
+          score: normalizedScore,
+          lastTestedAt: updatedAt.toISOString(),
+        },
+      ];
     })
     .sort((left, right) => right.score - left.score);
 }

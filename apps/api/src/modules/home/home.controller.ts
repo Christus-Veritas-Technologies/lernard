@@ -11,7 +11,9 @@ export class HomeController {
 
   @ProtectedRoute()
   @Get('payload')
-  async getPayload(@CurrentUser() user: User): Promise<PagePayload<HomeContent>> {
+  async getPayload(
+    @CurrentUser() user: User,
+  ): Promise<PagePayload<HomeContent>> {
     return this.homeService.getPayload(user.id);
   }
 }

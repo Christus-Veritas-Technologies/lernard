@@ -1,4 +1,8 @@
-import type { PagePayload, ScopedPermission, SlotAssignments } from '@lernard/shared-types';
+import type {
+  PagePayload,
+  ScopedPermission,
+  SlotAssignments,
+} from '@lernard/shared-types';
 
 const DEFAULT_PAGE_PAYLOAD_VERSION = 1;
 const DEFAULT_PERMISSIONS_TTL_SECONDS = 60;

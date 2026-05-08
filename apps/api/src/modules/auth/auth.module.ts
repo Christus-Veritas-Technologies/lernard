@@ -23,7 +23,13 @@ import { GoogleStrategy } from './strategies/google.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, MailService, GoogleSessionStore, JwtStrategy, GoogleStrategy],
+  providers: [
+    AuthService,
+    MailService,
+    GoogleSessionStore,
+    JwtStrategy,
+    GoogleStrategy,
+  ],
   exports: [AuthService],
 })
 export class AuthModule {}

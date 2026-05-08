@@ -137,7 +137,11 @@ interface TopicScoreEntry {
 }
 
 function toTopicScores(topicScores: unknown): TopicScoreEntry[] {
-  if (!topicScores || typeof topicScores !== 'object' || Array.isArray(topicScores)) {
+  if (
+    !topicScores ||
+    typeof topicScores !== 'object' ||
+    Array.isArray(topicScores)
+  ) {
     return [];
   }
 

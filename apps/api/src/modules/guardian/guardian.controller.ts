@@ -100,19 +100,28 @@ export class GuardianController {
 
   @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
   @Delete('children/:childId')
-  async removeChild(@CurrentUser() user: User, @Param('childId') childId: string) {
+  async removeChild(
+    @CurrentUser() user: User,
+    @Param('childId') childId: string,
+  ) {
     return this.guardianService.removeChild(user.id, childId);
   }
 
   @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
   @Get('children/:childId/progress')
-  async getChildProgress(@CurrentUser() user: User, @Param('childId') childId: string) {
+  async getChildProgress(
+    @CurrentUser() user: User,
+    @Param('childId') childId: string,
+  ) {
     return this.guardianService.getChildProgress(user.id, childId);
   }
 
   @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
   @Get('children/:childId/subjects')
-  async getChildSubjects(@CurrentUser() user: User, @Param('childId') childId: string) {
+  async getChildSubjects(
+    @CurrentUser() user: User,
+    @Param('childId') childId: string,
+  ) {
     return this.guardianService.getChildSubjects(user.id, childId);
   }
 

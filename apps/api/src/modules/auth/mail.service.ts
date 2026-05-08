@@ -14,7 +14,8 @@ export class MailService {
       this.transporter = nodemailer.createTransport({
         host,
         port: Number(this.configService.get<string>('SMTP_PORT') ?? 587),
-        secure: Number(this.configService.get<string>('SMTP_PORT') ?? 587) === 465,
+        secure:
+          Number(this.configService.get<string>('SMTP_PORT') ?? 587) === 465,
         auth: {
           user: this.configService.getOrThrow<string>('SMTP_USER'),
           pass: this.configService.getOrThrow<string>('SMTP_PASS'),
@@ -24,7 +25,8 @@ export class MailService {
   }
 
   async sendMagicLink(to: string, token: string, otp: string) {
-    const webUrl = this.configService.get<string>('WEB_APP_URL') ?? 'http://localhost:4000';
+    const webUrl =
+      this.configService.get<string>('WEB_APP_URL') ?? 'http://localhost:4000';
     const link = `${webUrl}/auth/verify?token=${encodeURIComponent(token)}`;
 
     if (!this.transporter) {
@@ -37,7 +39,9 @@ export class MailService {
       return;
     }
 
-    const from = this.configService.get<string>('SMTP_FROM') ?? 'Lernard <noreply@lernard.app>';
+    const from =
+      this.configService.get<string>('SMTP_FROM') ??
+      'Lernard <noreply@lernard.app>';
 
     await this.transporter.sendMail({
       from,
@@ -48,13 +52,26 @@ export class MailService {
     });
   }
 
-  async sendAdminSignupNotification(userName: string, userEmail: string, date: Date): Promise<void> {
-    const dateStr = date.toLocaleString('en-US', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' }) + ' UTC';
+  async sendAdminSignupNotification(
+    userName: string,
+    userEmail: string,
+    date: Date,
+  ): Promise<void> {
+    const dateStr =
+      date.toLocaleString('en-US', {
+        timeZone: 'UTC',
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }) + ' UTC';
     if (!this.transporter) {
-      this.logger.log(`[ADMIN] New signup: ${userName} <${userEmail}> at ${dateStr}`);
+      this.logger.log(
+        `[ADMIN] New signup: ${userName} <${userEmail}> at ${dateStr}`,
+      );
       return;
     }
-    const from = this.configService.get<string>('SMTP_FROM') ?? 'Lernard <noreply@lernard.app>';
+    const from =
+      this.configService.get<string>('SMTP_FROM') ??
+      'Lernard <noreply@lernard.app>';
     await this.transporter.sendMail({
       from,
       to: 'kinzinzombe07@gmail.com',

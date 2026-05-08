@@ -1,4 +1,14 @@
-import { Body, Controller, Get, MessageEvent, Param, Post, Sse, UploadedFile, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  MessageEvent,
+  Param,
+  Post,
+  Sse,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
 import type { User } from '@prisma/client';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Observable } from 'rxjs';
@@ -21,7 +31,10 @@ export class ChatController {
 
   @ProtectedRoute()
   @Get('conversations/:conversationId')
-  async getConversation(@CurrentUser() user: User, @Param('conversationId') conversationId: string) {
+  async getConversation(
+    @CurrentUser() user: User,
+    @Param('conversationId') conversationId: string,
+  ) {
     return this.chatService.getConversation(user, conversationId);
   }
 
@@ -53,7 +66,10 @@ export class ChatController {
 
   @ProtectedRoute()
   @Sse('message/stream')
-  streamMessage(@CurrentUser() user: User, @Body() dto: SendMessageDto): Observable<MessageEvent> {
+  streamMessage(
+    @CurrentUser() user: User,
+    @Body() dto: SendMessageDto,
+  ): Observable<MessageEvent> {
     return this.chatService.streamMessage(user, dto);
   }
 }

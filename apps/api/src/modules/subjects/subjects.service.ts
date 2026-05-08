@@ -42,7 +42,9 @@ export class SubjectsService {
       },
     });
 
-    const progressBySubjectId = new Map(progress.map((entry) => [entry.subjectId, entry]));
+    const progressBySubjectId = new Map(
+      progress.map((entry) => [entry.subjectId, entry]),
+    );
 
     return subjects.map((entry) => {
       const subjectProgress = progressBySubjectId.get(entry.subjectId);
@@ -58,7 +60,9 @@ export class SubjectsService {
   }
 
   async addMine(userId: string, subjects: string[]) {
-    const cleanedSubjectIds = Array.from(new Set(subjects.map((subject) => subject.trim()).filter(Boolean)));
+    const cleanedSubjectIds = Array.from(
+      new Set(subjects.map((subject) => subject.trim()).filter(Boolean)),
+    );
 
     if (!cleanedSubjectIds.length) {
       throw new BadRequestException('Provide at least one valid subject id.');
@@ -82,8 +86,12 @@ export class SubjectsService {
       orderBy: { priorityIndex: 'asc' },
     });
 
-    const existingSubjectIds = new Set(existing.map((entry) => entry.subjectId));
-    const toCreate = cleanedSubjectIds.filter((subjectId) => !existingSubjectIds.has(subjectId));
+    const existingSubjectIds = new Set(
+      existing.map((entry) => entry.subjectId),
+    );
+    const toCreate = cleanedSubjectIds.filter(
+      (subjectId) => !existingSubjectIds.has(subjectId),
+    );
 
     if (!toCreate.length) {
       return this.getMine(userId);
@@ -139,7 +147,9 @@ export class SubjectsService {
   }
 
   async reorder(userId: string, order: string[]) {
-    const cleanedOrder = Array.from(new Set(order.map((subjectId) => subjectId.trim()).filter(Boolean)));
+    const cleanedOrder = Array.from(
+      new Set(order.map((subjectId) => subjectId.trim()).filter(Boolean)),
+    );
 
     const existing = await this.prisma.userSubject.findMany({
       where: { userId },
@@ -153,19 +163,23 @@ export class SubjectsService {
     const existingIds = existing.map((entry) => entry.subjectId);
 
     if (cleanedOrder.length !== existingIds.length) {
-      throw new BadRequestException('Order must include all assigned subject ids exactly once.');
+      throw new BadRequestException(
+        'Order must include all assigned subject ids exactly once.',
+      );
     }
 
     if (!cleanedOrder.every((subjectId) => existingIds.includes(subjectId))) {
       throw new BadRequestException('Order includes unknown subject ids.');
     }
 
-    const userSubjectBySubjectId = new Map(existing.map((entry) => [entry.subjectId, entry.id]));
+    const userSubjectBySubjectId = new Map(
+      existing.map((entry) => [entry.subjectId, entry.id]),
+    );
 
     await this.prisma.$transaction(
       cleanedOrder.map((subjectId, index) =>
         this.prisma.userSubject.update({
-          where: { id: userSubjectBySubjectId.get(subjectId)! },
+          where: { id: userSubjectBySubjectId.get(subjectId) },
           data: { priorityIndex: index },
         }),
       ),

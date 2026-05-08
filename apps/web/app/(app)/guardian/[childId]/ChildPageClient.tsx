@@ -10,6 +10,7 @@ import { PageHero } from "@/components/dashboard/PageHero";
 import { PerformanceList } from "@/components/dashboard/PerformanceList";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { TimelineList } from "@/components/dashboard/TimelineList";
+import { GuardianEmptyVisual } from "@/components/guardian/GuardianEmptyVisual";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -202,9 +203,11 @@ export function ChildPageClient({ childId }: ChildPageClientProps) {
                         </Card>
                     ))
                 ) : (
-                    <div className="rounded-3xl border border-dashed border-border bg-surface p-5 text-sm leading-6 text-text-secondary lg:col-span-3">
-                        No subject progress is available yet for this child. Once lessons or quizzes are completed, the live Read on You will fill in here.
-                    </div>
+                    <GuardianEmptyVisual
+                        className="lg:col-span-3"
+                        subtitle="Subject cards will appear after lessons or quizzes are completed."
+                        title="No subject progress yet"
+                    />
                 )}
             </section>
 
@@ -240,9 +243,10 @@ export function ChildPageClient({ childId }: ChildPageClientProps) {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-sm leading-6 text-text-secondary">
-                                        Strong topics will appear once more activity has been tracked.
-                                    </p>
+                                    <GuardianEmptyVisual
+                                        subtitle="Strong topics appear here as activity builds."
+                                        title="Strongest topics pending"
+                                    />
                                 )}
                             </div>
                             <div className="space-y-3">
@@ -255,9 +259,10 @@ export function ChildPageClient({ childId }: ChildPageClientProps) {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-sm leading-6 text-text-secondary">
-                                        Growth areas will appear once quizzes and lessons have more data behind them.
-                                    </p>
+                                    <GuardianEmptyVisual
+                                        subtitle="Growth areas appear once enough scored work is available."
+                                        title="Growth map pending"
+                                    />
                                 )}
                             </div>
                         </CardContent>
@@ -303,9 +308,10 @@ export function ChildPageClient({ childId }: ChildPageClientProps) {
                             }))}
                         />
                     ) : (
-                        <p className="text-sm leading-6 text-text-secondary">
-                            No session history is available yet for this child.
-                        </p>
+                        <GuardianEmptyVisual
+                            subtitle="Lesson and quiz sessions will appear here as a timeline."
+                            title="No session history yet"
+                        />
                     )}
                 </CardContent>
             </Card>

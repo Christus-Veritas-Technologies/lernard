@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Delete, Patch, Param, Body } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Delete,
+  Patch,
+  Param,
+  Body,
+} from '@nestjs/common';
 import { SubjectsService } from './subjects.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
@@ -21,13 +29,19 @@ export class SubjectsController {
 
   @ProtectedRoute()
   @Post('mine')
-  async addMine(@CurrentUser() user: User, @Body('subjects') subjects: string[]) {
+  async addMine(
+    @CurrentUser() user: User,
+    @Body('subjects') subjects: string[],
+  ) {
     return this.subjectsService.addMine(user.id, subjects);
   }
 
   @ProtectedRoute()
   @Delete('mine/:subjectId')
-  async removeMine(@CurrentUser() user: User, @Param('subjectId') subjectId: string) {
+  async removeMine(
+    @CurrentUser() user: User,
+    @Param('subjectId') subjectId: string,
+  ) {
     return this.subjectsService.removeMine(user.id, subjectId);
   }
 

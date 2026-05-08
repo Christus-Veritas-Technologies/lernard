@@ -18,7 +18,9 @@ export class SettingsLockGuard implements CanActivate {
       return true;
     }
 
-    const student = await this.prisma.user.findUnique({ where: { id: user.id } });
+    const student = await this.prisma.user.findUnique({
+      where: { id: user.id },
+    });
     const lockedSettings: string[] = student?.lockedSettings ?? [];
     const settingKey = request.params.setting ?? request.path.split('/').pop();
 
