@@ -1,32 +1,27 @@
 ﻿import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
     ArrowRight01Icon,
+    Bell01Icon,
     BookOpen01Icon,
     Bookmark01Icon,
     Home01Icon,
-    PaintBrushIcon,
+    Moon02Icon,
     Settings02Icon,
-    Target01Icon,
     UserCircleIcon,
     UserGroupIcon,
 } from 'hugeicons-react-native';
 
-import { can } from '@lernard/auth-core';
 import { ROUTES } from '@lernard/routes';
 import type {
-    CompanionControls,
     GuardianManagedChildSettings,
     GuardianSettingsContent,
     SettingsContent,
     StudentSettingsContent,
-    UserSettings,
 } from '@lernard/shared-types';
 
-import { Switch } from '@rnr/switch';
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
@@ -34,7 +29,6 @@ import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoading
 import { StateNotice } from '@/components/StateNotice';
 import { usePagePayload } from '@/hooks/usePagePayload';
 import { capitalize } from '@/lib/formatters';
-import { nativeApiFetch } from '@/lib/native-api';
 
 // ─── Main screen ────────────────────────────────────────────────────────────
 
@@ -203,25 +197,13 @@ function GuardianChildCard({
 
 function StudentSettingsView({
     content,
-    permissions,
 }: {
     content: StudentSettingsContent;
     permissions: string[];
 }) {
     const router = useRouter();
-    const [settings, setSettings] = useState<UserSettings>(content.settings);
-    const [lockedSettings] = useState<string[]>(content.lockedSettings);
-    const [savingField, setSavingField] = useState<string | null>(null);
-
-    useEffect(() => {
-        setSettings(content.settings);
-    }, [content.settings]);
-
     const viewer = content.viewer;
-    const canEditMode = can(permissions, 'can_edit_mode') && !lockedSettings.includes('mode');
-    const companionControls = ensureCompanionControls(settings.companionControls);
-    const companionControlsLocked =
-        companionControls.lockedByGuardian || lockedSettings.includes('companion-controls');
+    const settings = content.settings;
 
     const initials = viewer.name
         .split(' ')
@@ -274,52 +256,37 @@ function StudentSettingsView({
                 <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                     <NavRow
                         icon={<BookOpen01Icon color="#6366f1" size={20} />}
+                        label="Study"
+                        onPress={() => router.push('/settings/study')}
+                        value={capitalize(settings.learningMode)}
+                    />
+                    <View className="mx-4 h-px bg-slate-100" />
+                    <NavRow
+                        icon={<BookOpen01Icon color="#6366f1" size={20} />}
                         label="Learning mode"
                         onPress={() => router.push('/settings/mode')}
                         value={capitalize(settings.learningMode)}
                     />
                 </View>
 
-                {/* Preferences */}
-                <SectionHeader title="Preferences" />
+                {/* Notifications */}
+                <SectionHeader title="Notifications" />
                 <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                     <NavRow
-                        icon={<PaintBrushIcon color="#6366f1" size={20} />}
-                        label="Appearance"
-                        onPress={() => router.push('/settings/preferences')}
-                        value={capitalize(settings.appearance)}
-                    />
-                    <View className="mx-4 h-px bg-slate-100" />
-                    <NavRow
-                        icon={<Target01Icon color="#6366f1" size={20} />}
-                        label="Daily goal"
-                        onPress={() => router.push('/settings/preferences')}
-                        value={`${settings.dailyGoal} sessions`}
+                        icon={<Bell01Icon color="#6366f1" size={20} />}
+                        label="Notifications"
+                        onPress={() => router.push('/settings/notifications')}
                     />
                 </View>
 
-                {/* Study controls */}
-                <SectionHeader title="Study controls" />
+                {/* Appearance */}
+                <SectionHeader title="Appearance" />
                 <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
-                    <InlineToggleRow
-                        checked={companionControls.showCorrectAnswers}
-                        disabled={companionControlsLocked || savingField === 'companion-controls'}
-                        label="Show correct answers"
-                        onCheckedChange={(v) => void updateCompanionControl('showCorrectAnswers', v)}
-                    />
-                    <View className="mx-4 h-px bg-slate-100" />
-                    <InlineToggleRow
-                        checked={companionControls.allowHints}
-                        disabled={companionControlsLocked || savingField === 'companion-controls'}
-                        label="Allow hints"
-                        onCheckedChange={(v) => void updateCompanionControl('allowHints', v)}
-                    />
-                    <View className="mx-4 h-px bg-slate-100" />
-                    <InlineToggleRow
-                        checked={companionControls.allowSkip}
-                        disabled={companionControlsLocked || savingField === 'companion-controls'}
-                        label="Allow skip"
-                        onCheckedChange={(v) => void updateCompanionControl('allowSkip', v)}
+                    <NavRow
+                        icon={<Moon02Icon color="#6366f1" size={20} />}
+                        label="Appearance"
+                        onPress={() => router.push('/settings/preferences')}
+                        value={capitalize(settings.appearance)}
                     />
                 </View>
 
@@ -334,13 +301,10 @@ function StudentSettingsView({
                     <View className="mx-4 h-px bg-slate-100" />
                     <NavRow
                         icon={<UserCircleIcon color="#6366f1" size={20} />}
-                        label="Profile"
-                        onPress={() => router.push('/settings/profile')}
+                        label="Account"
+                        onPress={() => router.push('/settings/account')}
                     />
-                </View>
-
-                {/* Plans */}
-                <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
+                    <View className="mx-4 h-px bg-slate-100" />
                     <NavRow
                         icon={<Settings02Icon color="#6366f1" size={20} />}
                         label="Plans & billing"
@@ -352,31 +316,6 @@ function StudentSettingsView({
             </ScrollView>
         </SafeAreaView>
     );
-
-    async function updateCompanionControl(
-        key: 'showCorrectAnswers' | 'allowHints' | 'allowSkip',
-        value: boolean,
-    ) {
-        if (companionControlsLocked) return;
-        const next = { ...companionControls, [key]: value };
-        setSettings((s) => ({ ...s, companionControls: next }));
-        setSavingField('companion-controls');
-        try {
-            const saved = await nativeApiFetch<CompanionControls>(ROUTES.SETTINGS.COMPANION_CONTROLS, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    showCorrectAnswers: next.showCorrectAnswers,
-                    allowHints: next.allowHints,
-                    allowSkip: next.allowSkip,
-                }),
-            });
-            setSettings((s) => ({ ...s, companionControls: saved }));
-        } catch {
-            setSettings((s) => ({ ...s, companionControls }));
-        } finally {
-            setSavingField(null);
-        }
-    }
 }
 
 // ─── Shared sub-components ───────────────────────────────────────────────────
@@ -412,43 +351,4 @@ function NavRow({
             </View>
         </Pressable>
     );
-}
-
-function InlineToggleRow({
-    checked,
-    disabled,
-    label,
-    onCheckedChange,
-}: {
-    checked: boolean;
-    disabled: boolean;
-    label: string;
-    onCheckedChange: (v: boolean) => void;
-}) {
-    return (
-        <View className={`flex-row items-center justify-between px-4 py-3.5 ${disabled ? 'opacity-60' : ''}`}>
-            <Text className="text-sm font-semibold text-slate-800">{label}</Text>
-            <Switch
-                disabled={disabled}
-                ios_backgroundColor="#cbd5e1"
-                onValueChange={onCheckedChange}
-                thumbColor="#ffffff"
-                trackColor={{ false: '#cbd5e1', true: '#818cf8' }}
-                value={checked}
-            />
-        </View>
-    );
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function ensureCompanionControls(controls: CompanionControls | null): CompanionControls {
-    return controls ?? {
-        showCorrectAnswers: true,
-        allowHints: true,
-        allowSkip: false,
-        lockedByGuardian: false,
-        lastChangedAt: new Date().toISOString(),
-        lastChangedBy: 'You',
-    };
 }
