@@ -42,21 +42,25 @@ const RESPONSE_OPTIONS: Array<{
   key: ConfidenceChoice;
   label: string;
   selectedClassName: string;
+  pressedClassName: string;
 }> = [
   {
     key: 'got_it',
     label: '✓ Got it',
     selectedClassName: 'border-emerald-500 bg-emerald-50',
+    pressedClassName: 'border-emerald-400 bg-emerald-100',
   },
   {
     key: 'not_sure',
     label: '~ Mostly',
     selectedClassName: 'border-amber-500 bg-amber-50',
+    pressedClassName: 'border-amber-400 bg-amber-100',
   },
   {
     key: 'confused',
     label: '? Not quite',
     selectedClassName: 'border-rose-500 bg-rose-50',
+    pressedClassName: 'border-rose-400 bg-rose-100',
   },
 ];
 
@@ -94,6 +98,8 @@ export default function LessonReaderScreen() {
   const [showSettings, setShowSettings] = useState(false);
   const [textScale, setTextScale] = useState(100);
   const [theme, setTheme] = useState<ThemeMode>('light');
+  const [copiedCodeId, setCopiedCodeId] = useState<string | null>(null);
+  const [pressedButton, setPressedButton] = useState<string | null>(null);
   const startedAtRef = useRef(Date.now());
 
   const load = useCallback(async () => {
@@ -285,16 +291,19 @@ export default function LessonReaderScreen() {
                 <View className="mt-2 gap-2">
                   {RESPONSE_OPTIONS.map((option) => {
                     const selected = responses[index] === option.key;
+                    const pressed = pressedButton === `${index}-${option.key}`;
                     return (
                       <Pressable
-                        className={`rounded-xl border px-3 py-2 ${selected ? option.selectedClassName : 'border-slate-300 bg-white'}`}
+                        className={`rounded-xl border px-3 py-2 ${pressed ? option.pressedClassName : selected ? option.selectedClassName : 'border-slate-300 bg-white'}`}
                         disabled={savingFor === index}
                         key={option.key}
+                        onPressIn={() => setPressedButton(`${index}-${option.key}`)}
+                        onPressOut={() => setPressedButton(null)}
                         onPress={() => {
                           void onSectionResponse(index, option.key);
                         }}
                       >
-                        <Text className="text-sm font-medium text-slate-700">{option.label}</Text>
+                        <Text className={`text-sm font-medium ${pressed || selected ? 'text-slate-700' : 'text-slate-700'}`}>{option.label}</Text>
                       </Pressable>
                     );
                   })}

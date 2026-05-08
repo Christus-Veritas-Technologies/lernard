@@ -44,10 +44,10 @@ type LessonResponse = { status: "generating" | "ready"; content?: LessonContent 
 type ConfidenceChoice = "got_it" | "not_sure" | "confused";
 type ThemeMode = "light" | "dark" | "sepia";
 
-const RESPONSE_OPTIONS: Array<{ key: ConfidenceChoice; label: string; activeClassName: string }> = [
-    { key: "got_it", label: "✓ Got it", activeClassName: "border-emerald-500 text-emerald-700 bg-emerald-50" },
-    { key: "not_sure", label: "~ Mostly", activeClassName: "border-amber-500 text-amber-700 bg-amber-50" },
-    { key: "confused", label: "? Not quite", activeClassName: "border-rose-500 text-rose-700 bg-rose-50" },
+const RESPONSE_OPTIONS: Array<{ key: ConfidenceChoice; label: string; activeClassName: string; hoverClassName: string }> = [
+    { key: "got_it", label: "✓ Got it", activeClassName: "border-emerald-500 text-emerald-700 bg-emerald-50", hoverClassName: "hover:border-emerald-400 hover:bg-emerald-100" },
+    { key: "not_sure", label: "~ Mostly", activeClassName: "border-amber-500 text-amber-700 bg-amber-50", hoverClassName: "hover:border-amber-400 hover:bg-amber-100" },
+    { key: "confused", label: "? Not quite", activeClassName: "border-rose-500 text-rose-700 bg-rose-50", hoverClassName: "hover:border-rose-400 hover:bg-rose-100" },
 ];
 
 const SECTION_STYLE: Record<LessonSectionType, { card: string; label: string }> = {
@@ -81,6 +81,7 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
     const [savingResponseFor, setSavingResponseFor] = useState<number | null>(null);
     const [reexplainLoadingFor, setReexplainLoadingFor] = useState<number | null>(null);
     const [sectionBodyOverrides, setSectionBodyOverrides] = useState<Record<number, string>>({});
+    const [copiedCodeIndex, setCopiedCodeIndex] = useState<string | null>(null);
     const sectionRefs = useRef<Array<HTMLElement | null>>([]);
     const startedAtRef = useRef<number>(Date.now());
 
@@ -325,7 +326,7 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
                                             const selected = responses[index] === option.key;
                                             return (
                                                 <button
-                                                    className={`rounded-xl border px-3 py-2 text-sm font-medium ${selected ? option.activeClassName : "border-slate-300 text-slate-700"}`}
+                                                    className={`rounded-xl border px-3 py-2 text-sm font-medium transition-all ${selected ? option.activeClassName : `border-slate-300 text-slate-700 ${option.hoverClassName}`}`}
                                                     disabled={savingResponseFor === index}
                                                     key={option.key}
                                                     onClick={() => void submitSectionResponse(index, option.key)}
@@ -439,11 +440,16 @@ function MarkdownSection({ body, section }: { body: string; section: LessonSecti
                                 <div className="flex items-center justify-between border-b border-slate-700 bg-slate-900 px-3 py-2 text-xs text-slate-200">
                                     <span>{language}</span>
                                     <button
-                                        className="rounded border border-slate-600 px-2 py-1 text-[11px]"
-                                        onClick={() => void navigator.clipboard.writeText(content)}
+                                        className="rounded border border-slate-600 px-2 py-1 text-[11px] transition-all hover:border-slate-500 hover:bg-slate-800 active:scale-95 disabled:opacity-50"
+                                        onClick={() => {
+                                            const codeId = `code-${Date.now()}-${Math.random()}`;
+                                            void navigator.clipboard.writeText(content);
+                                            setCopiedCodeIndex(codeId);
+                                            setTimeout(() => setCopiedCodeIndex(null), 2000);
+                                        }}
                                         type="button"
                                     >
-                                        Copy
+                                        {copiedCodeIndex && copiedCodeIndex.startsWith(`code-`) ? "Copied!" : "Copy"}
                                     </button>
                                 </div>
                                 <pre className="overflow-x-auto p-3 text-sm text-slate-100">
