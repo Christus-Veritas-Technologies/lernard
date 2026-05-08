@@ -181,11 +181,12 @@ export class MastraService {
         messages: [{ role: 'user', content: userPrompt }],
       });
 
-      const parsed = safeJsonParse<Partial<LessonContent>>(text);
+      const parsed = parseLessonContentFromModelText(text);
       if (!parsed || !Array.isArray(parsed.sections)) {
-        throw new ContentValidationError(
-          'Lesson generation returned malformed JSON',
+        this.logger.warn(
+          `[mastra.generateLesson] malformed_json_fallback topic="${input.topic}" depth=${input.depth} rawPreview="${truncateForLog(text.replace(/\s+/g, ' '), 600)}"`,
         );
+        return buildFallbackLesson(input.topic, input.subjectName, input.depth);
       }
 
       assertLessonContentValid(parsed);
@@ -1000,6 +1001,50 @@ function safeJsonParse<T>(value: string): T | null {
   } catch {
     return null;
   }
+}
+
+function parseLessonContentFromModelText(
+  value: string,
+): Partial<LessonContent> | null {
+  const candidates = buildJsonCandidates(value);
+
+  for (const candidate of candidates) {
+    const parsed = safeJsonParse<Partial<LessonContent>>(candidate);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+function buildJsonCandidates(value: string): string[] {
+  const candidates: string[] = [];
+  const trimmed = value.trim();
+
+  if (trimmed) {
+    candidates.push(trimmed);
+  }
+
+  const fencedMatches = [
+    ...trimmed.matchAll(/```json\s*([\s\S]*?)```/gi),
+    ...trimmed.matchAll(/```\s*([\s\S]*?)```/g),
+  ];
+
+  for (const match of fencedMatches) {
+    const block = (match[1] ?? '').trim();
+    if (block) {
+      candidates.push(block);
+    }
+  }
+
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    candidates.push(trimmed.slice(firstBrace, lastBrace + 1));
+  }
+
+  return Array.from(new Set(candidates));
 }
 
 function truncateForLog(value: string, maxLength: number): string {
