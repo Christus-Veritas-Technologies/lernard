@@ -708,30 +708,30 @@ function buildFallbackLesson(
       {
         type: 'hook',
         heading: 'Why this matters',
-        body: `Understanding ${topic} helps you connect ideas and solve real problems with confidence.`,
+        body: `Understanding ${topic} is a valuable skill that opens up new ways of thinking and solving problems. When you grasp the core ideas behind ${topic}, you gain the ability to connect concepts across different subjects and apply your knowledge in practical, real-world situations. Many learners find that mastering ${topic} builds confidence and makes related topics easier to approach.`,
         terms: [],
       },
       {
         type: 'concept',
         heading: `Core idea of ${topic}`,
-        body: `${topic} can be understood by breaking it into smaller steps and patterns you can reuse.`,
+        body: `${topic} can be understood by breaking it into smaller, manageable steps and recognising the patterns that appear throughout. The key is to focus on the underlying principles rather than trying to memorise every detail. Once you understand why things work the way they do in ${topic}, the specific facts and procedures start to make much more sense and become easier to remember.`,
         terms: [
           {
             term: topic,
-            explanation: `${topic} is the key idea being studied in this lesson.`,
+            explanation: `${topic} is the central concept studied in this lesson. It refers to a body of ideas, methods, or principles that help explain a particular area of knowledge or skill.`,
           },
         ],
       },
       {
         type: 'examples',
         heading: 'Worked example',
-        body: `Apply the main rule for ${topic} in one short example, then try a similar one yourself.`,
+        body: `Consider a simple, concrete case involving ${topic}. Start with a straightforward scenario: identify the key components, apply the relevant rule or method from step 1 through to the final answer, and check that the result makes sense. For instance, if ${topic} involves a process, trace through that process with specific values like 10, 25, or 100 to see the pattern in action. Practising with at least two or three examples like this will solidify your understanding.`,
         terms: [],
       },
       {
         type: 'recap',
         heading: 'Quick recap',
-        body: `You learned what ${topic} is, why it matters, and how to apply it in a simple case.`,
+        body: `In this lesson you explored what ${topic} is and why it matters, identified the core principles that make it work, and saw how to apply those principles in a worked example. The most important takeaway is that ${topic} follows consistent patterns you can rely on. In your next session, try applying what you learned here to a new problem or a slightly different context to reinforce your understanding.`,
         terms: [],
       },
     ],
@@ -750,7 +750,7 @@ function buildFallbackQuizQuestions(
     if (variant === 0) {
       return {
         type: 'multiple_choice',
-        text: `Which option gives the clearest summary of ${normalizedTopic}?`,
+        text: `Which of the following options gives the most accurate and complete summary of what ${normalizedTopic} is?`,
         options: [
           `${normalizedTopic} is a concept or process that can be understood step by step.`,
           `${normalizedTopic} is only a random guess with no pattern.`,
@@ -774,7 +774,7 @@ function buildFallbackQuizQuestions(
     if (variant === 2) {
       return {
         type: 'multiple_select',
-        text: `Which actions would help someone understand ${normalizedTopic} more deeply?`,
+        text: `Which of the following actions would most help someone build a deeper understanding of ${normalizedTopic}?`,
         options: [
           `Define the key terms in ${normalizedTopic}`,
           `Work through a concrete example of ${normalizedTopic}`,
@@ -793,7 +793,7 @@ function buildFallbackQuizQuestions(
     if (variant === 3) {
       return {
         type: 'fill_blank',
-        text: `Fill in the blank: This quiz is helping you practise _____.`,
+        text: `Fill in the blank: The subject this entire quiz has been designed to help you practise is _____.`,
         correctAnswer: normalizedTopic,
         explanation: `The blank should be filled with the topic the quiz is focused on.`,
       };
