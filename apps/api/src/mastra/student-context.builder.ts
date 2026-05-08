@@ -3,8 +3,16 @@ import { PrismaService } from '../prisma/prisma.service';
 
 export type LearningModeKey = 'guide' | 'companion';
 export type DepthKey = 'quick' | 'standard' | 'deep';
-export type AgeGroupKey = 'primary' | 'secondary' | 'university' | 'professional';
-export type LearningGoalKey = 'exam_prep' | 'keep_up' | 'learn_something_new' | 'fill_gaps';
+export type AgeGroupKey =
+  | 'primary'
+  | 'secondary'
+  | 'university'
+  | 'professional';
+export type LearningGoalKey =
+  | 'exam_prep'
+  | 'keep_up'
+  | 'learn_something_new'
+  | 'fill_gaps';
 export type StrengthKey = 'strong' | 'developing' | 'needs_work';
 
 export interface StudentContextSubject {
@@ -58,7 +66,13 @@ export class StudentContextBuilder {
   async buildForUser(userId: string): Promise<StudentContext> {
     const prisma = this.prisma as any;
 
-    const [user, userSubjects, subjectProgress, recentLessonSessions, lastQuiz] = await Promise.all([
+    const [
+      user,
+      userSubjects,
+      subjectProgress,
+      recentLessonSessions,
+      lastQuiz,
+    ] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: {
@@ -112,26 +126,39 @@ export class StudentContextBuilder {
       .map((s: { lessonId: string | null }) => s.lessonId)
       .filter((id: string | null): id is string => Boolean(id));
 
-    const lessonRows: Array<{ id: string; confidenceRating: number | null }> = lessonIds.length
-      ? await prisma.lesson.findMany({
-          where: { id: { in: lessonIds } },
-          select: { id: true, confidenceRating: true },
-        })
-      : [];
+    const lessonRows: Array<{ id: string; confidenceRating: number | null }> =
+      lessonIds.length
+        ? await prisma.lesson.findMany({
+            where: { id: { in: lessonIds } },
+            select: { id: true, confidenceRating: true },
+          })
+        : [];
 
-    const confidenceById = new Map(lessonRows.map((row) => [row.id, row.confidenceRating]));
+    const confidenceById = new Map(
+      lessonRows.map((row) => [row.id, row.confidenceRating]),
+    );
 
     const recentLessonTopics: StudentContextLesson[] = recentLessonSessions.map(
-      (session: { topic: string; subjectName: string | null; completedAt: Date; lessonId: string | null }) => ({
+      (session: {
+        topic: string;
+        subjectName: string | null;
+        completedAt: Date;
+        lessonId: string | null;
+      }) => ({
         topic: session.topic,
         subjectName: session.subjectName ?? 'General',
         completedAt: session.completedAt.toISOString(),
-        confidenceRating: session.lessonId ? confidenceById.get(session.lessonId) ?? null : null,
+        confidenceRating: session.lessonId
+          ? (confidenceById.get(session.lessonId) ?? null)
+          : null,
       }),
     );
 
     const subjects: StudentContextSubject[] = userSubjects.map(
-      (us: { priorityIndex: number; subject: { id: string; name: string } }) => {
+      (us: {
+        priorityIndex: number;
+        subject: { id: string; name: string };
+      }) => {
         const progress = subjectProgress.find(
           (p: { subjectId: string }) => p.subjectId === us.subject.id,
         );
@@ -232,7 +259,8 @@ function normalizeGoal(value: unknown): LearningGoalKey | null {
 }
 
 function normalizeDepth(value: unknown): DepthKey {
-  if (value === 'quick' || value === 'standard' || value === 'deep') return value;
+  if (value === 'quick' || value === 'standard' || value === 'deep')
+    return value;
   return 'standard';
 }
 
@@ -258,9 +286,12 @@ function deriveGrowthAreas(input: {
 
   for (const progress of input.subjectProgress) {
     const scores = progress.topicScores;
-    if (!scores || typeof scores !== 'object' || Array.isArray(scores)) continue;
+    if (!scores || typeof scores !== 'object' || Array.isArray(scores))
+      continue;
     const subjectName = progress.subject?.name ?? 'General';
-    for (const [topic, raw] of Object.entries(scores as Record<string, unknown>)) {
+    for (const [topic, raw] of Object.entries(
+      scores as Record<string, unknown>,
+    )) {
       if (topic === '__first_look__') continue;
       const score = typeof raw === 'number' ? raw : Number(raw);
       if (!Number.isFinite(score) || score >= LOW_SCORE_THRESHOLD) continue;
