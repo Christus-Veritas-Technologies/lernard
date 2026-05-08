@@ -34,11 +34,6 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
     Dialog,
     DialogContent,
     DialogDescription,
@@ -778,31 +773,22 @@ export function StudentSettingsPageClient({ content, permissions }: StudentSetti
                             </Card>
                         )}
 
-                        <Collapsible>
-                            <Card>
-                                <CardHeader>
-                                    <CollapsibleTrigger className="flex w-full items-center justify-between text-left">
-                                        <div>
-                                            <CardTitle>Data &amp; privacy</CardTitle>
-                                            <CardDescription>Manage your data and privacy options.</CardDescription>
-                                        </div>
-                                        <span className="text-sm text-text-secondary">▾</span>
-                                    </CollapsibleTrigger>
-                                </CardHeader>
-                                <CollapsibleContent>
-                                    <CardContent className="space-y-4 pt-0">
-                                        <p className="text-sm text-text-secondary">
-                                            Lernard stores your progress, quiz results, and session history. You can reset your progress or delete your account at any time.
-                                        </p>
-                                        <div className="flex flex-wrap gap-3">
-                                            <Link href="/privacy" target="_blank">
-                                                <Button variant="secondary" size="sm">Privacy policy</Button>
-                                            </Link>
-                                        </div>
-                                    </CardContent>
-                                </CollapsibleContent>
-                            </Card>
-                        </Collapsible>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Data &amp; privacy</CardTitle>
+                                <CardDescription>Manage your data and privacy options.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4 pt-0">
+                                <p className="text-sm text-text-secondary">
+                                    Lernard stores your progress, quiz results, and session history. You can reset your progress or delete your account at any time.
+                                </p>
+                                <div className="flex flex-wrap gap-3">
+                                    <Link href="/privacy" target="_blank">
+                                        <Button variant="secondary" size="sm">Privacy policy</Button>
+                                    </Link>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
 
                     <div className="flex flex-col gap-6">
