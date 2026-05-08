@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
@@ -116,11 +116,65 @@ interface AuthUser {
     role: string;
 }
 
+interface PendingInvite {
+    pending: boolean;
+    code?: string;
+    guardianName?: string;
+}
+
 function StudentHomeDashboardScreen() {
     const router = useRouter();
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<HomeContent>(
         ROUTES.HOME.PAYLOAD,
     );
+    const [pendingInvite, setPendingInvite] = useState<PendingInvite | null>(null);
+    const [showInviteModal, setShowInviteModal] = useState(false);
+    const [isActingOnInvite, setIsActingOnInvite] = useState(false);
+
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        nativeApiFetch<PendingInvite>(ROUTES.GUARDIAN.PENDING_INVITE_FOR_ME)
+            .then((result) => {
+                if (result.pending) {
+                    setPendingInvite(result);
+                }
+            })
+            .catch(() => { /* non-critical — ignore */ });
+    }, [isAuthenticated]);
+
+    async function handleAcceptInvite() {
+        if (!pendingInvite?.code) return;
+        setIsActingOnInvite(true);
+        try {
+            await nativeApiFetch(ROUTES.GUARDIAN.ACCEPT_INVITE, {
+                method: 'POST',
+                body: JSON.stringify({ code: pendingInvite.code }),
+            });
+            setShowInviteModal(false);
+            setPendingInvite(null);
+        } catch {
+            // keep modal open — user can try again
+        } finally {
+            setIsActingOnInvite(false);
+        }
+    }
+
+    async function handleDeclineInvite() {
+        if (!pendingInvite?.code) return;
+        setIsActingOnInvite(true);
+        try {
+            await nativeApiFetch(ROUTES.GUARDIAN.DECLINE_INVITE, {
+                method: 'POST',
+                body: JSON.stringify({ code: pendingInvite.code }),
+            });
+            setShowInviteModal(false);
+            setPendingInvite(null);
+        } catch {
+            // keep modal open — user can try again
+        } finally {
+            setIsActingOnInvite(false);
+        }
+    }
 
     if (!isAuthenticated) {
         return (
@@ -177,7 +231,58 @@ function StudentHomeDashboardScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+            <Modal
+                animationType="slide"
+                onRequestClose={() => setShowInviteModal(false)}
+                presentationStyle="pageSheet"
+                transparent={false}
+                visible={showInviteModal}
+            >
+                <SafeAreaView className="flex-1 bg-background" edges={['top', 'bottom']}>
+                    <View className="flex-1 px-6 pt-6 pb-8 gap-6">
+                        <View className="flex-row items-center justify-between">
+                            <Text className="text-2xl font-bold text-slate-900">Guardian invite</Text>
+                            <Pressable onPress={() => setShowInviteModal(false)} className="px-2 py-1">
+                                <Text className="text-base text-slate-500">Dismiss</Text>
+                            </Pressable>
+                        </View>
+                        <Text className="text-base leading-7 text-slate-600">
+                            {pendingInvite?.guardianName ?? 'A guardian'} has invited you to connect your Lernard account.
+                            They will be able to view your progress and manage your learning settings.
+                        </Text>
+                        <View className="gap-3">
+                            <Button
+                                disabled={isActingOnInvite}
+                                onPress={handleAcceptInvite}
+                                title={isActingOnInvite ? 'Working...' : 'Accept invite'}
+                            />
+                            <Button
+                                disabled={isActingOnInvite}
+                                onPress={handleDeclineInvite}
+                                title="Decline"
+                                variant="secondary"
+                            />
+                        </View>
+                    </View>
+                </SafeAreaView>
+            </Modal>
+
             <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
+                {pendingInvite?.pending && (
+                    <Pressable
+                        onPress={() => setShowInviteModal(true)}
+                        className="flex-row items-center gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3"
+                    >
+                        <View className="flex-1">
+                            <Text className="text-sm font-semibold text-indigo-900">Guardian invite pending</Text>
+                            <Text className="mt-0.5 text-xs leading-5 text-indigo-700">
+                                {pendingInvite.guardianName ?? 'A guardian'} wants to connect with you. Tap to review.
+                            </Text>
+                        </View>
+                        <Text className="text-sm font-semibold text-indigo-600">View →</Text>
+                    </Pressable>
+                )}
+
                 <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
                     <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Your dashboard</Text>
                     <Text className="mt-3 text-3xl font-semibold text-slate-900">{content.greeting}</Text>
