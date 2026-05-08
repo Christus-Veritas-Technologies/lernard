@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type {
   QuizCompletionResult,
   QuizContent,
@@ -9,7 +9,9 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MastraService } from '../../mastra/mastra.service';
 import { StudentContextBuilder } from '../../mastra/student-context.builder';
 import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
+import { R2Service } from '../../r2/r2.service';
 import { GenerateQuizDto, SubmitAnswerDto } from './dto/quizzes.dto';
+import { deleteQuizUpload, readQuizUpload } from './quiz-uploads';
 
 @Injectable()
 export class QuizzesService {
@@ -17,24 +19,85 @@ export class QuizzesService {
     private readonly prisma: PrismaService,
     private readonly mastraService: MastraService,
     private readonly studentContextBuilder: StudentContextBuilder,
+    private readonly r2: R2Service,
   ) {}
 
   async generate(
     user: User,
     dto: GenerateQuizDto,
   ): Promise<{ quizId: string; status: string }> {
+    if (!dto.topic && !dto.fromUploadId) {
+      throw new BadRequestException('topic or fromUploadId is required');
+    }
+
     const studentContext = await this.studentContextBuilder.buildForUser(
       user.id,
     );
-    const generated = await this.mastraService.generateQuiz({
-      topic: dto.topic,
-      questionCount: dto.questionCount,
-      subjectName: dto.subject,
-      mode: normalizeMode(user.learningMode),
-      studentContext,
-    });
+    const mode = normalizeMode(user.learningMode);
 
-    await validateGeneratedContent(generated, this.mastraService);
+    let generated: {
+      topic: string;
+      subjectName: string;
+      mode: 'guide' | 'companion';
+      questions: Array<{
+        type: string;
+        text: string;
+        options?: string[];
+        correctAnswer?: string;
+        correctAnswers?: string[];
+        explanation?: string;
+      }>;
+    };
+
+    if (dto.fromUploadId) {
+      if (!dto.fromUploadKind) {
+        throw new BadRequestException('fromUploadKind is required when fromUploadId is provided');
+      }
+      const upload = await readQuizUpload(this.r2, user.id, dto.fromUploadId);
+      if (!upload) {
+        throw new BadRequestException('Uploaded file not found or has expired. Please upload again.');
+      }
+      generated = await this.mastraService.generateQuizFromFile({
+        buffer: upload.buffer,
+        kind: upload.kind,
+        mimeType: upload.mimeType,
+        questionCount: dto.questionCount,
+        mode,
+        studentContext,
+      });
+      // Fire-and-forget: delete the temp upload after generation
+      deleteQuizUpload(this.r2, user.id, dto.fromUploadId).catch(() => {});
+    } else {
+      let lessonSections: Array<{
+        type: string;
+        heading: string | null;
+        body: string;
+        terms: Array<{ term: string; explanation: string }>;
+      }> | undefined;
+      let confidenceRating: number | null = null;
+
+      if (dto.fromLessonId) {
+        const lesson = await (this.prisma as any).lesson.findFirst({
+          where: { id: dto.fromLessonId, userId: user.id },
+          select: { sections: true, confidenceRating: true },
+        });
+        if (lesson) {
+          lessonSections = lesson.sections as typeof lessonSections;
+          confidenceRating = lesson.confidenceRating ?? null;
+        }
+      }
+
+      generated = await this.mastraService.generateQuiz({
+        topic: dto.topic!,
+        questionCount: dto.questionCount,
+        subjectName: dto.subject,
+        mode,
+        studentContext,
+        lessonSections,
+        confidenceRating,
+      });
+      await validateGeneratedContent(generated, this.mastraService);
+    }
 
     if (generated.questions.length !== dto.questionCount) {
       throw new Error(
@@ -71,6 +134,7 @@ export class QuizzesService {
           explanation:
             question.explanation ??
             'Review this concept and compare your answer with the expected pattern.',
+          subtopic: (question as any).subtopic ?? null,
         },
       });
     }
@@ -182,6 +246,66 @@ export class QuizzesService {
     };
   }
 
+  async evaluateShortAnswer(
+    user: User,
+    quizId: string,
+    dto: { questionIndex: number; studentAnswer: string },
+  ): Promise<{ result: 'correct' | 'partial' | 'incorrect'; feedback: string }> {
+    const quiz = await (this.prisma as any).quiz.findFirst({
+      where: { id: quizId, userId: user.id },
+      include: {
+        questions: {
+          where: { questionIndex: dto.questionIndex },
+          take: 1,
+        },
+      },
+    });
+
+    if (!quiz || !quiz.questions[0]) {
+      throw new NotFoundException('Quiz question not found');
+    }
+
+    const question = quiz.questions[0];
+    if (question.type !== 'SHORT_ANSWER') {
+      throw new BadRequestException('This endpoint is only for short_answer questions');
+    }
+
+    const studentContext = await this.studentContextBuilder.buildForUser(user.id);
+    const evaluation = await this.mastraService.evaluateShortAnswer({
+      questionText: question.text,
+      modelAnswer: question.correctAnswer,
+      studentAnswer: dto.studentAnswer,
+      studentContext: {
+        name: studentContext.name,
+        grade: studentContext.grade,
+        ageGroup: studentContext.ageGroup,
+      },
+    });
+
+    const isCorrect = evaluation.result === 'correct';
+    await (this.prisma as any).quizAnswer.upsert({
+      where: { quizId_questionIndex: { quizId, questionIndex: dto.questionIndex } },
+      update: {
+        answer: dto.studentAnswer,
+        isCorrect,
+        evaluationResult: evaluation.result,
+        feedback: evaluation.feedback,
+        submittedAt: new Date(),
+      },
+      create: {
+        quizId,
+        userId: user.id,
+        questionIndex: dto.questionIndex,
+        answer: dto.studentAnswer,
+        isCorrect,
+        evaluationResult: evaluation.result,
+        feedback: evaluation.feedback,
+      },
+    });
+
+    return evaluation;
+  }
+
   async complete(user: User, quizId: string): Promise<QuizCompletionResult> {
     const quiz = await (this.prisma as any).quiz.findFirst({
       where: { id: quizId, userId: user.id },
@@ -197,12 +321,12 @@ export class QuizzesService {
 
     const answersByIndex = new Map<
       number,
-      { answer: string; isCorrect: boolean }
+      { answer: string; isCorrect: boolean; evaluationResult?: string; feedback?: string }
     >(
       quiz.answers.map(
-        (a: { questionIndex: number; answer: string; isCorrect: boolean }) => [
+        (a: { questionIndex: number; answer: string; isCorrect: boolean; evaluationResult?: string; feedback?: string }) => [
           a.questionIndex,
-          { answer: a.answer, isCorrect: a.isCorrect },
+          { answer: a.answer, isCorrect: a.isCorrect, evaluationResult: a.evaluationResult, feedback: a.feedback },
         ],
       ),
     );
@@ -216,6 +340,9 @@ export class QuizzesService {
           correctAnswer: question.correctAnswer,
           isCorrect: student?.isCorrect ?? false,
           explanation: question.explanation,
+          subtopic: question.subtopic ?? undefined,
+          evaluationResult: (student?.evaluationResult as 'correct' | 'partial' | 'incorrect' | undefined) ?? undefined,
+          feedback: student?.feedback ?? undefined,
         };
       },
     );
@@ -224,9 +351,29 @@ export class QuizzesService {
     const shouldRevealAnswers = true;
     const weakTopics = reviews
       .filter((entry) => !entry.isCorrect)
-      .map((entry) => summariseQuestionAsTopic(entry.text))
+      .map((entry) => entry.subtopic ?? summariseQuestionAsTopic(entry.text))
       .filter(Boolean)
       .slice(0, 5);
+
+    // Build topic breakdown from subtopics
+    const subtopicResults = new Map<string, { correct: number; total: number }>();
+    for (const review of reviews) {
+      const sub = review.subtopic ?? quiz.topic;
+      const entry = subtopicResults.get(sub) ?? { correct: 0, total: 0 };
+      subtopicResults.set(sub, {
+        correct: entry.correct + (review.isCorrect ? 1 : 0),
+        total: entry.total + 1,
+      });
+    }
+    const strong: string[] = [];
+    const needsWork: string[] = [];
+    const revisitSoon: string[] = [];
+    for (const [sub, { correct, total }] of subtopicResults) {
+      const ratio = correct / total;
+      if (ratio >= 0.8) strong.push(sub);
+      else if (ratio < 0.5) needsWork.push(sub);
+      else revisitSoon.push(sub);
+    }
 
     await (this.prisma as any).quiz.update({
       where: { id: quizId },
@@ -265,17 +412,23 @@ export class QuizzesService {
       },
     });
 
+    const studentContext = await this.studentContextBuilder.buildForUser(user.id);
+    const debriefText = await this.mastraService.generateQuizDebrief({
+      topic: quiz.topic,
+      studentName: studentContext.name,
+      studentLevel: studentContext.grade ?? studentContext.ageGroup ?? 'student',
+      score,
+      total: quiz.totalQuestions,
+      questions: reviews.map((r) => ({ text: r.text, isCorrect: r.isCorrect })),
+    });
+
     return {
       score,
       totalQuestions: quiz.totalQuestions,
       xpEarned: 10 + score,
       shouldRevealAnswers,
-      topicBreakdown: {
-        strong: score > 0 ? [quiz.topic] : [],
-        needsWork: score < quiz.totalQuestions ? [quiz.topic] : [],
-        revisitSoon:
-          score >= Math.ceil(quiz.totalQuestions / 2) ? [quiz.topic] : [],
-      },
+      debriefText,
+      topicBreakdown: { strong, needsWork, revisitSoon },
       questions: reviews.map((entry) => ({
         ...entry,
         correctAnswer: shouldRevealAnswers ? entry.correctAnswer : null,
@@ -417,8 +570,11 @@ function checkAnswer(
       }
       return normalizedStudentAnswer === normalizeFreeTextAnswer(storedCorrect);
     }
-    case 'FILL_BLANK':
     case 'SHORT_ANSWER':
+      // Short answers are evaluated via POST /:quizId/evaluate-short-answer (AI grading).
+      // answer() just stores the response; isCorrect defaults false until evaluation updates it.
+      return false;
+    case 'FILL_BLANK':
     case 'ORDERING':
       return compareAcceptedAnswers(studentAnswer, storedCorrect);
     case 'MULTIPLE_CHOICE':

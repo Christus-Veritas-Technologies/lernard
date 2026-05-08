@@ -68,6 +68,14 @@ interface GeneratedQuizQuestion {
   correctAnswer?: string;
   correctAnswers?: string[];
   explanation?: string;
+  subtopic?: string;
+}
+
+interface LessonSectionInput {
+  type: string;
+  heading: string | null;
+  body: string;
+  terms: Array<{ term: string; explanation: string }>;
 }
 
 export interface ChatToolExecutor {
@@ -235,6 +243,8 @@ export class MastraService {
     subjectName?: string;
     mode: 'guide' | 'companion';
     studentContext: StudentContext;
+    lessonSections?: LessonSectionInput[];
+    confidenceRating?: number | null;
   }): Promise<{
     topic: string;
     subjectName: string;
@@ -262,62 +272,258 @@ export class MastraService {
       subjectName: input.subjectName,
       questionCount: input.questionCount,
       mode: input.mode,
+      lessonSections: input.lessonSections,
+      confidenceRating: input.confidenceRating,
     });
 
-    return this.runWithRetry(
-      async () => {
-        const text = await this.completeText({
-          model: SONNET_MODEL,
-          maxTokens: quizMaxTokens(input.questionCount),
-          systemPrompt,
-          messages: [{ role: 'user', content: userPrompt }],
-        });
+    return this.runWithRetry(async () => {
+      const text = await this.completeText({
+        model: SONNET_MODEL,
+        maxTokens: quizMaxTokens(input.questionCount),
+        systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
 
-        const parsed = safeJsonParse<{ questions?: GeneratedQuizQuestion[] }>(
-          text,
+      if (isResponseTruncated(text)) {
+        throw new ContentValidationError(
+          'Quiz response was truncated — retry',
         );
-        if (!parsed || !Array.isArray(parsed.questions)) {
-          throw new ContentValidationError(
-            'Quiz generation returned malformed JSON',
-          );
-        }
+      }
 
-        const normalized = parsed.questions
-          .map((question) => normalizeGeneratedQuestion(question))
-          .filter(isUsableGeneratedQuestion);
+      const parsed = safeJsonParse<{ questions?: GeneratedQuizQuestion[] }>(
+        text,
+      );
+      if (!parsed || !Array.isArray(parsed.questions)) {
+        throw new ContentValidationError(
+          'Quiz generation returned malformed JSON',
+        );
+      }
 
-        const seen = new Set<string>();
-        const unique: GeneratedQuizQuestion[] = [];
-        for (const question of normalized) {
-          const key = `${question.type}|${normalizeQuestionKey(question.text)}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
-          unique.push(question);
-        }
+      const normalized = parsed.questions
+        .map((question) => normalizeGeneratedQuestion(question))
+        .filter(isUsableGeneratedQuestion);
 
-        if (unique.length < input.questionCount) {
-          throw new ContentValidationError(
-            `Quiz generation returned ${unique.length} usable questions, expected ${input.questionCount}`,
-          );
-        }
+      const seen = new Set<string>();
+      const unique: GeneratedQuizQuestion[] = [];
+      for (const question of normalized) {
+        const key = `${question.type}|${normalizeQuestionKey(question.text)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(question);
+      }
 
-        const finalQuestions = unique.slice(0, input.questionCount);
-        assertQuizContentValid({ questions: finalQuestions });
+      if (unique.length < input.questionCount) {
+        throw new ContentValidationError(
+          `Quiz generation returned ${unique.length} usable questions, expected ${input.questionCount}`,
+        );
+      }
 
-        return {
-          topic: input.topic,
-          subjectName: input.subjectName ?? 'General',
-          mode: input.mode,
-          questions: finalQuestions,
-        };
-      },
-      () => ({
+      const finalQuestions = unique.slice(0, input.questionCount);
+      assertQuizContentValid({ questions: finalQuestions });
+
+      return {
         topic: input.topic,
         subjectName: input.subjectName ?? 'General',
         mode: input.mode,
-        questions: buildFallbackQuizQuestions(input.topic, input.questionCount),
-      }),
-    );
+        questions: finalQuestions,
+      };
+    });
+  }
+
+  async generateQuizFromFile(input: {
+    buffer: Buffer;
+    kind: 'image' | 'pdf';
+    mimeType: string;
+    questionCount: number;
+    mode: 'guide' | 'companion';
+    studentContext: StudentContext;
+  }): Promise<{
+    topic: string;
+    subjectName: string;
+    mode: 'guide' | 'companion';
+    questions: GeneratedQuizQuestion[];
+  }> {
+    if (this.devMode) {
+      return {
+        topic: 'Uploaded content',
+        subjectName: 'General',
+        mode: input.mode,
+        questions: buildFallbackQuizQuestions('the uploaded content', input.questionCount),
+      };
+    }
+
+    const systemPrompt = buildSystemPrompt(input.studentContext, {
+      kind: 'quiz',
+      topic: 'the provided content',
+      mode: input.mode,
+      questionCount: input.questionCount,
+    });
+
+    const fileBlock: ClaudeContentBlock =
+      input.kind === 'pdf'
+        ? {
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: input.mimeType,
+              data: input.buffer.toString('base64'),
+            },
+          }
+        : {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: input.mimeType,
+              data: input.buffer.toString('base64'),
+            },
+          };
+
+    const textBlock: ClaudeContentBlock = {
+      type: 'text',
+      text: [
+        `Generate exactly ${input.questionCount} quiz questions based on the content of this ${input.kind === 'pdf' ? 'document' : 'image'}.`,
+        'Also determine a concise topic name and subject area from the content.',
+        'Return only valid JSON in this exact shape:',
+        '{"topic":"<short topic name>","subjectName":"<subject>","questions":[...]}',
+        'Questions must follow the same format as a standard Lernard quiz.',
+      ].join('\n'),
+    };
+
+    return this.runWithRetry(async () => {
+      const text = await this.completeText({
+        model: SONNET_MODEL,
+        maxTokens: quizMaxTokens(input.questionCount),
+        systemPrompt,
+        messages: [{ role: 'user', content: [fileBlock, textBlock] }],
+      });
+
+      if (isResponseTruncated(text)) {
+        throw new ContentValidationError(
+          'Quiz-from-file response was truncated — retry',
+        );
+      }
+
+      const parsed = safeJsonParse<{
+        topic?: string;
+        subjectName?: string;
+        questions?: GeneratedQuizQuestion[];
+      }>(text);
+      if (!parsed || !Array.isArray(parsed.questions)) {
+        throw new ContentValidationError(
+          'Quiz-from-file generation returned malformed JSON',
+        );
+      }
+
+      const normalized = parsed.questions
+        .map((q) => normalizeGeneratedQuestion(q))
+        .filter(isUsableGeneratedQuestion);
+
+      const seen = new Set<string>();
+      const unique: GeneratedQuizQuestion[] = [];
+      for (const question of normalized) {
+        const key = `${question.type}|${normalizeQuestionKey(question.text)}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        unique.push(question);
+      }
+
+      if (unique.length < input.questionCount) {
+        throw new ContentValidationError(
+          `Quiz-from-file returned ${unique.length} usable questions, expected ${input.questionCount}`,
+        );
+      }
+
+      const finalQuestions = unique.slice(0, input.questionCount);
+      assertQuizContentValid({ questions: finalQuestions });
+
+      return {
+        topic: parsed.topic ?? 'Uploaded content',
+        subjectName: parsed.subjectName ?? 'General',
+        mode: input.mode,
+        questions: finalQuestions,
+      };
+    });
+  }
+
+  async evaluateShortAnswer(input: {
+    questionText: string;
+    modelAnswer: string;
+    studentAnswer: string;
+    studentContext: Pick<StudentContext, 'name' | 'grade' | 'ageGroup'>;
+  }): Promise<{ result: 'correct' | 'partial' | 'incorrect'; feedback: string }> {
+    const level = input.studentContext.grade ?? input.studentContext.ageGroup ?? 'student';
+    const userMessage = [
+      `Question: ${input.questionText}`,
+      `Model answer: ${input.modelAnswer}`,
+      `Student's answer: ${input.studentAnswer}`,
+      `Student level: ${level}`,
+      '',
+      'Evaluate on a 3-point scale:',
+      '- "correct": Student demonstrated understanding of the core concept. Minor wording differences are fine.',
+      '- "partial": Student got part of it right but missed a key element.',
+      '- "incorrect": Student\'s answer is wrong or does not address the question.',
+      '',
+      'Return ONLY valid JSON:',
+      '{"result":"correct"|"partial"|"incorrect","feedback":"one sentence telling the student specifically what they got right or what they missed"}',
+    ].join('\n');
+
+    try {
+      const text = await this.completeText({
+        model: HAIKU_MODEL,
+        maxTokens: 300,
+        systemPrompt: 'You evaluate student answers concisely. Return ONLY valid JSON.',
+        messages: [{ role: 'user', content: userMessage }],
+      });
+      const parsed = safeJsonParse<{ result?: string; feedback?: string }>(text);
+      const result = parsed?.result;
+      if (result === 'correct' || result === 'partial' || result === 'incorrect') {
+        return { result, feedback: parsed?.feedback ?? '' };
+      }
+    } catch {
+      // fall through to default
+    }
+    return {
+      result: 'incorrect',
+      feedback: 'Unable to evaluate — please compare your answer with the model answer.',
+    };
+  }
+
+  async generateQuizDebrief(input: {
+    topic: string;
+    studentName: string;
+    studentLevel: string;
+    score: number;
+    total: number;
+    questions: Array<{ text: string; isCorrect: boolean }>;
+  }): Promise<string> {
+    const wrongQuestions = input.questions.filter((q) => !q.isCorrect);
+    const userMessage = [
+      `Student: ${input.studentName} (${input.studentLevel})`,
+      `Quiz topic: ${input.topic}`,
+      `Score: ${input.score}/${input.total}`,
+      wrongQuestions.length > 0
+        ? `Questions answered incorrectly:\n${wrongQuestions.map((q) => `- ${q.text}`).join('\n')}`
+        : 'All questions answered correctly.',
+      '',
+      `Write one sentence in Lernard's voice (warm, direct, personal) summarising this result.`,
+      `Start with "You scored ${input.score}/${input.total} on ${input.topic}." then add one specific observation.`,
+      `Return ONLY the sentence — no JSON, no quotes.`,
+    ].join('\n');
+
+    try {
+      const text = await this.completeText({
+        model: HAIKU_MODEL,
+        maxTokens: 120,
+        systemPrompt:
+          'You are Lernard, a personal AI tutor. Write brief, warm, specific feedback for students. Never use generic praise.',
+        messages: [{ role: 'user', content: userMessage }],
+      });
+      const trimmed = text.trim();
+      if (trimmed.length > 20) return trimmed;
+    } catch {
+      // fall through to default
+    }
+    return `You scored ${input.score}/${input.total} on ${input.topic}.`;
   }
 
   async reexplainLessonSection(input: {
@@ -765,9 +971,14 @@ function lessonMaxTokens(depth: 'quick' | 'standard' | 'deep'): number {
 }
 
 function quizMaxTokens(questionCount: number): number {
-  if (questionCount >= 15) return 5000;
-  if (questionCount >= 10) return 4000;
+  if (questionCount >= 15) return 6000;
+  if (questionCount >= 10) return 4500;
   return 2500;
+}
+
+function isResponseTruncated(text: string): boolean {
+  const t = text.trim();
+  return !t.endsWith('}') && !t.endsWith(']');
 }
 
 function lessonMinutesForDepth(depth: 'quick' | 'standard' | 'deep'): number {
@@ -999,6 +1210,10 @@ function normalizeGeneratedQuestion(
       typeof question.explanation === 'string'
         ? question.explanation.trim()
         : undefined,
+    subtopic:
+      typeof question.subtopic === 'string'
+        ? question.subtopic.trim()
+        : undefined,
   };
 }
 
@@ -1007,9 +1222,16 @@ function isUsableGeneratedQuestion(question: GeneratedQuizQuestion): boolean {
     return false;
   }
 
+  if (!question.explanation || countWords(question.explanation) < 10) {
+    return false;
+  }
+
   switch (question.type) {
     case 'multiple_choice': {
       if (!hasDistinctOptions(question.options, 4)) {
+        return false;
+      }
+      if (allOptionsSharePrefix(question.options)) {
         return false;
       }
       return Boolean(
@@ -1023,6 +1245,9 @@ function isUsableGeneratedQuestion(question: GeneratedQuizQuestion): boolean {
         !Array.isArray(question.correctAnswers) ||
         question.correctAnswers.length < 2
       ) {
+        return false;
+      }
+      if (allOptionsSharePrefix(question.options)) {
         return false;
       }
       return question.correctAnswers.every((answer) =>
@@ -1042,6 +1267,18 @@ function isUsableGeneratedQuestion(question: GeneratedQuizQuestion): boolean {
     default:
       return false;
   }
+}
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function allOptionsSharePrefix(options: string[] | undefined): boolean {
+  if (!Array.isArray(options) || options.length < 2) return false;
+  const firstThreeWords = (s: string) =>
+    s.trim().toLowerCase().split(/\s+/).slice(0, 3).join(' ');
+  const prefix = firstThreeWords(options[0]);
+  return options.every((o) => firstThreeWords(o) === prefix);
 }
 
 function hasDistinctOptions(
@@ -1072,17 +1309,26 @@ function optionListIncludes(
   );
 }
 
+const HARD_REJECT_PATTERNS = [
+  /which\s+(statement|option)\s+(best\s+)?describes/i,
+  /gives\s+the\s+(clearest|most\s+accurate|best)\s+summary/i,
+  /becomes\s+easier\s+when\s+you\s+break\s+it\s+into/i,
+  /helping\s+you\s+practi[cs]e\s+___/i,
+  /can\s+be\s+understood\s+step\s+by\s+step/i,
+  /is\s+(only\s+)?a\s+random\s+guess/i,
+  /cannot\s+be\s+explained\s+or\s+practi[cs]ed/i,
+  /is\s+unrelated\s+to\s+problem.solving/i,
+];
+
 function isGenericQuestionText(text: string): boolean {
   const normalized = text.trim().toLowerCase();
 
-  return (
-    normalized.length < 12 ||
-    normalized.startsWith('which statement best describes') ||
-    normalized.startsWith('which option best describes') ||
-    normalized.includes('definition a') ||
-    normalized.includes('definition b') ||
-    /^\d+\./.test(normalized)
-  );
+  if (normalized.length < 12) return true;
+  if (countWords(normalized) < 6) return true;
+  if (/^\d+\./.test(normalized)) return true;
+  if (normalized.includes('definition a') || normalized.includes('definition b')) return true;
+
+  return HARD_REJECT_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 function normalizeQuestionKey(text: string): string {
