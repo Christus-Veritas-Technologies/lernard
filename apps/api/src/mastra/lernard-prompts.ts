@@ -260,74 +260,236 @@ export function buildQuizUserPrompt(
     subjectName?: string;
     questionCount: number;
     mode: LearningModeKey;
+    style?: 'standard' | 'zimsec';
+    lessonSections?: Array<{
+      type: string;
+      heading: string | null;
+      body: string;
+      terms: Array<{ term: string; explanation: string }>;
+    }>;
+    confidenceRating?: number | null;
   },
 ): string {
+  if (input.style === 'zimsec') {
+    return buildZimsecQuizUserPrompt(ctx, input);
+  }
   const subject = input.subjectName ?? 'General';
+  const studentLevel = ctx.grade ?? ctx.ageGroup ?? 'student';
   const topicStrength =
     ctx.subjects.find((s) => s.name.toLowerCase() === subject.toLowerCase())
       ?.strengthLevel ?? 'developing';
-  const recentlyStruggled =
-    ctx.growthAreas.map((g) => g.topic).join(', ') || 'none';
   const lastQuiz = ctx.lastQuizResult;
   const lastQuizScore = lastQuiz
     ? `${lastQuiz.score}/${lastQuiz.total}`
     : 'no prior attempt';
   const lastWeak = lastQuiz?.weakTopics.length
     ? lastQuiz.weakTopics.join(', ')
-    : 'not available';
+    : 'none flagged';
+
+  // ── Student context block ──────────────────────────────────────────────────
+  const studentContextBlock = [
+    `STUDENT CONTEXT:`,
+    `Name: ${ctx.name}`,
+    `Level: ${studentLevel}`,
+    `Learning mode: ${input.mode}`,
+    `Strength on ${subject}: ${topicStrength}`,
+    `Growth areas: ${ctx.growthAreas.map((g) => g.topic).join(', ') || 'none'}`,
+    `Last quiz score: ${lastQuizScore}`,
+    `Weak subtopics from last attempt: ${lastWeak}`,
+  ].join('\n');
+
+  // ── Lesson context or standalone context ──────────────────────────────────
+  let sourceContextBlock: string;
+  if (input.lessonSections && input.lessonSections.length > 0) {
+    const sectionLines = input.lessonSections.map((s) => {
+      const termsText = s.terms.length > 0
+        ? `TERMS INTRODUCED: ${s.terms.map((t) => `${t.term}: ${t.explanation}`).join('; ')}`
+        : '';
+      return [
+        `  TYPE: ${s.type}`,
+        s.heading ? `  HEADING: ${s.heading}` : null,
+        `  KEY POINTS: ${s.body.slice(0, 500)}`,
+        termsText ? `  ${termsText}` : null,
+      ].filter(Boolean).join('\n');
+    });
+
+    let confidenceNote = '';
+    if (input.confidenceRating !== null && input.confidenceRating !== undefined) {
+      if (input.confidenceRating <= 2) {
+        confidenceNote =
+          `\nThe student found this lesson difficult (confidence: ${input.confidenceRating}/5). Weight questions toward foundational understanding, not edge cases.`;
+      } else if (input.confidenceRating >= 4) {
+        confidenceNote =
+          `\nThe student felt confident (confidence: ${input.confidenceRating}/5). Include harder application and edge-case questions.`;
+      } else {
+        confidenceNote = `\nConfidence rating: ${input.confidenceRating}/5 — use standard difficulty for the student's level.`;
+      }
+    } else {
+      confidenceNote = '\nNo confidence rating — use standard difficulty for the student\'s level.';
+    }
+
+    sourceContextBlock = [
+      `LESSON CONTEXT:`,
+      `Topic: ${input.topic}`,
+      `Subject: ${subject}`,
+      '',
+      'Lesson sections covered:',
+      sectionLines.join('\n\n'),
+      confidenceNote,
+    ].join('\n');
+  } else {
+    sourceContextBlock = [
+      `STANDALONE QUIZ:`,
+      `Topic: ${input.topic}`,
+      `Subject: ${subject}`,
+      '',
+      `This quiz is NOT linked to a lesson. Generate questions that cover:`,
+      `- Core definitions and terminology for ${input.topic}`,
+      `- Practical application of ${input.topic}`,
+      `- Common misconceptions about ${input.topic}`,
+      `- The relationship between ${input.topic} and adjacent concepts in ${subject}`,
+      '',
+      `Student's prior performance on this topic:`,
+      `Strength level: ${topicStrength}`,
+      `Previous quiz score: ${lastQuizScore}`,
+      `Known weak subtopics: ${lastWeak}`,
+    ].join('\n');
+  }
+
+  // ── Distribution table ─────────────────────────────────────────────────────
+  let distributionTable: string;
+  if (input.questionCount >= 15) {
+    distributionTable = [
+      '15 questions:',
+      '  5× multiple_choice',
+      '  3× true_false',
+      '  3× multiple_select',
+      '  2× fill_blank',
+      '  2× short_answer',
+    ].join('\n');
+  } else if (input.questionCount >= 10) {
+    distributionTable = [
+      '10 questions:',
+      '  4× multiple_choice',
+      '  2× true_false',
+      '  2× multiple_select',
+      '  1× fill_blank',
+      '  1× short_answer',
+    ].join('\n');
+  } else {
+    distributionTable = [
+      '5 questions:',
+      '  2× multiple_choice',
+      '  1× true_false',
+      '  1× multiple_select',
+      '  1× fill_blank OR short_answer',
+    ].join('\n');
+  }
+
+  // ── Difficulty calibration ─────────────────────────────────────────────────
+  const difficultyTable = [
+    `RULE 3 — CALIBRATE DIFFICULTY TO THE STUDENT'S LEVEL.`,
+    `${ctx.name} is a ${studentLevel} student. Their current strength on this topic is ${topicStrength}.`,
+    '',
+    'Use this table:',
+    '  needs_work + primary/secondary:',
+    '    → 60% recall questions, 30% basic application, 10% synthesis',
+    '    → Simple scenarios, everyday analogies, direct definitions',
+    '    → Options clearly differentiated (not tricky)',
+    '',
+    '  developing + any level:',
+    '    → 40% recall, 40% application, 20% edge cases',
+    '    → Realistic scenarios, small code snippets, numerical examples',
+    '    → Options require careful reading but are not traps',
+    '',
+    '  strong + secondary/university:',
+    '    → 20% recall, 50% application, 30% synthesis/analysis',
+    '    → Complex scenarios, code that has bugs or edge cases',
+    '    → Options include common professional mistakes',
+    '',
+    '  strong + professional:',
+    '    → 10% recall, 40% application, 50% synthesis/analysis',
+    '    → Real-world architecture decisions, performance trade-offs, subtle correctness issues',
+    '    → Options indistinguishable to a beginner, clear to an expert',
+  ].join('\n');
+
+  const lessonRuleNote = input.lessonSections && input.lessonSections.length > 0
+    ? `\nRULE 7 — IF A LESSON WAS PROVIDED, USE IT.\nAt least ${Math.max(4, Math.floor(input.questionCount * 0.8))} of ${input.questionCount} questions must test concepts, terms, or examples that appeared in the lesson above. The lesson is the source material — the quiz tests whether the student retained it.`
+    : '';
 
   return [
-    `Generate ${input.questionCount} quiz questions on: ${input.topic}`,
-    `Subject: ${subject}`,
-    `Student: ${ctx.name}, ${ctx.grade ?? ctx.ageGroup ?? 'student'} level`,
-    `Student's strength on this topic: ${topicStrength}`,
-    `Topics the student has struggled with recently: ${recentlyStruggled}`,
-    `Last quiz score on a related topic: ${lastQuizScore}`,
-    `Weak subtopics from last attempt: ${lastWeak}`,
+    `Generate ${input.questionCount} quiz questions for ${ctx.name}, a ${studentLevel} student.`,
     '',
-    'QUESTION DIFFICULTY:',
-    '- If strength is "strong" or last score was 8+/10: include at least 2 hard questions',
-    '- If strength is "developing" or last score was 5–7/10: mix of easy and medium',
-    '- If strength is "needs_work" or last score was below 5/10: mostly easy-to-medium, build confidence',
+    studentContextBlock,
     '',
-    'QUESTION RULES:',
-    `1. Every question must test knowledge of ${input.topic} specifically.`,
-    `   A question like "which statement best describes ${input.topic}?" is not specific enough.`,
-    '   Use scenarios with concrete numbers, names, and conditions.',
+    sourceContextBlock,
     '',
-    '2. Question types to use across the set:',
-    '   - multiple_choice: factual recall or applied calculation. Exactly 4 options. One correct.',
-    `   - true_false: target common misconceptions about ${input.topic}. No options array needed.`,
-    '   - multiple_select: ask which of 4–5 items belong to a category. 2–3 correct answers.',
-    '   - fill_blank: complete a definition or formula. 1–5 word answer.',
-    '   - short_answer: explain a concept or interpret a scenario in 1–2 sentences.',
+    '═══════════════════════════════════════════════════════',
+    'QUESTION GENERATION RULES',
+    '═══════════════════════════════════════════════════════',
     '',
-    `3. Because questionCount is ${input.questionCount}:`,
-    input.questionCount >= 5
-      ? '   - Include at least 1 multiple_select question'
-      : '   - (skip multi-type minimums for short quizzes)',
-    input.questionCount >= 5
-      ? '   - Include at least 1 fill_blank OR short_answer question'
-      : '',
-    '   - No more than 2 questions of the same type in a row',
+    'RULE 1 — EVERY QUESTION MUST TEST SPECIFIC KNOWLEDGE.',
     '',
-    '4. For multiple_choice questions:',
-    '   - All 4 options must be plausible. Wrong options should represent real misconceptions,',
-    `     not obviously absurd answers like "${input.topic} cannot be explained or practised."`,
-    '   - The correct answer must be one of the 4 options, worded identically.',
+    'A good question names specific terms, values, scenarios, or mechanisms from the topic.',
+    'A bad question could apply to any topic by replacing the topic name.',
     '',
-    '5. Every question must include a one-sentence "explanation" that says specifically',
-    '   why the correct answer is right — not just that it is right.',
+    `GOOD: "Which of the following correctly [does something specific to ${input.topic}]?"`,
+    `BAD:  "Which statement best describes ${input.topic}?"`,
     '',
-    `6. Calibrate language to ${ctx.name}'s level (${ctx.grade ?? ctx.ageGroup ?? 'student'}).`,
-    '   For lower grades, use everyday scenarios. For university level, use professional contexts.',
+    `If ANY question you generate could have its topic name replaced with another topic and still make sense, that question is invalid. Rewrite it.`,
     '',
-    'RETURN FORMAT — JSON only, no markdown:',
-    '{"questions":[{"type":"multiple_choice|multiple_select|true_false|fill_blank|short_answer","text":"...","options":["..."],"correctAnswer":"...","correctAnswers":["..."],"explanation":"..."}]}',
+    '───────────────────────────────────────────────────────',
     '',
-    'Do NOT number the question text (no "1." prefix). Do not repeat question patterns.',
+    'RULE 2 — WRONG OPTIONS MUST BE PLAUSIBLE MISCONCEPTIONS.',
+    '',
+    'For multiple_choice questions, all four options must be things a student might genuinely believe if they misunderstood the topic.',
+    'BAD wrong options: absurd statements, obviously grammatically wrong, repetitions of the correct answer.',
+    '',
+    '───────────────────────────────────────────────────────',
+    '',
+    difficultyTable,
+    '',
+    '───────────────────────────────────────────────────────',
+    '',
+    `RULE 4 — QUESTION TYPE DISTRIBUTION.`,
+    '',
+    `For ${input.questionCount} questions, use this distribution:`,
+    distributionTable,
+    '',
+    'Do NOT put the same question type more than twice in a row. Vary the order.',
+    '',
+    '───────────────────────────────────────────────────────',
+    '',
+    'RULE 5 — QUESTION TYPE SPECIFICATIONS.',
+    '',
+    'multiple_choice: Exactly 4 options. correctAnswer must be the exact text of one option. All 4 options roughly similar in length.',
+    'multiple_select: 4 to 5 options. correctAnswers is an array of 2 or 3 correct option texts.',
+    'true_false: No options array. correctAnswer must be exactly "true" or "false" (lowercase). Target common misconceptions.',
+    'fill_blank: The blank appears as _____ in the question text. correctAnswer is 1–5 words.',
+    'short_answer: No options array. correctAnswer is a model answer (1–2 sentences). Question asks for explanation, not recall.',
+    '',
+    '───────────────────────────────────────────────────────',
+    '',
+    'RULE 6 — EVERY QUESTION NEEDS AN EXPLANATION.',
+    '',
+    'The explanation must:',
+    '  - Be one sentence (at least 10 words)',
+    '  - Explain WHY the correct answer is correct — not just state that it is',
+    '  - Name the specific concept, rule, or mechanism being tested',
+    '',
+    '───────────────────────────────────────────────────────',
+    lessonRuleNote,
+    '═══════════════════════════════════════════════════════',
+    'RETURN FORMAT',
+    '═══════════════════════════════════════════════════════',
+    '',
+    'Return ONLY valid JSON. No markdown fences. No preamble. No explanation.',
+    '',
+    'Each question must include a "subtopic" field: a 2–5 word label for the specific sub-concept being tested (e.g. "const vs let", "scope rules", "hoisting").',
+    '',
+    '{"questions":[{"type":"multiple_choice","text":"...","options":["...","...","...","..."],"correctAnswer":"...","explanation":"...","subtopic":"..."},{"type":"multiple_select","text":"...","options":["...","...","...","..."],"correctAnswers":["...","..."],"explanation":"...","subtopic":"..."},{"type":"true_false","text":"...","correctAnswer":"true","explanation":"...","subtopic":"..."},{"type":"fill_blank","text":"A variable declared with _____ cannot be reassigned.","correctAnswer":"const","explanation":"...","subtopic":"..."},{"type":"short_answer","text":"...","correctAnswer":"...","explanation":"...","subtopic":"..."}]}',
   ]
-    .filter((line) => line !== '')
+    .filter((line) => line !== undefined)
     .join('\n');
 }
 
@@ -370,4 +532,180 @@ function goalFramingLine(goal: StudentContext['onboardingGoal']): string {
     default:
       return 'No specific framing — explain clearly and connect to real-world relevance.';
   }
+}
+
+// ─── ZIMSEC-style structured quiz prompt ─────────────────────────────────────
+
+function buildZimsecQuizUserPrompt(
+  ctx: StudentContext,
+  input: {
+    topic: string;
+    subjectName?: string;
+    questionCount: number;
+    mode: LearningModeKey;
+    lessonSections?: Array<{
+      type: string;
+      heading: string | null;
+      body: string;
+      terms: Array<{ term: string; explanation: string }>;
+    }>;
+    confidenceRating?: number | null;
+  },
+): string {
+  const subject = input.subjectName ?? 'General';
+  const studentLevel = ctx.grade ?? ctx.ageGroup ?? 'student';
+  const topicStrength =
+    ctx.subjects.find((s) => s.name.toLowerCase() === subject.toLowerCase())
+      ?.strengthLevel ?? 'developing';
+  const lastQuiz = ctx.lastQuizResult;
+  const lastQuizScore = lastQuiz
+    ? `${lastQuiz.score}/${lastQuiz.total}`
+    : 'no prior attempt';
+  const lastWeak = lastQuiz?.weakTopics.length
+    ? lastQuiz.weakTopics.join(', ')
+    : 'none flagged';
+
+  const studentContextBlock = [
+    `STUDENT CONTEXT:`,
+    `Name: ${ctx.name}`,
+    `Level: ${studentLevel}`,
+    `Subject: ${subject}`,
+    `Strength on ${subject}: ${topicStrength}`,
+    `Growth areas: ${ctx.growthAreas.map((g) => g.topic).join(', ') || 'none'}`,
+    `Last quiz score: ${lastQuizScore}`,
+    `Weak subtopics from last attempt: ${lastWeak}`,
+  ].join('\n');
+
+  let sourceContextBlock: string;
+  if (input.lessonSections && input.lessonSections.length > 0) {
+    const sectionLines = input.lessonSections.map((s) => {
+      const termsText = s.terms.length > 0
+        ? `TERMS INTRODUCED: ${s.terms.map((t) => `${t.term}: ${t.explanation}`).join('; ')}`
+        : '';
+      return [
+        `  TYPE: ${s.type}`,
+        s.heading ? `  HEADING: ${s.heading}` : null,
+        `  KEY POINTS: ${s.body.slice(0, 500)}`,
+        termsText ? `  ${termsText}` : null,
+      ].filter(Boolean).join('\n');
+    });
+    sourceContextBlock = [
+      `LESSON CONTEXT:`,
+      `Topic: ${input.topic}`,
+      '',
+      'Lesson sections covered:',
+      sectionLines.join('\n\n'),
+    ].join('\n');
+  } else {
+    sourceContextBlock = [
+      `STANDALONE QUIZ:`,
+      `Topic: ${input.topic}`,
+      `Subject: ${subject}`,
+      '',
+      `Cover core concepts, definitions, mechanisms, calculations, and applications for ${input.topic} in ${subject}.`,
+    ].join('\n');
+  }
+
+  // The number of structured questions to generate
+  const numQuestions = Math.min(Math.max(input.questionCount, 2), 5);
+
+  return [
+    `Generate ${numQuestions} ZIMSEC-style structured exam questions for ${ctx.name}, a ${studentLevel} student.`,
+    '',
+    studentContextBlock,
+    '',
+    sourceContextBlock,
+    '',
+    '═══════════════════════════════════════════════════════',
+    'ZIMSEC STRUCTURED QUESTION RULES',
+    '═══════════════════════════════════════════════════════',
+    '',
+    'RULE 1 — ALL QUESTIONS ARE STRUCTURED TYPE.',
+    'Every question must be type "structured". Do NOT generate multiple_choice, true_false, fill_blank, or short_answer.',
+    'A structured question has a stem (the main scenario or context) and multiple numbered/lettered sub-parts.',
+    '',
+    'RULE 2 — ZIMSEC COMMAND WORD TAXONOMY.',
+    'Assign each sub-part exactly one command word. Choose from:',
+    '  recall tier:      State, Define, Identify, Name, List, Give, Write',
+    '  application tier: Describe, Explain, Calculate, Determine, Solve, Apply, Show that',
+    '  analysis tier:    Discuss, Compare, Evaluate, Justify, Analyse, Hence, Suggest',
+    '',
+    '"Show that" questions: give the student the final answer and ask them to derive/prove it.',
+    '"Hence" questions: follow directly from a previous part — require the student to use the result of the prior part.',
+    '',
+    'RULE 3 — SUB-PART PROGRESSION.',
+    'Sub-parts must progress from lower to higher cognitive demand:',
+    '  (a) → recall (State/Define/Identify) — 1–2 marks',
+    '  (b) → application (Explain/Calculate/Describe) — 2–4 marks',
+    '  (c) → analysis (Discuss/Evaluate/Hence/Justify) — 3–6 marks',
+    'Never start with analysis. Never put a recall question after an analysis question.',
+    '',
+    'RULE 4 — MARK ALLOCATION.',
+    'Total marks per structured question: 8–15 marks.',
+    'Each sub-part mark value must match the command word:',
+    '  State/Define/Identify/Name: 1–2 marks',
+    '  Explain/Describe/Calculate/Determine: 2–4 marks',
+    '  Discuss/Evaluate/Justify/Analyse: 3–6 marks',
+    '  Show that/Hence: 2–4 marks',
+    'totalMarks must equal the sum of all sub-part marks exactly.',
+    '',
+    'RULE 5 — MARKING POINTS.',
+    'Every sub-part must include markingPoints: an array of acceptable credit-earning statements.',
+    'Rules for marking points:',
+    '  - One mark = one marking point (1 mark → 1 point, 3 marks → 3 points)',
+    '  - State the EXACT fact, value, or statement that earns the mark',
+    '  - Use examiner-style phrasing: "Identifies X as...", "States that X = ...", "Explains that..."',
+    '  - For calculations: include the method step AND the final value as separate points',
+    '',
+    'RULE 6 — MODEL ANSWER.',
+    'Each sub-part must include a modelAnswer: a complete student-facing answer at the target level.',
+    'The model answer must be a natural prose/calculation response — not bullet points.',
+    '',
+    'RULE 7 — DIFFICULTY CALIBRATION.',
+    `${ctx.name} is a ${studentLevel} student. Strength: ${topicStrength}.`,
+    'needs_work: Simple stems. Recall-heavy (50%). Familiar contexts. Small numbers in calculations.',
+    'developing: Moderate complexity. Balanced recall/application. Real-world contexts.',
+    'strong: Complex stems. Analysis-heavy (40%+). Multi-step calculations. Counter-intuitive scenarios.',
+    '',
+    '═══════════════════════════════════════════════════════',
+    'RETURN FORMAT',
+    '═══════════════════════════════════════════════════════',
+    '',
+    'Return ONLY valid JSON. No markdown fences. No preamble. No explanation.',
+    '',
+    'Each structured question must follow this exact shape:',
+    '{',
+    '  "type": "structured",',
+    '  "subtopic": "2-5 word label for the specific concept being tested",',
+    '  "text": "The stem — sets the scenario, context, or given information. May be multiple sentences.",',
+    '  "totalMarks": <sum of all part marks>,',
+    '  "parts": [',
+    '    {',
+    '      "label": "(a)",',
+    '      "command": "State",',
+    '      "text": "The sub-question text (do not repeat the stem).",',
+    '      "marks": 2,',
+    '      "tier": "recall",',
+    '      "answerType": "short",',
+    '      "markingPoints": ["States that X is...", "Identifies Y as..."],',
+    '      "modelAnswer": "Full model answer text.",',
+    '      "explanation": "Why this is the correct answer — 1 sentence."',
+    '    }',
+    '  ]',
+    '}',
+    '',
+    'answerType must be one of: "short" (1-3 sentences), "written" (paragraph/extended), "numeric" (number or calculation)',
+    'label format: "(a)", "(b)", "(c)", or nested "(b)(i)", "(b)(ii)" for sub-sub-parts.',
+    '',
+    `Full response shape: {"questions":[<${numQuestions} structured question objects>]}`,
+    '',
+    'QUALITY CHECK — before returning, verify each question:',
+    '- Does totalMarks equal the sum of all part marks?',
+    '- Does each part have the correct number of marking points for its mark allocation?',
+    '- Do sub-parts progress from recall → application → analysis?',
+    '- Does the model answer match the command word (e.g. "Calculate" → shows working)?',
+    '- Is every marking point a specific, testable, examiner-style statement?',
+    '',
+    'Return JSON only. No markdown fences. No prose before or after the JSON.',
+  ].join('\n');
 }
