@@ -206,28 +206,24 @@ export function StudentSettingsPageClient({ content, permissions }: StudentSetti
                                     Decide how much help Lernard gives you mid-session.
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-0 divide-y divide-border">
-                                <ToggleRow
-                                    checked={companionControls.showCorrectAnswers}
-                                    description="Reveal the right answer after a miss."
-                                    disabled={companionControlsLocked || savingField === "companion-controls"}
-                                    label="Show correct answers"
-                                    onCheckedChange={(value) => updateCompanionControl("showCorrectAnswers", value)}
-                                />
-                                <ToggleRow
-                                    checked={companionControls.allowHints}
-                                    description="Let Lernard give you a nudge before the answer."
-                                    disabled={companionControlsLocked || savingField === "companion-controls"}
-                                    label="Allow hints"
-                                    onCheckedChange={(value) => updateCompanionControl("allowHints", value)}
-                                />
-                                <ToggleRow
-                                    checked={companionControls.allowSkip}
-                                    description="Move past a question and return later when needed."
-                                    disabled={companionControlsLocked || savingField === "companion-controls"}
-                                    label="Allow skip"
-                                    onCheckedChange={(value) => updateCompanionControl("allowSkip", value)}
-                                />
+                            <CardContent className="space-y-3">
+                                {companionControlsLocked && (
+                                    <p className="text-xs text-text-secondary">
+                                        These settings are managed by your guardian.
+                                    </p>
+                                )}
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-text-secondary">Answer reveal</span>
+                                    <span className="font-medium text-text-primary">
+                                        {companionControls.answerRevealTiming === "after_quiz" ? "After quiz passed" : "Immediately"}
+                                    </span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-text-secondary">Pass threshold</span>
+                                    <span className="font-medium text-text-primary">
+                                        {Math.round(companionControls.quizPassThreshold * 100)}%
+                                    </span>
+                                </div>
                             </CardContent>
                         </Card>
                     </div>
@@ -404,51 +400,7 @@ export function StudentSettingsPageClient({ content, permissions }: StudentSetti
         }
     }
 
-    async function updateCompanionControl(
-        key: keyof Pick<CompanionControls, "showCorrectAnswers" | "allowHints" | "allowSkip">,
-        value: boolean,
-    ) {
-        if (companionControlsLocked) {
-            toast.error("These companion controls are locked right now.");
-            return;
-        }
-
-        const nextControls = {
-            ...companionControls,
-            [key]: value,
-        };
-
-        setSettings((current) => ({
-            ...current,
-            companionControls: nextControls,
-        }));
-        setSavingField("companion-controls");
-
-        try {
-            const savedControls = await browserApiFetch<CompanionControls>(ROUTES.SETTINGS.COMPANION_CONTROLS, {
-                method: "PATCH",
-                body: JSON.stringify({
-                    showCorrectAnswers: nextControls.showCorrectAnswers,
-                    allowHints: nextControls.allowHints,
-                    allowSkip: nextControls.allowSkip,
-                }),
-            });
-
-            setSettings((current) => ({
-                ...current,
-                companionControls: savedControls,
-            }));
-            toast.success("Study controls updated.");
-        } catch (error) {
-            setSettings((current) => ({
-                ...current,
-                companionControls,
-            }));
-            toast.error(getErrorMessage(error));
-        } finally {
-            setSavingField(null);
-        }
-    }
+    // companion controls are now managed by guardians on the dedicated companion page
 }
 
 function QuickSummaryRow({ label, value }: { label: string; value: string }) {

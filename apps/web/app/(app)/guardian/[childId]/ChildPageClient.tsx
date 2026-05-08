@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { can } from "@lernard/auth-core";
 import { ROUTES } from "@lernard/routes";
 import type { ChildProfileContent } from "@lernard/shared-types";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { PageHero } from "@/components/dashboard/PageHero";
@@ -14,7 +15,9 @@ import { GuardianEmptyVisual } from "@/components/guardian/GuardianEmptyVisual";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { usePagePayload } from "@/hooks/usePagePayload";
+import { browserApiFetch } from "@/lib/browser-api";
 import { formatMinutes, formatPercent, formatRelativeDate } from "@/lib/formatters";
 
 interface ChildPageClientProps {
@@ -66,6 +69,8 @@ export function ChildPageClient({ childId }: ChildPageClientProps) {
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<ChildProfileContent>(
         ROUTES.GUARDIAN.CHILD_PAYLOAD(childId),
     );
+    const [isUnlinking, setIsUnlinking] = useState(false);
+    const [isResendingSetup, setIsResendingSetup] = useState(false);
 
     if (!isAuthenticated) {
         return (
@@ -130,6 +135,27 @@ export function ChildPageClient({ childId }: ChildPageClientProps) {
     const { content, permissions } = data;
     const strongestTopics = collectTopicInsights(content, "strongest");
     const growthAreas = collectTopicInsights(content, "growth");
+    const childData = content.child as any;
+
+    async function handleUnlink() {
+        if (!confirm(`Unlink ${content.child.name}? Their account will become independent.`)) return;
+        setIsUnlinking(true);
+        try {
+            await browserApiFetch(ROUTES.GUARDIAN.REMOVE_CHILD(childId), { method: "DELETE" });
+            router.push("/guardian");
+        } catch {
+            setIsUnlinking(false);
+        }
+    }
+
+    async function handleResendSetup() {
+        setIsResendingSetup(true);
+        try {
+            await browserApiFetch(ROUTES.GUARDIAN.CHILD_RESEND_SETUP(childId), { method: "POST" });
+        } finally {
+            setIsResendingSetup(false);
+        }
+    }
 
     return (
         <div className="flex flex-col gap-6">
@@ -156,165 +182,233 @@ export function ChildPageClient({ childId }: ChildPageClientProps) {
                 eyebrow="Child overview"
                 title={`${content.child.name}'s Lernard snapshot`}
             >
-                <Badge tone="primary">Child ID: {childId}</Badge>
                 <Badge tone="warm">Last active {formatRelativeDate(content.child.lastActiveAt)}</Badge>
                 <Button
                     disabled={!can(permissions, "can_change_companion_controls", childId)}
                     onClick={() => router.push(`/guardian/${childId}/companion`)}
                 >
-                    Open companion controls
+                    Companion controls
                 </Button>
-                <Button variant="danger">Remove child</Button>
             </PageHero>
 
-            <section className="grid gap-4 lg:grid-cols-3">
-                {content.progress.length ? (
-                    content.progress.map((subject) => (
-                        <Card key={subject.subjectId}>
+            <Tabs defaultValue="subjects">
+                <TabsList>
+                    <TabsTrigger value="subjects">Subjects</TabsTrigger>
+                    <TabsTrigger value="history">History</TabsTrigger>
+                    <TabsTrigger value="settings">Settings</TabsTrigger>
+                </TabsList>
+
+                {/* ── Subjects Tab ── */}
+                <TabsContent className="mt-6 flex flex-col gap-6" value="subjects">
+                    <section className="grid gap-4 lg:grid-cols-3">
+                        {content.progress.length ? (
+                            content.progress.map((subject) => (
+                                <Card key={subject.subjectId}>
+                                    <CardHeader>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <CardTitle>{subject.subjectName}</CardTitle>
+                                                <CardDescription>
+                                                    Last active {formatRelativeDate(subject.lastActiveAt)}
+                                                </CardDescription>
+                                            </div>
+                                            <Badge tone={getStrengthTone(subject.strengthLevel)}>
+                                                {subject.strengthLevel.replace("_", " ")}
+                                            </Badge>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3 text-sm text-text-secondary">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span>Total lessons</span>
+                                            <span className="font-medium text-text-primary">{(subject as any).totalLessons ?? "—"}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span>Total quizzes</span>
+                                            <span className="font-medium text-text-primary">{(subject as any).totalQuizzes ?? "—"}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span>Average score</span>
+                                            <span className="font-medium text-text-primary">
+                                                {subject.topics.length
+                                                    ? formatPercent(subject.topics.reduce((sum, t) => sum + t.score, 0) / subject.topics.length)
+                                                    : "—"}
+                                            </span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        ) : (
+                            <GuardianEmptyVisual
+                                className="lg:col-span-3"
+                                subtitle="Subject cards will appear after lessons or quizzes are completed."
+                                title="No subject progress yet"
+                            />
+                        )}
+                    </section>
+
+                    <section className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)]">
+                        <Card>
                             <CardHeader>
-                                <div className="flex items-start justify-between gap-3">
-                                    <div>
-                                        <CardTitle>{subject.subjectName}</CardTitle>
-                                        <CardDescription>
-                                            Last active {formatRelativeDate(subject.lastActiveAt)}
-                                        </CardDescription>
-                                    </div>
-                                    <Badge tone={getStrengthTone(subject.strengthLevel)}>
-                                        {subject.strengthLevel.replace("_", " ")}
-                                    </Badge>
-                                </div>
+                                <CardTitle>Subject comparison</CardTitle>
+                                <CardDescription>
+                                    A quick chart of subject averages so you can spot where extra support will matter most.
+                                </CardDescription>
                             </CardHeader>
-                            <CardContent className="space-y-3 text-sm text-text-secondary">
-                                <div className="flex items-center justify-between gap-3">
-                                    <span>Total lessons</span>
-                                    <span className="font-medium text-text-primary">{subject.totalLessons}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                    <span>Total quizzes</span>
-                                    <span className="font-medium text-text-primary">{subject.totalQuizzes}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                    <span>Average score</span>
-                                    <span className="font-medium text-text-primary">
-                                        {formatPercent(subject.averageScore)}
-                                    </span>
-                                </div>
+                            <CardContent>
+                                <PerformanceList items={buildSubjectComparisonItems(content)} />
                             </CardContent>
                         </Card>
-                    ))
-                ) : (
-                    <GuardianEmptyVisual
-                        className="lg:col-span-3"
-                        subtitle="Subject cards will appear after lessons or quizzes are completed."
-                        title="No subject progress yet"
-                    />
-                )}
-            </section>
 
-            <section className="grid gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(300px,0.9fr)]">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Subject comparison</CardTitle>
-                        <CardDescription>
-                            A quick chart of subject averages so you can spot where extra support will matter most.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <PerformanceList items={buildSubjectComparisonItems(content)} />
-                    </CardContent>
-                </Card>
+                        <div className="grid gap-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Lernard&apos;s Read on You</CardTitle>
+                                    <CardDescription>
+                                        Clear signals on what feels secure and what deserves more practice next.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="grid gap-5 sm:grid-cols-2">
+                                    <div className="space-y-3">
+                                        <p className="text-sm font-semibold text-text-primary">Strongest topics</p>
+                                        {strongestTopics.length ? (
+                                            strongestTopics.map((topic) => (
+                                                <div className="rounded-2xl bg-accent-cool-100 p-3" key={`${topic.subject}-${topic.topic}`}>
+                                                    <p className="text-sm font-semibold text-text-primary">{topic.topic}</p>
+                                                    <p className="mt-1 text-sm text-text-secondary">{topic.subject}</p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <GuardianEmptyVisual subtitle="Strong topics appear here as activity builds." title="Strongest topics pending" />
+                                        )}
+                                    </div>
+                                    <div className="space-y-3">
+                                        <p className="text-sm font-semibold text-text-primary">Growth areas</p>
+                                        {growthAreas.length ? (
+                                            growthAreas.map((topic) => (
+                                                <div className="rounded-2xl bg-accent-warm-100 p-3" key={`${topic.subject}-${topic.topic}`}>
+                                                    <p className="text-sm font-semibold text-text-primary">{topic.topic}</p>
+                                                    <p className="mt-1 text-sm text-text-secondary">{topic.subject}</p>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <GuardianEmptyVisual subtitle="Growth areas appear once enough scored work is available." title="Growth map pending" />
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
 
-                <div className="grid gap-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Lernard&apos;s Read on You</CardTitle>
-                            <CardDescription>
-                                Clear signals on what feels secure and what deserves more practice next.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="grid gap-5 sm:grid-cols-2">
-                            <div className="space-y-3">
-                                <p className="text-sm font-semibold text-text-primary">Strongest topics</p>
-                                {strongestTopics.length ? (
-                                    strongestTopics.map((topic) => (
-                                        <div className="rounded-2xl bg-accent-cool-100 p-3" key={`${topic.subject}-${topic.topic}`}>
-                                            <p className="text-sm font-semibold text-text-primary">{topic.topic}</p>
-                                            <p className="mt-1 text-sm text-text-secondary">{topic.subject}</p>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <GuardianEmptyVisual
-                                        subtitle="Strong topics appear here as activity builds."
-                                        title="Strongest topics pending"
-                                    />
-                                )}
-                            </div>
-                            <div className="space-y-3">
-                                <p className="text-sm font-semibold text-text-primary">Growth areas</p>
-                                {growthAreas.length ? (
-                                    growthAreas.map((topic) => (
-                                        <div className="rounded-2xl bg-accent-warm-100 p-3" key={`${topic.subject}-${topic.topic}`}>
-                                            <p className="text-sm font-semibold text-text-primary">{topic.topic}</p>
-                                            <p className="mt-1 text-sm text-text-secondary">{topic.subject}</p>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <GuardianEmptyVisual
-                                        subtitle="Growth areas appear once enough scored work is available."
-                                        title="Growth map pending"
-                                    />
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Next guardian actions</CardTitle>
-                            <CardDescription>
-                                The smallest changes likely to improve this learner&apos;s next few sessions.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-3 text-sm leading-6 text-text-secondary">
-                            {buildGuardianActions(content).map((action) => (
-                                <p key={action}>{action}</p>
-                            ))}
-                        </CardContent>
-                    </Card>
-                </div>
-            </section>
-
-            <Card>
-                <CardHeader>
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <CardTitle>Recent sessions</CardTitle>
-                            <CardDescription>
-                                The latest lesson and quiz activity, ready for a quick review.
-                            </CardDescription>
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Next guardian actions</CardTitle>
+                                    <CardDescription>
+                                        The smallest changes likely to improve this learner&apos;s next few sessions.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-3 text-sm leading-6 text-text-secondary">
+                                    {buildGuardianActions(content).map((action) => (
+                                        <p key={action}>{action}</p>
+                                    ))}
+                                </CardContent>
+                            </Card>
                         </div>
-                        <Button variant="secondary">Load more history</Button>
-                    </div>
-                </CardHeader>
-                <CardContent>
-                    {content.recentSessions.length ? (
-                        <TimelineList
-                            items={content.recentSessions.map((session) => ({
-                                id: session.id,
-                                title: `${session.subject} • ${session.topic}`,
-                                description: `${session.type === "lesson" ? "Lesson" : "Quiz"} • ${formatMinutes(session.duration)} • ${session.xpEarned} XP earned`,
-                                meta: formatRelativeDate(session.createdAt),
-                                tone: session.type === "lesson" ? "cool" : "primary",
-                            }))}
-                        />
-                    ) : (
-                        <GuardianEmptyVisual
-                            subtitle="Lesson and quiz sessions will appear here as a timeline."
-                            title="No session history yet"
-                        />
-                    )}
-                </CardContent>
-            </Card>
+                    </section>
+                </TabsContent>
+
+                {/* ── History Tab ── */}
+                <TabsContent className="mt-6" value="history">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Session history</CardTitle>
+                            <CardDescription>
+                                {content.child.name}&apos;s lesson and quiz sessions.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            {(content as any).recentSessions?.length ? (
+                                <TimelineList
+                                    items={(content as any).recentSessions.map((session: any) => ({
+                                        id: session.id,
+                                        title: `${session.subject} • ${session.topic}`,
+                                        description: `${session.type === "lesson" ? "Lesson" : "Quiz"} • ${formatMinutes(session.duration)} • ${session.xpEarned} XP earned`,
+                                        meta: formatRelativeDate(session.createdAt),
+                                        tone: session.type === "lesson" ? "cool" : "primary",
+                                    }))}
+                                />
+                            ) : (
+                                <GuardianEmptyVisual
+                                    subtitle={`${content.child.name} hasn't had any sessions yet. Once they start learning, their history will appear here.`}
+                                    title="No sessions yet"
+                                />
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* ── Settings Tab ── */}
+                <TabsContent className="mt-6 flex flex-col gap-6" value="settings">
+                    <Card>
+                        <CardHeader><CardTitle>Learning settings</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium">Learning mode</p>
+                                    <p className="text-sm text-text-secondary">Current mode for {content.child.name}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Badge tone="primary">{(childData.learningMode ?? "GUIDE").toLowerCase()}</Badge>
+                                    <Button onClick={() => router.push(`/guardian/${childId}/companion`)} variant="secondary">
+                                        Change
+                                    </Button>
+                                </div>
+                            </div>
+                            <hr className="border-border" />
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium">Account status</p>
+                                    <p className="text-sm text-text-secondary">
+                                        {childData.accountStatus === "PENDING_SETUP"
+                                            ? `${content.child.name} hasn't set up their account yet.`
+                                            : "Account is active."}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Badge tone={childData.accountStatus === "PENDING_SETUP" ? "warning" : "success"}>
+                                        {childData.accountStatus === "PENDING_SETUP" ? "Pending setup" : "Active"}
+                                    </Badge>
+                                    {childData.accountStatus === "PENDING_SETUP" && (
+                                        <Button disabled={isResendingSetup} onClick={handleResendSetup} variant="secondary">
+                                            {isResendingSetup ? "Sending..." : "Resend setup email"}
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+                            {childData.createdAt && (
+                                <>
+                                    <hr className="border-border" />
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-sm font-medium">Linked since</p>
+                                        <p className="text-sm text-text-secondary">{formatRelativeDate(childData.createdAt)}</p>
+                                    </div>
+                                </>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Danger zone</CardTitle>
+                            <CardDescription>
+                                Unlinking removes your guardian access. {content.child.name}&apos;s learning history stays with them.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Button disabled={isUnlinking} onClick={handleUnlink} variant="danger">
+                                {isUnlinking ? "Unlinking..." : `Unlink ${content.child.name}`}
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }
@@ -346,11 +440,12 @@ function buildSubjectComparisonItems(content: ChildProfileContent) {
         ];
     }
 
-    return content.progress.map((subject) => ({
-        label: subject.subjectName,
-        value: subject.averageScore ?? 0,
-        trailing: formatPercent(subject.averageScore),
-    }));
+    return content.progress.map((subject) => {
+        const avg = subject.topics.length
+            ? subject.topics.reduce((sum, t) => sum + t.score, 0) / subject.topics.length
+            : 0;
+        return { label: subject.subjectName, value: avg, trailing: formatPercent(avg) };
+    });
 }
 
 function buildGuardianActions(content: ChildProfileContent) {

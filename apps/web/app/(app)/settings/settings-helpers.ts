@@ -6,9 +6,8 @@ export const DAILY_GOAL_PRESETS = [1, 2, 3, 5, 7, 10] as const;
 
 export function ensureCompanionControls(companionControls: CompanionControls | null): CompanionControls {
     return companionControls ?? {
-        showCorrectAnswers: true,
-        allowHints: true,
-        allowSkip: false,
+        answerRevealTiming: "after_quiz",
+        quizPassThreshold: 0.7,
         lockedByGuardian: false,
         lastChangedAt: new Date().toISOString(),
         lastChangedBy: "Lernard",

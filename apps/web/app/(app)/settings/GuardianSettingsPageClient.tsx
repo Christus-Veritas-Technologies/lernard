@@ -80,6 +80,41 @@ export function GuardianSettingsPageClient({ content, permissions }: GuardianSet
         return Date.now() - lastActive <= 7 * 24 * 60 * 60 * 1000;
     }).length;
 
+    const openRenameDialog = (child: GuardianManagedChildSettings) => {
+        setSelectedChildId(child.studentId);
+        setRenameDraft(child.name);
+    };
+
+    const handleRenameDialogChange = (nextOpen: boolean) => {
+        if (!nextOpen) {
+            setSelectedChildId(null);
+            setRenameDraft("");
+        }
+    };
+
+    const submitRename = async () => {
+        if (!selectedChild) {
+            return;
+        }
+
+        setSavingField(`rename:${selectedChild.studentId}`);
+
+        try {
+            const updatedChild = await browserApiFetch<GuardianManagedChildSettings>(ROUTES.GUARDIAN.CHILD(selectedChild.studentId), {
+                method: "PATCH",
+                body: JSON.stringify({ name: renameDraft.trim() }),
+            });
+
+            setChildren((current) => current.map((child) => child.studentId === updatedChild.studentId ? updatedChild : child));
+            toast.success(`${updatedChild.name} is updated.`);
+            handleRenameDialogChange(false);
+        } catch (error) {
+            toast.error(getErrorMessage(error));
+        } finally {
+            setSavingField(null);
+        }
+    };
+
     return (
         <>
             <div className="flex flex-col gap-6">
@@ -229,7 +264,6 @@ export function GuardianSettingsPageClient({ content, permissions }: GuardianSet
                             children.map((child) => {
                                 const controls = ensureCompanionControls(child.companionControls);
                                 const canChangeControls = can(permissions, "can_change_companion_controls", child.studentId);
-                                const isSavingChild = savingField === `companion:${child.studentId}`;
 
                                 return (
                                     <Card key={child.studentId}>
@@ -246,28 +280,28 @@ export function GuardianSettingsPageClient({ content, permissions }: GuardianSet
                                                 </Badge>
                                             </div>
                                         </CardHeader>
-                                        <CardContent className="space-y-0 divide-y divide-border">
-                                            <ToggleControlRow
-                                                checked={controls.showCorrectAnswers}
-                                                description="Reveal the right answer after a miss."
-                                                disabled={!canChangeControls || isSavingChild}
-                                                label="Show correct answers"
-                                                onCheckedChange={(value) => updateChildCompanionControl(child.studentId, "showCorrectAnswers", value)}
-                                            />
-                                            <ToggleControlRow
-                                                checked={controls.allowHints}
-                                                description="Keep hints available before the answer."
-                                                disabled={!canChangeControls || isSavingChild}
-                                                label="Allow hints"
-                                                onCheckedChange={(value) => updateChildCompanionControl(child.studentId, "allowHints", value)}
-                                            />
-                                            <ToggleControlRow
-                                                checked={controls.allowSkip}
-                                                description="Allow a child to skip and come back later."
-                                                disabled={!canChangeControls || isSavingChild}
-                                                label="Allow skip"
-                                                onCheckedChange={(value) => updateChildCompanionControl(child.studentId, "allowSkip", value)}
-                                            />
+                                        <CardContent className="space-y-3">
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="text-text-secondary">Answer reveal</span>
+                                                <span className="font-medium text-text-primary capitalize">
+                                                    {controls.answerRevealTiming === "after_quiz" ? "After quiz passed" : "Immediately"}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="text-text-secondary">Pass threshold</span>
+                                                <span className="font-medium text-text-primary">
+                                                    {Math.round(controls.quizPassThreshold * 100)}%
+                                                </span>
+                                            </div>
+                                            {canChangeControls && (
+                                                <Link
+                                                    className="mt-2 flex items-center gap-1 text-sm font-semibold text-primary-600 hover:underline"
+                                                    href={`/guardian/${child.studentId}/companion`}
+                                                >
+                                                    Edit companion controls
+                                                    <ArrowRight02Icon size={14} />
+                                                </Link>
+                                            )}
                                         </CardContent>
                                     </Card>
                                 );
@@ -322,87 +356,6 @@ export function GuardianSettingsPageClient({ content, permissions }: GuardianSet
             </Dialog>
         </>
     );
-
-    function openRenameDialog(child: GuardianManagedChildSettings) {
-        setSelectedChildId(child.studentId);
-        setRenameDraft(child.name);
-    }
-
-    function handleRenameDialogChange(nextOpen: boolean) {
-        if (!nextOpen) {
-            setSelectedChildId(null);
-            setRenameDraft("");
-        }
-    }
-
-    async function submitRename() {
-        if (!selectedChild) {
-            return;
-        }
-
-        setSavingField(`rename:${selectedChild.studentId}`);
-
-        try {
-            const updatedChild = await browserApiFetch<GuardianManagedChildSettings>(ROUTES.GUARDIAN.CHILD(selectedChild.studentId), {
-                method: "PATCH",
-                body: JSON.stringify({ name: renameDraft.trim() }),
-            });
-
-            setChildren((current) => current.map((child) => child.studentId === updatedChild.studentId ? updatedChild : child));
-            toast.success(`${updatedChild.name} is updated.`);
-            handleRenameDialogChange(false);
-        } catch (error) {
-            toast.error(getErrorMessage(error));
-        } finally {
-            setSavingField(null);
-        }
-    }
-
-    async function updateChildCompanionControl(
-        childId: string,
-        key: keyof Pick<CompanionControls, "showCorrectAnswers" | "allowHints" | "allowSkip">,
-        value: boolean,
-    ) {
-        const currentChild = children.find((child) => child.studentId === childId);
-
-        if (!currentChild) {
-            return;
-        }
-
-        const previousControls = ensureCompanionControls(currentChild.companionControls);
-        const nextControls = {
-            ...previousControls,
-            [key]: value,
-        };
-
-        setChildren((current) => current.map((child) => child.studentId === childId
-            ? { ...child, companionControls: nextControls }
-            : child));
-        setSavingField(`companion:${childId}`);
-
-        try {
-            const savedControls = await browserApiFetch<CompanionControls>(ROUTES.GUARDIAN.CHILD_COMPANION_CONTROLS(childId), {
-                method: "PATCH",
-                body: JSON.stringify({
-                    showCorrectAnswers: nextControls.showCorrectAnswers,
-                    allowHints: nextControls.allowHints,
-                    allowSkip: nextControls.allowSkip,
-                }),
-            });
-
-            setChildren((current) => current.map((child) => child.studentId === childId
-                ? { ...child, companionControls: savedControls }
-                : child));
-            toast.success("Companion controls updated.");
-        } catch (error) {
-            setChildren((current) => current.map((child) => child.studentId === childId
-                ? { ...child, companionControls: previousControls }
-                : child));
-            toast.error(getErrorMessage(error));
-        } finally {
-            setSavingField(null);
-        }
-    }
 }
 
 function HeroMetric({

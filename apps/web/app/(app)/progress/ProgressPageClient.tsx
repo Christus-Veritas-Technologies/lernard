@@ -43,6 +43,16 @@ export function ProgressPageClient() {
             .catch(() => setHistory({ sessions: [], hasMore: false, nextCursor: null }));
     }, [historyTypeFilter, isAuthenticated]);
 
+    const totalLessons = useMemo(
+        () => history?.sessions.filter((session) => session.type === "lesson").length ?? 0,
+        [history],
+    );
+
+    const totalQuizzes = useMemo(
+        () => history?.sessions.filter((session) => session.type === "quiz").length ?? 0,
+        [history],
+    );
+
     if (!isAuthenticated) {
         return (
             <Card>
@@ -73,16 +83,6 @@ export function ProgressPageClient() {
     }
 
     const { content, slots } = data;
-
-    const totalLessons = useMemo(
-        () => history?.sessions.filter((session) => session.type === "lesson").length ?? 0,
-        [history],
-    );
-
-    const totalQuizzes = useMemo(
-        () => history?.sessions.filter((session) => session.type === "quiz").length ?? 0,
-        [history],
-    );
 
     return (
         <div className="flex flex-col gap-6">
