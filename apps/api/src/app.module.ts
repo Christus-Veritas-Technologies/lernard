@@ -14,11 +14,13 @@ import { LessonsModule } from './modules/lessons/lessons.module';
 import { QuizzesModule } from './modules/quizzes/quizzes.module';
 import { ChatModule } from './modules/chat/chat.module';
 import { JobsModule } from './jobs/jobs.module';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    RedisModule,
     MastraModule,
     AuthModule,
     OnboardingModule,
