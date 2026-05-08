@@ -1,9 +1,12 @@
 import {
   Controller,
+  Delete,
   Get,
   Patch,
   Post,
   Body,
+  HttpCode,
+  HttpStatus,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -15,6 +18,11 @@ import {
   CompanionControlsDto,
   UpdateAppearanceDto,
   UpdateDailyGoalDto,
+  UpdateProfileDto,
+  UpdateStudyDto,
+  UpdateNotificationsDto,
+  UnlinkGuardianDto,
+  DeleteAccountDto,
 } from './dto/settings.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
@@ -92,3 +100,50 @@ export class SettingsController {
     return this.settingsService.uploadAvatar(user.id, file);
   }
 }
+  @ProtectedRoute()
+  @Patch('profile')
+  async updateProfile(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    return this.settingsService.updateProfile(user.id, dto);
+  }
+
+  @ProtectedRoute()
+  @Patch('study')
+  async updateStudy(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateStudyDto,
+  ) {
+      return this.settingsService.updateStudy(user.id, dto);
+  }
+
+  @ProtectedRoute()
+  @Patch('notifications')
+  async updateNotifications(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateNotificationsDto,
+  ) {
+      return this.settingsService.updateNotifications(user.id, dto);
+  }
+
+  @ProtectedRoute()
+  @HttpCode(HttpStatus.OK)
+  @Post('unlink-guardian')
+  async unlinkGuardian(
+    @CurrentUser() user: User,
+    @Body() dto: UnlinkGuardianDto,
+  ) {
+    return this.settingsService.unlinkGuardian(user.id, dto.studentPassword);
+  }
+
+  @ProtectedRoute()
+  @Delete('account')
+  async deleteAccount(
+    @CurrentUser() user: User,
+    @Body() dto: DeleteAccountDto,
+  ) {
+    return this.settingsService.deleteAccount(user.id, dto.password);
+  }
+}
+  ) {

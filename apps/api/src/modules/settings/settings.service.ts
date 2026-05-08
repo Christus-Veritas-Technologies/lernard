@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   Injectable,
+  ForbiddenException,
+  UnauthorizedException,
   NotFoundException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -10,6 +12,7 @@ import type {
   Appearance,
   CompanionControls,
   GuardianManagedChildSettings,
+  GuardianViewerSummary,
   PagePayload,
   Role,
   ScopedPermission,
@@ -56,6 +59,18 @@ export class SettingsService {
         plan: true,
         role: true,
         lockedSettings: true,
+        ageGroup: true,
+        grade: true,
+        timezone: true,
+        learningGoal: true,
+        createdAt: true,
+        controlledBy: {
+          select: {
+            id: true,
+            createdAt: true,
+            userId: true,
+          },
+        },
       },
     });
 
@@ -65,7 +80,13 @@ export class SettingsService {
     if (role === 'guardian') {
       const guardian = await this.prisma.guardian.findUnique({
         where: { userId },
-        select: { id: true },
+        select: {
+          id: true,
+          contactPreference: true,
+          dashboardDefault: true,
+          weeklyFamilySummary: true,
+          unsubscribeAll: true,
+        },
       });
 
       if (!guardian) {
@@ -77,13 +98,25 @@ export class SettingsService {
       return buildPagePayload(
         {
           roleView: 'guardian',
-          viewer,
+          viewer: mapGuardianViewerSummary(user, guardian),
           children,
         },
         {
           permissions: buildGuardianSettingsPermissions(children),
         },
       );
+    }
+
+    // Resolve guardian name if student is linked
+    let guardianName: string | null = null;
+    let guardianLinkedSince: string | null = null;
+    if (user.controlledBy) {
+      const guardianUser = await this.prisma.user.findUnique({
+        where: { id: user.controlledBy.userId },
+        select: { name: true },
+      });
+      guardianName = guardianUser?.name ?? null;
+      guardianLinkedSince = user.controlledBy.createdAt.toISOString();
     }
 
     const settings = await this.getUserSettings(userId);
@@ -94,6 +127,8 @@ export class SettingsService {
         viewer,
         settings,
         lockedSettings: user.lockedSettings,
+        guardianName,
+        guardianLinkedSince,
       },
       {
         permissions: buildStudentSettingsPermissions(user.lockedSettings),
@@ -215,6 +250,17 @@ export class SettingsService {
           dailyGoal: true,
           sessionLength: true,
           notificationsEnabled: true,
+          supportLevel: true,
+          textSize: true,
+          reducedMotion: true,
+          reminderEnabled: true,
+          reminderTime: true,
+          streakAlertEnabled: true,
+          growthAreaNudgeEnabled: true,
+          growthAreaNudgeFrequency: true,
+          planLimitAlertEnabled: true,
+          weeklyEmailEnabled: true,
+          plan: true,
         },
       }),
       this.prisma.companionControls.findUnique({
@@ -229,6 +275,16 @@ export class SettingsService {
       dailyGoal: user.dailyGoal,
       preferredSessionLength: user.sessionLength,
       notificationsEnabled: user.notificationsEnabled,
+      supportLevel: (user.supportLevel as 'minimal' | 'moderate' | 'full') ?? 'moderate',
+      textSize: (user.textSize as 'small' | 'medium' | 'large' | 'xl') ?? 'medium',
+      reducedMotion: user.reducedMotion ?? false,
+      reminderEnabled: user.reminderEnabled ?? true,
+      reminderTime: user.reminderTime ?? '07:00',
+      streakAlertEnabled: user.streakAlertEnabled ?? true,
+      growthAreaNudgeEnabled: user.growthAreaNudgeEnabled ?? true,
+      growthAreaNudgeFrequency: (user.growthAreaNudgeFrequency as 'daily' | 'weekly' | 'in_app_only') ?? 'daily',
+      planLimitAlertEnabled: user.planLimitAlertEnabled ?? true,
+      weeklyEmailEnabled: user.weeklyEmailEnabled ?? true,
       companionControls: companionControls
         ? mapCompanionControls(companionControls)
         : null,
@@ -244,6 +300,208 @@ export class SettingsService {
         deletedAt: null,
       },
       select: {
+        async updateProfile(
+          userId: string,
+          dto: {
+            name?: string;
+            ageGroup?: string | null;
+            grade?: string | null;
+            timezone?: string;
+            learningGoal?: string | null;
+          },
+        ): Promise<UserSettings> {
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+              ...(dto.name !== undefined && { name: dto.name }),
+              ...(dto.ageGroup !== undefined && { ageGroup: dto.ageGroup as any }),
+              ...(dto.grade !== undefined && { grade: dto.grade }),
+              ...(dto.timezone !== undefined && { timezone: dto.timezone }),
+              ...(dto.learningGoal !== undefined && { learningGoal: dto.learningGoal as any }),
+            },
+          });
+          return this.get(userId);
+        }
+
+        async updateStudy(
+          userId: string,
+          dto: {
+            learningMode?: 'guide' | 'companion';
+            answerRevealTiming?: 'after_quiz' | 'immediate';
+            quizPassThreshold?: number;
+            sessionLength?: number;
+            preferredDepth?: string;
+            dailyGoal?: number;
+            supportLevel?: 'minimal' | 'moderate' | 'full';
+          },
+        ): Promise<{ settings: UserSettings; lockedFields: string[] }> {
+          const userRecord = await this.prisma.user.findUniqueOrThrow({
+            where: { id: userId },
+            select: { lockedSettings: true },
+          });
+          const lockedSettings = userRecord.lockedSettings;
+          const lockedFields: string[] = [];
+
+          if (dto.learningMode !== undefined && lockedSettings.includes('mode')) {
+            lockedFields.push('learningMode');
+          }
+          if (
+            (dto.answerRevealTiming !== undefined || dto.quizPassThreshold !== undefined) &&
+            lockedSettings.includes('companion-controls')
+          ) {
+            lockedFields.push('answerRevealTiming', 'quizPassThreshold');
+          }
+
+          if (lockedFields.length > 0) {
+            throw new ForbiddenException({ lockedFields });
+          }
+
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+              ...(dto.learningMode !== undefined && {
+                learningMode: toPrismaLearningMode(dto.learningMode),
+              }),
+              ...(dto.sessionLength !== undefined && { sessionLength: dto.sessionLength }),
+              ...(dto.preferredDepth !== undefined && { preferredDepth: dto.preferredDepth }),
+              ...(dto.dailyGoal !== undefined && { dailyGoal: dto.dailyGoal }),
+              ...(dto.supportLevel !== undefined && { supportLevel: dto.supportLevel }),
+            },
+          });
+
+          // Update companion controls separately if provided
+          if (dto.answerRevealTiming !== undefined || dto.quizPassThreshold !== undefined) {
+            const user = await this.prisma.user.findUniqueOrThrow({
+              where: { id: userId },
+              select: { name: true, controlledByGuardianId: true },
+            });
+            await (this.prisma.companionControls as any).upsert({
+              where: { studentId: userId },
+              update: {
+                ...(dto.answerRevealTiming !== undefined && {
+                  answerRevealTiming: dto.answerRevealTiming,
+                }),
+                ...(dto.quizPassThreshold !== undefined && {
+                  quizPassThreshold: dto.quizPassThreshold,
+                }),
+                lastChangedBy: user.name,
+              },
+              create: {
+                studentId: userId,
+                answerRevealTiming: dto.answerRevealTiming ?? 'after_quiz',
+                quizPassThreshold: dto.quizPassThreshold ?? 0.7,
+                lockedByGuardian: Boolean(user.controlledByGuardianId),
+                lastChangedBy: user.name,
+              },
+            });
+          }
+
+          return { settings: await this.get(userId), lockedFields: [] };
+        }
+
+        async updateNotifications(
+          userId: string,
+          dto: {
+            reminderEnabled?: boolean;
+            reminderTime?: string;
+            streakAlertEnabled?: boolean;
+            growthAreaNudgeEnabled?: boolean;
+            growthAreaNudgeFrequency?: string;
+            planLimitAlertEnabled?: boolean;
+            weeklyEmailEnabled?: boolean;
+          },
+        ): Promise<UserSettings> {
+          const userRecord = await this.prisma.user.findUniqueOrThrow({
+            where: { id: userId },
+            select: { plan: true },
+          });
+          const userPlan = userRecord.plan;
+          const data: Record<string, unknown> = {};
+
+          if (dto.reminderEnabled !== undefined) data.reminderEnabled = dto.reminderEnabled;
+          if (dto.reminderTime !== undefined) data.reminderTime = dto.reminderTime;
+          if (dto.streakAlertEnabled !== undefined) data.streakAlertEnabled = dto.streakAlertEnabled;
+          if (dto.growthAreaNudgeEnabled !== undefined) data.growthAreaNudgeEnabled = dto.growthAreaNudgeEnabled;
+          if (dto.growthAreaNudgeFrequency !== undefined) data.growthAreaNudgeFrequency = dto.growthAreaNudgeFrequency;
+          // Explorer cannot turn off plan limit alerts
+          if (dto.planLimitAlertEnabled !== undefined && userPlan !== 'EXPLORER') {
+            data.planLimitAlertEnabled = dto.planLimitAlertEnabled;
+          }
+          if (dto.weeklyEmailEnabled !== undefined) data.weeklyEmailEnabled = dto.weeklyEmailEnabled;
+
+          await this.prisma.user.update({ where: { id: userId }, data });
+          return this.get(userId);
+        }
+
+        async unlinkGuardian(
+          userId: string,
+          studentPassword: string,
+        ): Promise<{ message: string }> {
+          const user = await this.prisma.user.findUniqueOrThrow({
+            where: { id: userId },
+            select: { passwordHash: true, controlledByGuardianId: true },
+          });
+
+          if (!user.controlledByGuardianId) {
+            throw new BadRequestException('No linked guardian found.');
+          }
+
+          if (!user.passwordHash) {
+            throw new BadRequestException(
+              'Your account uses social login. You cannot unlink with a password.',
+            );
+          }
+
+          const bcrypt = await import('bcrypt');
+          const valid = await bcrypt.compare(studentPassword, user.passwordHash);
+          if (!valid) {
+            throw new UnauthorizedException('Incorrect password.');
+          }
+
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+              controlledByGuardianId: null,
+              lockedSettings: [],
+            },
+          });
+
+          return { message: 'Guardian unlinked.' };
+        }
+
+        async deleteAccount(
+          userId: string,
+          password: string,
+        ): Promise<{ message: string }> {
+          const user = await this.prisma.user.findUniqueOrThrow({
+            where: { id: userId },
+            select: { passwordHash: true },
+          });
+
+          if (!user.passwordHash) {
+            throw new BadRequestException(
+              'Your account uses social login. Contact support to delete it.',
+            );
+          }
+
+          const bcrypt = await import('bcrypt');
+          const valid = await bcrypt.compare(password, user.passwordHash);
+          if (!valid) {
+            throw new UnauthorizedException('Incorrect password.');
+          }
+
+          // Revoke all refresh tokens
+          await this.prisma.refreshToken.deleteMany({ where: { userId } });
+
+          // Soft-delete
+          await this.prisma.user.update({
+            where: { id: userId },
+            data: { deletedAt: new Date() },
+          });
+
+          return { message: 'Account deleted.' };
+        }
+
         id: true,
         email: true,
         name: true,
@@ -319,6 +577,10 @@ function mapViewerSummary(user: {
   name: string;
   plan: Parameters<typeof toSharedPlan>[0];
   role: Parameters<typeof toSharedRole>[0];
+  ageGroup?: string | null;
+  grade?: string | null;
+  timezone?: string;
+  learningGoal?: string | null;
 }): SettingsViewerSummary {
   return {
     id: user.id,
@@ -326,6 +588,33 @@ function mapViewerSummary(user: {
     name: user.name,
     plan: toSharedPlan(user.plan),
     role: toSharedRole(user.role),
+    ageGroup: (user.ageGroup as any) ?? null,
+    grade: user.grade ?? null,
+    timezone: user.timezone ?? 'UTC',
+    learningGoal: (user.learningGoal as any) ?? null,
+  };
+}
+
+function mapGuardianViewerSummary(
+  user: {
+    id: string;
+    email: string | null;
+    name: string;
+    plan: Parameters<typeof toSharedPlan>[0];
+    role: Parameters<typeof toSharedRole>[0];
+  },
+  guardian: { contactPreference?: string; dashboardDefault?: string; weeklyFamilySummary?: boolean; unsubscribeAll?: boolean },
+): GuardianViewerSummary {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    plan: toSharedPlan(user.plan),
+    role: toSharedRole(user.role),
+    contactPreference: (guardian.contactPreference as 'email' | 'push' | 'both') ?? 'email',
+    dashboardDefault: (guardian.dashboardDefault as 'overview' | 'last_viewed' | 'most_recent') ?? 'overview',
+    weeklyFamilySummary: guardian.weeklyFamilySummary ?? true,
+    unsubscribeAll: guardian.unsubscribeAll ?? false,
   };
 }
 
