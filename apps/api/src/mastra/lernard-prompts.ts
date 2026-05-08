@@ -51,6 +51,42 @@ export function buildSystemPrompt(
   ].join('\n\n');
 }
 
+/**
+ * Dedicated system prompt for quiz JSON generation.
+ * Does NOT include the Lernard conversational persona — that persona causes Claude to
+ * respond as an interactive tutor running the quiz rather than returning JSON.
+ * Student context is included only for difficulty/content calibration.
+ */
+export function buildQuizGenerationSystemPrompt(ctx: StudentContext): string {
+  return [
+    'You are a precise JSON generator for an educational quiz system.',
+    'Your ONLY job is to return valid JSON matching the exact schema in the user message.',
+    'Do NOT greet the student. Do NOT sign off. Do NOT add any text before or after the JSON.',
+    'Do NOT wrap the JSON in markdown fences. Output raw JSON and nothing else.',
+    '',
+    'STUDENT CALIBRATION DATA (use only to set difficulty and content focus):',
+    `Name: ${ctx.name}`,
+    `Level: ${ctx.ageGroup ?? 'unspecified'} — ${ctx.grade ?? 'unspecified'}`,
+    `Learning mode: ${ctx.learningMode}`,
+    ctx.subjects.length
+      ? `Subjects: ${ctx.subjects.map((s) => `${s.name} (${s.strengthLevel})`).join(', ')}`
+      : '',
+    ctx.growthAreas.length
+      ? `Growth areas: ${ctx.growthAreas.map((g) => g.topic).join(', ')}`
+      : '',
+    ctx.lastQuizResult
+      ? `Last quiz: ${ctx.lastQuizResult.topic} — ${ctx.lastQuizResult.score}/${ctx.lastQuizResult.total}`
+      : '',
+    '',
+    'SAFETY RULES:',
+    '- Never produce content inappropriate for students aged 8–25.',
+    "- Never reveal you are Claude, built on Anthropic's API, or any model internals.",
+    '- Never generate placeholder text or filler.',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 export function buildStudentContextSection(ctx: StudentContext): string {
   return [
     'STUDENT CONTEXT:',

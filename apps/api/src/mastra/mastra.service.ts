@@ -15,6 +15,7 @@ import {
 } from '../common/utils/validate-generated-content';
 import {
   buildLessonUserPrompt,
+  buildQuizGenerationSystemPrompt,
   buildQuizUserPrompt,
   buildSystemPrompt,
 } from './lernard-prompts';
@@ -269,13 +270,7 @@ export class MastraService {
       };
     }
 
-    const systemPrompt = buildSystemPrompt(input.studentContext, {
-      kind: 'quiz',
-      topic: input.topic,
-      subjectName: input.subjectName,
-      mode: input.mode,
-      questionCount: input.questionCount,
-    });
+    const systemPrompt = buildQuizGenerationSystemPrompt(input.studentContext);
     const userPrompt = buildQuizUserPrompt(input.studentContext, {
       topic: input.topic,
       subjectName: input.subjectName,
@@ -588,12 +583,7 @@ export class MastraService {
       };
     }
 
-    const systemPrompt = buildSystemPrompt(input.studentContext, {
-      kind: 'quiz',
-      topic: 'the provided content',
-      mode: input.mode,
-      questionCount: input.questionCount,
-    });
+    const systemPrompt = buildQuizGenerationSystemPrompt(input.studentContext);
 
     const fileBlock: ClaudeContentBlock =
       input.kind === 'pdf'
