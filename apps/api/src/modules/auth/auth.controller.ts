@@ -161,4 +161,11 @@ export class AuthController {
   ) {
     return this.authService.guardianVerifyPassword(user.id, dto.password);
   }
+
+  // ─── Child Account Setup (Path B) ─────────────────────────────────────────
+
+  @Post('setup')
+  async setupChildAccount(@Body() dto: { token: string; password: string }) {
+    return this.authService.activateChildAccount(dto.token, dto.password);
+  }
 }

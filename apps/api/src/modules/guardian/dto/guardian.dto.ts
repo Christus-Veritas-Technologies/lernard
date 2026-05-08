@@ -2,15 +2,25 @@ import {
   IsString,
   MaxLength,
   IsOptional,
-  IsBoolean,
+  IsEmail,
   MinLength,
+  IsIn,
+  IsNumber,
+  Min,
+  Max,
+  IsArray,
 } from 'class-validator';
 
 export class InviteChildDto {
-  @IsString()
+  @IsEmail()
   @MaxLength(254)
+  email: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(50)
   @IsOptional()
-  childEmail?: string;
+  childName?: string;
 }
 
 export class AcceptInviteDto {
@@ -19,15 +29,27 @@ export class AcceptInviteDto {
   code: string;
 }
 
+export class DeclineInviteDto {
+  @IsString()
+  @MaxLength(10)
+  code: string;
+}
+
 export class UpdateChildCompanionControlsDto {
-  @IsBoolean()
-  showCorrectAnswers: boolean;
+  @IsIn(['guide', 'companion'])
+  learningMode: 'guide' | 'companion';
 
-  @IsBoolean()
-  allowHints: boolean;
+  @IsIn(['after_quiz', 'immediate'])
+  answerRevealTiming: 'after_quiz' | 'immediate';
 
-  @IsBoolean()
-  allowSkip: boolean;
+  @IsNumber()
+  @Min(0.5)
+  @Max(1.0)
+  quizPassThreshold: number;
+
+  @IsArray()
+  @IsString({ each: true })
+  lockedSettings: string[];
 }
 
 export class UpdateChildSettingsDto {

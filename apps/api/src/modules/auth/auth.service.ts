@@ -254,6 +254,38 @@ export class AuthService {
     return { verified: true };
   }
 
+  // ─── Child Account Activation (Path B setup) ──────────────────────────────
+
+  async activateChildAccount(token: string, password: string) {
+    const user = await this.prisma.user.findFirst({
+      where: { setupToken: token } as any,
+    });
+
+    if (!user) {
+      throw new BadRequestException('This setup link is invalid or has already been used.');
+    }
+
+    const setupTokenExpiresAt = (user as any).setupTokenExpiresAt as Date | null;
+    if (!setupTokenExpiresAt || setupTokenExpiresAt < new Date()) {
+      throw new BadRequestException('This setup link has expired. Ask your guardian to resend the setup email.');
+    }
+
+    const bcrypt = await import('bcrypt');
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash,
+        accountStatus: 'ACTIVE',
+        setupToken: null,
+        setupTokenExpiresAt: null,
+      } as any,
+    });
+
+    return this.issueTokens(updatedUser);
+  }
+
   // ─── Private Helpers ───────────────────────────────────────────────────────
 
   private async issueTokens(user: User) {

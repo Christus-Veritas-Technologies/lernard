@@ -1,5 +1,10 @@
-import { randomInt } from 'crypto';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { randomInt, randomUUID } from 'crypto';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import type {
   ChildCompanionContent,
   ChildProfileContent,
@@ -14,6 +19,7 @@ import type {
   TopicStrength,
 } from '@lernard/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MailService } from '../auth/mail.service';
 import { buildPagePayload } from '../../common/utils/build-page-payload';
 import { listPendingInviteSnapshots } from '../../common/utils/page-payload-queries';
 import {
@@ -29,7 +35,11 @@ import type {
 
 @Injectable()
 export class GuardianService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly mailService: MailService,
+    private readonly configService: ConfigService,
+  ) {}
 
   async getChildren(userId: string): Promise<GuardianChildOverview[]> {
     const content = await this.buildDashboardContent(userId);
@@ -49,66 +59,241 @@ export class GuardianService {
   async inviteChild(
     userId: string,
     dto: InviteChildDto,
-  ): Promise<PendingInvite> {
-    const guardian = await this.getGuardianByUserId(userId);
-    const invite = await this.prisma.childInvite.create({
-      data: {
-        guardianId: guardian.id,
-        childEmail: dto.childEmail?.toLowerCase() ?? null,
-        code: generateInviteCode(),
-        expiresAt: daysFromNow(7),
-      },
+  ): Promise<{
+    type: 'existing_account' | 'new_account';
+    code?: string;
+    expiresAt?: string;
+    childEmail: string;
+    childName: string | null;
+    setupEmailSent?: boolean;
+  }> {
+    const { guardian, guardianUser } = await this.getGuardianContext(userId);
+    const email = dto.email.toLowerCase();
+    const childName = dto.childName?.trim() ?? null;
+    const webUrl = this.configService.get<string>('WEB_APP_URL') ?? 'http://localhost:4000';
+
+    // Guard: linked + pending < 3
+    const [linkedCount, pendingCount] = await Promise.all([
+      this.prisma.user.count({ where: { controlledByGuardianId: guardian.id, deletedAt: null } }),
+      this.prisma.childInvite.count({
+        where: { guardianId: guardian.id, status: 'pending', expiresAt: { gt: new Date() } },
+      }),
+    ]);
+    if (linkedCount + pendingCount >= 3) {
+      throw new BadRequestException("You've reached the maximum of 3 children on your plan.");
+    }
+
+    // Guard: self-invite
+    if (guardianUser.email?.toLowerCase() === email) {
+      throw new BadRequestException("You can't invite yourself.");
+    }
+
+    // Guard: already linked
+    const alreadyLinked = await this.prisma.user.findFirst({
+      where: { email, controlledByGuardianId: guardian.id, deletedAt: null },
+    });
+    if (alreadyLinked) {
+      throw new BadRequestException('This child is already linked to your account.');
+    }
+
+    // Return existing pending invite if one exists
+    const existingInvite = await this.prisma.childInvite.findFirst({
+      where: { guardianId: guardian.id, childEmail: email, status: 'pending', expiresAt: { gt: new Date() } },
+    });
+    if (existingInvite) {
+      return {
+        type: existingInvite.type as 'existing_account',
+        code: existingInvite.code,
+        expiresAt: existingInvite.expiresAt.toISOString(),
+        childEmail: email,
+        childName,
+      };
+    }
+
+    // Check if a student account exists for this email
+    const existingStudent = await this.prisma.user.findFirst({
+      where: { email, deletedAt: null },
+      select: { id: true, name: true },
     });
 
-    return mapPendingInvite(invite);
+    if (existingStudent) {
+      // Path A: existing account
+      const code = generateInviteCode();
+      const expiresAt = hoursFromNow(24);
+      await this.prisma.childInvite.create({
+        data: {
+          guardianId: guardian.id,
+          childEmail: email,
+          childId: existingStudent.id,
+          type: 'existing_account',
+          status: 'pending',
+          code,
+          expiresAt,
+        },
+      });
+      const acceptLink = `${webUrl}/accept-invite?token=${encodeURIComponent(code)}`;
+      await this.mailService.sendInviteExistingAccount(email, {
+        guardianName: guardianUser.name,
+        code,
+        expiresAt,
+        acceptLink,
+      });
+      return {
+        type: 'existing_account',
+        code,
+        expiresAt: expiresAt.toISOString(),
+        childEmail: email,
+        childName: childName ?? existingStudent.name,
+      };
+    }
+
+    // Path B: no account — create pending_setup student
+    const setupToken = randomUUID();
+    const setupTokenExpiresAt = hoursFromNow(48);
+    const newChild = await this.prisma.user.create({
+      data: {
+        email,
+        name: childName ?? 'Student',
+        role: 'STUDENT' as any,
+        accountStatus: 'PENDING_SETUP',
+        setupToken,
+        setupTokenExpiresAt,
+        controlledByGuardianId: guardian.id,
+      },
+    });
+    await this.prisma.childInvite.create({
+      data: {
+        guardianId: guardian.id,
+        childEmail: email,
+        childId: newChild.id,
+        type: 'new_account',
+        status: 'accepted',
+        code: generateInviteCode(),
+        expiresAt: hoursFromNow(48),
+        usedAt: new Date(),
+      },
+    });
+    const setupLink = `${webUrl}/setup?token=${encodeURIComponent(setupToken)}`;
+    await this.mailService.sendInviteNewAccount(email, {
+      guardianName: guardianUser.name,
+      childName: childName ?? 'there',
+      setupLink,
+      childEmail: email,
+    });
+    return {
+      type: 'new_account',
+      childEmail: email,
+      childName,
+      setupEmailSent: true,
+    };
+  }
+
+  async getPendingInviteForMe(userId: string) {
+    const user = await this.prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { email: true },
+    });
+
+    const invite = await (this.prisma.childInvite as any).findFirst({
+      where: {
+        status: 'pending',
+        expiresAt: { gt: new Date() },
+        OR: [
+          { childId: userId },
+          ...(user.email ? [{ childEmail: user.email }] : []),
+        ],
+      },
+      include: { guardian: { include: { user: { select: { name: true } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!invite) return { pending: false };
+
+    return {
+      pending: true,
+      code: invite.code,
+      guardianName: (invite.guardian?.user?.name as string | null) ?? 'Your guardian',
+    };
   }
 
   async acceptInvite(userId: string, code: string) {
     const invite = await this.prisma.childInvite.findFirst({
-      where: {
-        code,
-        usedAt: null,
-        expiresAt: {
-          gt: new Date(),
-        },
-      },
-      include: {
-        guardian: true,
-      },
+      where: { code, status: 'pending', expiresAt: { gt: new Date() } },
+      include: { guardian: { include: { children: false } } },
     });
 
     if (!invite) {
       throw new NotFoundException('Invite not found or expired');
     }
 
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.user.update({
+    const [guardianUser, child] = await Promise.all([
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: invite.guardian.userId },
+        select: { email: true },
+      }),
+      this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { name: true } }),
+    ]);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
         where: { id: userId },
-        data: {
-          controlledByGuardianId: invite.guardianId,
-        },
+        data: { controlledByGuardianId: invite.guardianId },
       });
-
-      await transaction.companionControls.upsert({
+      await tx.companionControls.upsert({
         where: { studentId: userId },
-        update: {
-          lockedByGuardian: true,
-          lastChangedBy: 'Guardian',
-        },
-        create: {
-          studentId: userId,
-          lockedByGuardian: true,
-          lastChangedBy: 'Guardian',
-        },
+        update: { lockedByGuardian: true, lastChangedBy: 'Guardian' },
+        create: { studentId: userId, lockedByGuardian: true, lastChangedBy: 'Guardian' },
       });
-
-      await transaction.childInvite.update({
+      await tx.childInvite.update({
         where: { id: invite.id },
-        data: { usedAt: new Date() },
+        data: { usedAt: new Date(), status: 'accepted' },
       });
     });
 
+    const webUrl = this.configService.get<string>('WEB_APP_URL') ?? 'http://localhost:4000';
+    if (guardianUser.email) {
+      await this.mailService.sendInviteAccepted(guardianUser.email, {
+        childName: child.name,
+        profileLink: `${webUrl}/guardian/${userId}`,
+      });
+    }
+
     return { linked: true };
+  }
+
+  async declineInvite(userId: string, code: string) {
+    const invite = await this.prisma.childInvite.findFirst({
+      where: { code, status: 'pending', expiresAt: { gt: new Date() } },
+      include: { guardian: true },
+    });
+
+    if (!invite) {
+      throw new NotFoundException('Invite not found or expired');
+    }
+
+    const [guardianUser, student] = await Promise.all([
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: invite.guardian.userId },
+        select: { email: true },
+      }),
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { email: true },
+      }),
+    ]);
+
+    await this.prisma.childInvite.update({
+      where: { id: invite.id },
+      data: { status: 'declined' },
+    });
+
+    if (guardianUser.email) {
+      await this.mailService.sendInviteDeclined(guardianUser.email, {
+        childEmail: student.email ?? invite.childEmail ?? 'the student',
+      });
+    }
+
+    return { declined: true };
   }
 
   async getPending(userId: string): Promise<PendingInvite[]> {
@@ -117,26 +302,29 @@ export class GuardianService {
 
   async cancelInvite(userId: string, token: string) {
     const guardian = await this.getGuardianByUserId(userId);
-    const result = await this.prisma.childInvite.deleteMany({
-      where: {
-        guardianId: guardian.id,
-        OR: [{ id: token }, { code: token }],
-      },
+    const invite = await this.prisma.childInvite.findFirst({
+      where: { guardianId: guardian.id, OR: [{ id: token }, { code: token }] },
     });
 
-    if (result.count === 0) {
+    if (!invite) {
       throw new NotFoundException('Invite not found');
     }
+
+    await this.prisma.childInvite.update({
+      where: { id: invite.id },
+      data: { status: 'cancelled' },
+    });
 
     return { cancelled: true };
   }
 
   async resendInvite(userId: string, token: string): Promise<PendingInvite> {
+    const { guardianUser } = await this.getGuardianContext(userId);
     const guardian = await this.getGuardianByUserId(userId);
     const existingInvite = await this.prisma.childInvite.findFirst({
       where: {
         guardianId: guardian.id,
-        usedAt: null,
+        status: 'pending',
         OR: [{ id: token }, { code: token }],
       },
     });
@@ -145,14 +333,53 @@ export class GuardianService {
       throw new NotFoundException('Invite not found');
     }
 
+    const newExpiresAt = hoursFromNow(24);
     const updatedInvite = await this.prisma.childInvite.update({
       where: { id: existingInvite.id },
-      data: {
-        expiresAt: daysFromNow(7),
-      },
+      data: { expiresAt: newExpiresAt },
     });
 
+    const webUrl = this.configService.get<string>('WEB_APP_URL') ?? 'http://localhost:4000';
+    if (existingInvite.childEmail) {
+      const acceptLink = `${webUrl}/accept-invite?token=${encodeURIComponent(existingInvite.code)}`;
+      await this.mailService.sendInviteExistingAccount(existingInvite.childEmail, {
+        guardianName: guardianUser.name,
+        code: existingInvite.code,
+        expiresAt: newExpiresAt,
+        acceptLink,
+      });
+    }
+
     return mapPendingInvite(updatedInvite);
+  }
+
+  async resendSetup(userId: string, childId: string) {
+    const [{ guardianUser }, child] = await Promise.all([
+      this.getGuardianContext(userId),
+      this.getChildForGuardian(userId, childId),
+    ]);
+
+    if ((child as any).accountStatus !== 'PENDING_SETUP') {
+      throw new BadRequestException('Child account is already active.');
+    }
+
+    const setupToken = randomUUID();
+    const setupTokenExpiresAt = hoursFromNow(48);
+    await this.prisma.user.update({
+      where: { id: childId },
+      data: { setupToken, setupTokenExpiresAt, setupReminderSentAt: null } as any,
+    });
+
+    const webUrl = this.configService.get<string>('WEB_APP_URL') ?? 'http://localhost:4000';
+    const setupLink = `${webUrl}/setup?token=${encodeURIComponent(setupToken)}`;
+    await this.mailService.sendInviteNewAccount(child.email!, {
+      guardianName: guardianUser.name,
+      childName: child.name,
+      setupLink,
+      childEmail: child.email!,
+    });
+
+    return { sent: true };
   }
 
   async getChild(
@@ -175,26 +402,16 @@ export class GuardianService {
   }
 
   async removeChild(userId: string, childId: string) {
-    const [{ guardianUser }, child] = await Promise.all([
-      this.getGuardianContext(userId),
-      this.getChildForGuardian(userId, childId),
-    ]);
+    await this.getChildForGuardian(userId, childId);
 
-    await this.prisma.$transaction(async (transaction) => {
-      await transaction.user.update({
-        where: { id: child.id },
-        data: {
-          controlledByGuardianId: null,
-          lockedSettings: [],
-        },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: childId },
+        data: { controlledByGuardianId: null, lockedSettings: [] },
       });
-
-      await transaction.companionControls.updateMany({
-        where: { studentId: child.id },
-        data: {
-          lockedByGuardian: false,
-          lastChangedBy: guardianUser.name,
-        },
+      await tx.companionControls.updateMany({
+        where: { studentId: childId },
+        data: { lockedByGuardian: false },
       });
     });
 
@@ -211,11 +428,12 @@ export class GuardianService {
 
   async getChildSubjects(userId: string, childId: string) {
     const progress = await this.getChildProgress(userId, childId);
-    return progress.map((subjectProgress) => ({
-      name: subjectProgress.subjectName,
-      strengthLevel: subjectProgress.strengthLevel,
+    return progress.map((sp) => ({
+      name: sp.subjectName,
+      strengthLevel: sp.strengthLevel,
     }));
   }
+
   async getChildCompanionPayload(
     userId: string,
     childId: string,
@@ -231,40 +449,91 @@ export class GuardianService {
     userId: string,
     childId: string,
     dto: UpdateChildCompanionControlsDto,
+    ip: string,
+    userAgent: string,
   ): Promise<CompanionControls> {
-    const [{ guardianUser }, child] = await Promise.all([
+    const [{ guardian, guardianUser }, child] = await Promise.all([
       this.getGuardianContext(userId),
       this.getChildForGuardian(userId, childId),
     ]);
 
-    const companionControls = await this.prisma.companionControls.upsert({
-      where: { studentId: child.id },
-      update: {
-        showCorrectAnswers: dto.showCorrectAnswers,
-        allowHints: dto.allowHints,
-        allowSkip: dto.allowSkip,
-        lockedByGuardian: true,
-        lastChangedBy: guardianUser.name,
-      },
-      create: {
-        studentId: child.id,
-        showCorrectAnswers: dto.showCorrectAnswers,
-        allowHints: dto.allowHints,
-        allowSkip: dto.allowSkip,
-        lockedByGuardian: true,
-        lastChangedBy: guardianUser.name,
-      },
-    });
+    // Load current values for audit diff
+    const [currentControls, currentChild] = await Promise.all([
+      this.prisma.companionControls.findUnique({ where: { studentId: child.id } }),
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: child.id },
+        select: { learningMode: true, lockedSettings: true },
+      }),
+    ]);
 
-    await this.prisma.user.update({
-      where: { id: child.id },
-      data: {
-        lockedSettings: ensureSettingLocked(
-          child.lockedSettings,
-          'companion-controls',
-        ),
-      },
-    });
+    const newLearningMode = dto.learningMode === 'companion' ? 'COMPANION' : 'GUIDE';
+
+    // Write audit entries for changed fields
+    const auditEntries: { setting: string; oldValue: string; newValue: string }[] = [];
+    if (currentChild.learningMode !== newLearningMode) {
+      auditEntries.push({ setting: 'learningMode', oldValue: currentChild.learningMode, newValue: newLearningMode });
+    }
+    if (currentControls?.answerRevealTiming !== dto.answerRevealTiming) {
+      auditEntries.push({
+        setting: 'answerRevealTiming',
+        oldValue: currentControls?.answerRevealTiming ?? 'after_quiz',
+        newValue: dto.answerRevealTiming,
+      });
+    }
+    if (currentControls?.quizPassThreshold !== dto.quizPassThreshold) {
+      auditEntries.push({
+        setting: 'quizPassThreshold',
+        oldValue: String(currentControls?.quizPassThreshold ?? 0.7),
+        newValue: String(dto.quizPassThreshold),
+      });
+    }
+    const oldLocked = JSON.stringify([...(currentChild.lockedSettings ?? [])].sort());
+    const newLocked = JSON.stringify([...dto.lockedSettings].sort());
+    if (oldLocked !== newLocked) {
+      auditEntries.push({ setting: 'lockedSettings', oldValue: oldLocked, newValue: newLocked });
+    }
+
+    if (auditEntries.length > 0) {
+      await this.prisma.settingsAudit.createMany({
+        data: auditEntries.map((entry) => ({
+          guardianId: guardian.id,
+          studentId: child.id,
+          setting: entry.setting,
+          oldValue: entry.oldValue,
+          newValue: entry.newValue,
+          ip,
+          userAgent,
+          createdAt: new Date(),
+        })),
+      });
+    }
+
+    const [companionControls] = await Promise.all([
+      this.prisma.companionControls.upsert({
+        where: { studentId: child.id },
+        update: {
+          answerRevealTiming: dto.answerRevealTiming,
+          quizPassThreshold: dto.quizPassThreshold,
+          lockedByGuardian: true,
+          lastChangedBy: guardianUser.name,
+        },
+        create: {
+          studentId: child.id,
+          answerRevealTiming: dto.answerRevealTiming,
+          quizPassThreshold: dto.quizPassThreshold,
+          lockedByGuardian: true,
+          lastChangedBy: guardianUser.name,
+        },
+      }),
+      this.prisma.user.update({
+        where: { id: child.id },
+        data: {
+          learningMode: newLearningMode as any,
+          lockedSettings: dto.lockedSettings,
+          invalidatePermissionsAt: new Date(),
+        },
+      }),
+    ]);
 
     return mapCompanionControls(companionControls);
   }
@@ -278,9 +547,7 @@ export class GuardianService {
 
     const updatedChild = await this.prisma.user.update({
       where: { id: childId },
-      data: {
-        name: dto.name.trim(),
-      },
+      data: { name: dto.name.trim() },
       select: {
         id: true,
         email: true,
@@ -345,9 +612,9 @@ export class GuardianService {
         name: child.name,
         streak: child.streakDays,
         lastActiveAt: child.lastActiveAt?.toISOString() ?? null,
-        subjects: progress.map((subjectProgress) => ({
-          name: subjectProgress.subjectName,
-          strengthLevel: subjectProgress.strengthLevel,
+        subjects: progress.map((sp) => ({
+          name: sp.subjectName,
+          strengthLevel: sp.strengthLevel,
         })),
       },
       progress,
@@ -359,25 +626,27 @@ export class GuardianService {
     childId: string,
   ): Promise<ChildCompanionContent> {
     const child = await this.getChildForGuardian(userId, childId);
-    const companionControls = await this.prisma.companionControls.findUnique({
-      where: { studentId: child.id },
-    });
+    const [companionControls, childUser] = await Promise.all([
+      this.prisma.companionControls.findUnique({ where: { studentId: child.id } }),
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: child.id },
+        select: { learningMode: true, lockedSettings: true },
+      }),
+    ]);
 
     return {
-      child: {
-        studentId: child.id,
-        name: child.name,
-      },
-      controls: companionControls
-        ? mapCompanionControls(companionControls)
-        : {
-            showCorrectAnswers: true,
-            allowHints: true,
-            allowSkip: false,
-            lockedByGuardian: true,
-            lastChangedAt: child.updatedAt.toISOString(),
-            lastChangedBy: 'Lernard',
-          },
+      child: { studentId: child.id, name: child.name },
+      controls: mapCompanionControls(
+        companionControls ?? {
+          answerRevealTiming: 'after_quiz',
+          quizPassThreshold: 0.7,
+          lockedByGuardian: true,
+          lastChangedAt: child.updatedAt,
+          lastChangedBy: 'Lernard',
+        },
+        childUser.learningMode,
+        childUser.lockedSettings,
+      ),
     };
   }
 
@@ -385,10 +654,7 @@ export class GuardianService {
     guardianId: string,
   ): Promise<GuardianChildOverview[]> {
     const children = await this.prisma.user.findMany({
-      where: {
-        controlledByGuardianId: guardianId,
-        deletedAt: null,
-      },
+      where: { controlledByGuardianId: guardianId, deletedAt: null },
       include: {
         subjectProgress: {
           include: { subject: true },
@@ -403,62 +669,47 @@ export class GuardianService {
       name: child.name,
       streak: child.streakDays,
       lastActiveAt: child.lastActiveAt?.toISOString() ?? null,
-      subjects: child.subjectProgress.map((subjectProgress) => ({
-        name: subjectProgress.subject.name,
-        strengthLevel: toSharedStrengthLevel(subjectProgress.strengthLevel),
+      subjects: child.subjectProgress.map((sp) => ({
+        name: sp.subject.name,
+        strengthLevel: toSharedStrengthLevel(sp.strengthLevel),
       })),
     }));
   }
 
   private async listPendingInvites(userId: string): Promise<PendingInvite[]> {
-    const pendingInviteSnapshots = await listPendingInviteSnapshots(
-      this.prisma,
-      userId,
-      10,
-    );
-    return pendingInviteSnapshots.map((pendingInviteSnapshot) => ({
-      id: pendingInviteSnapshot.id,
-      childEmail: pendingInviteSnapshot.childEmail,
-      code: pendingInviteSnapshot.code,
-      sentAt: pendingInviteSnapshot.createdAt,
-      status: pendingInviteSnapshot.usedAt
+    const snapshots = await listPendingInviteSnapshots(this.prisma, userId, 10);
+    return snapshots.map((s) => ({
+      id: s.id,
+      childEmail: s.childEmail,
+      code: s.code,
+      sentAt: s.createdAt,
+      status: s.usedAt
         ? 'Accepted'
-        : new Date(pendingInviteSnapshot.expiresAt) < new Date()
+        : new Date(s.expiresAt) < new Date()
           ? 'Expired'
           : 'Awaiting acceptance',
     }));
   }
 
-  private async buildSubjectProgress(
-    childId: string,
-  ): Promise<SubjectProgress[]> {
-    const progressRecords = await this.prisma.subjectProgress.findMany({
+  private async buildSubjectProgress(childId: string): Promise<SubjectProgress[]> {
+    const records = await this.prisma.subjectProgress.findMany({
       where: { userId: childId },
       include: { subject: true },
       orderBy: { updatedAt: 'desc' },
     });
 
-    return progressRecords.map((progressRecord) => ({
-      subjectId: progressRecord.subjectId,
-      subjectName: progressRecord.subject.name,
-      strengthLevel: toSharedStrengthLevel(progressRecord.strengthLevel),
-      topics: mapTopicStrengths(
-        progressRecord.topicScores,
-        progressRecord.updatedAt,
-      ),
-      lastActiveAt: progressRecord.updatedAt.toISOString(),
+    return records.map((r) => ({
+      subjectId: r.subjectId,
+      subjectName: r.subject.name,
+      strengthLevel: toSharedStrengthLevel(r.strengthLevel),
+      topics: mapTopicStrengths(r.topicScores, r.updatedAt),
+      lastActiveAt: r.updatedAt.toISOString(),
     }));
   }
 
   private async getGuardianByUserId(userId: string) {
-    const guardian = await this.prisma.guardian.findUnique({
-      where: { userId },
-    });
-
-    if (!guardian) {
-      throw new NotFoundException('Guardian account not found');
-    }
-
+    const guardian = await this.prisma.guardian.findUnique({ where: { userId } });
+    if (!guardian) throw new NotFoundException('Guardian account not found');
     return guardian;
   }
 
@@ -467,27 +718,18 @@ export class GuardianService {
       this.getGuardianByUserId(userId),
       this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
-        select: { name: true },
+        select: { name: true, email: true },
       }),
     ]);
-
     return { guardian, guardianUser };
   }
 
   private async getChildForGuardian(userId: string, childId: string) {
     const guardian = await this.getGuardianByUserId(userId);
     const child = await this.prisma.user.findFirst({
-      where: {
-        id: childId,
-        controlledByGuardianId: guardian.id,
-        deletedAt: null,
-      },
+      where: { id: childId, controlledByGuardianId: guardian.id, deletedAt: null },
     });
-
-    if (!child) {
-      throw new NotFoundException('Child not found');
-    }
-
+    if (!child) throw new NotFoundException('Child not found');
     return child;
   }
 }
@@ -495,28 +737,14 @@ export class GuardianService {
 function buildGuardianPermissions(
   children: GuardianChildOverview[],
 ): ScopedPermission[] {
-  return children.flatMap((child) =>
-    buildGuardianChildPermissions(child.studentId),
-  );
+  return children.flatMap((child) => buildGuardianChildPermissions(child.studentId));
 }
 
 function buildGuardianChildPermissions(childId: string): ScopedPermission[] {
   return [
-    {
-      action: 'can_edit_child_settings',
-      resourceId: childId,
-      resourceType: 'child',
-    },
-    {
-      action: 'can_view_child_progress',
-      resourceId: childId,
-      resourceType: 'child',
-    },
-    {
-      action: 'can_change_companion_controls',
-      resourceId: childId,
-      resourceType: 'child',
-    },
+    { action: 'can_edit_child_settings', resourceId: childId, resourceType: 'child' },
+    { action: 'can_view_child_progress', resourceId: childId, resourceType: 'child' },
+    { action: 'can_change_companion_controls', resourceId: childId, resourceType: 'child' },
   ];
 }
 
@@ -524,17 +752,13 @@ function generateInviteCode(): string {
   return String(randomInt(100000, 999999));
 }
 
-function daysFromNow(days: number): Date {
-  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+function hoursFromNow(hours: number): Date {
+  return new Date(Date.now() + hours * 60 * 60 * 1000);
 }
 
 function isWithinLastDays(value: string | null, days: number): boolean {
-  if (!value) {
-    return false;
-  }
-
-  const threshold = Date.now() - days * 24 * 60 * 60 * 1000;
-  return new Date(value).getTime() >= threshold;
+  if (!value) return false;
+  return new Date(value).getTime() >= Date.now() - days * 24 * 60 * 60 * 1000;
 }
 
 function mapPendingInvite(invite: {
@@ -558,76 +782,49 @@ function mapPendingInvite(invite: {
   };
 }
 
-function mapCompanionControls(companionControls: {
-  showCorrectAnswers: boolean;
-  allowHints: boolean;
-  allowSkip: boolean;
-  lockedByGuardian: boolean;
-  lastChangedAt: Date;
-  lastChangedBy: string;
-}): CompanionControls {
+function mapCompanionControls(
+  controls: {
+    answerRevealTiming: string;
+    quizPassThreshold: number;
+    lockedByGuardian: boolean;
+    lastChangedAt: Date;
+    lastChangedBy: string;
+  },
+  learningMode?: string,
+  lockedSettings?: string[],
+): CompanionControls {
   return {
-    showCorrectAnswers: companionControls.showCorrectAnswers,
-    allowHints: companionControls.allowHints,
-    allowSkip: companionControls.allowSkip,
-    lockedByGuardian: companionControls.lockedByGuardian,
-    lastChangedAt: companionControls.lastChangedAt.toISOString(),
-    lastChangedBy: companionControls.lastChangedBy,
-  };
+    showCorrectAnswers: controls.answerRevealTiming === 'immediate',
+    allowHints: true,
+    allowSkip: false,
+    lockedByGuardian: controls.lockedByGuardian,
+    lastChangedAt: controls.lastChangedAt.toISOString(),
+    lastChangedBy: controls.lastChangedBy,
+    // Extended spec fields
+    ...(learningMode !== undefined && { learningMode: learningMode === 'COMPANION' ? 'companion' : 'guide' }),
+    ...(lockedSettings !== undefined && { lockedSettings }),
+    answerRevealTiming: controls.answerRevealTiming as 'after_quiz' | 'immediate',
+    quizPassThreshold: controls.quizPassThreshold,
+  } as CompanionControls;
 }
 
-function mapTopicStrengths(
-  topicScores: unknown,
-  updatedAt: Date,
-): TopicStrength[] {
-  if (
-    !topicScores ||
-    typeof topicScores !== 'object' ||
-    Array.isArray(topicScores)
-  ) {
+function mapTopicStrengths(topicScores: unknown, updatedAt: Date): TopicStrength[] {
+  if (!topicScores || typeof topicScores !== 'object' || Array.isArray(topicScores)) {
     return [];
   }
-
   return Object.entries(topicScores)
     .flatMap(([topic, rawScore]) => {
-      if (typeof rawScore !== 'number' || Number.isNaN(rawScore)) {
-        return [];
-      }
-
-      const normalizedScore =
-        rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
-
-      return [
-        {
-          topic,
-          level: toTopicLevel(normalizedScore),
-          score: normalizedScore,
-          lastTestedAt: updatedAt.toISOString(),
-        },
-      ];
+      if (typeof rawScore !== 'number' || Number.isNaN(rawScore)) return [];
+      const score = rawScore <= 1 ? Math.round(rawScore * 100) : Math.round(rawScore);
+      return [{ topic, level: toTopicLevel(score), score, lastTestedAt: updatedAt.toISOString() }];
     })
-    .sort((left, right) => right.score - left.score);
+    .sort((a, b) => b.score - a.score);
 }
 
 function toTopicLevel(score: number): TopicStrength['level'] {
-  if (score >= 80) {
-    return 'confident';
-  }
-
-  if (score >= 60) {
-    return 'getting_there';
-  }
-
+  if (score >= 80) return 'confident';
+  if (score >= 60) return 'getting_there';
   return 'needs_work';
-}
-
-function ensureSettingLocked(
-  existingSettings: string[],
-  settingKey: string,
-): string[] {
-  return existingSettings.includes(settingKey)
-    ? existingSettings
-    : [...existingSettings, settingKey];
 }
 
 function mapGuardianManagedChildSettings(
@@ -644,9 +841,8 @@ function mapGuardianManagedChildSettings(
     lockedSettings: string[];
   },
   companionControls: {
-    showCorrectAnswers: boolean;
-    allowHints: boolean;
-    allowSkip: boolean;
+    answerRevealTiming: string;
+    quizPassThreshold: number;
     lockedByGuardian: boolean;
     lastChangedAt: Date;
     lastChangedBy: string;
@@ -665,8 +861,6 @@ function mapGuardianManagedChildSettings(
       notificationsEnabled: child.notificationsEnabled,
     },
     lockedSettings: child.lockedSettings,
-    companionControls: companionControls
-      ? mapCompanionControls(companionControls)
-      : null,
+    companionControls: companionControls ? mapCompanionControls(companionControls) : null,
   };
 }

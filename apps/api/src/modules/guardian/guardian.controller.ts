@@ -6,11 +6,14 @@ import {
   Patch,
   Param,
   Body,
+  Req,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { GuardianService } from './guardian.service';
 import {
   InviteChildDto,
   AcceptInviteDto,
+  DeclineInviteDto,
   UpdateChildCompanionControlsDto,
   UpdateChildSettingsDto,
 } from './dto/guardian.dto';
@@ -50,9 +53,21 @@ export class GuardianController {
   }
 
   @ProtectedRoute()
+  @Get('children/pending-invite-for-me')
+  async getPendingInviteForMe(@CurrentUser() user: User) {
+    return this.guardianService.getPendingInviteForMe(user.id);
+  }
+
+  @ProtectedRoute()
   @Post('children/accept-invite')
   async acceptInvite(@CurrentUser() user: User, @Body() dto: AcceptInviteDto) {
     return this.guardianService.acceptInvite(user.id, dto.code);
+  }
+
+  @ProtectedRoute()
+  @Post('children/decline-invite')
+  async declineInvite(@CurrentUser() user: User, @Body() dto: DeclineInviteDto) {
+    return this.guardianService.declineInvite(user.id, dto.code);
   }
 
   @ProtectedRoute({ roles: [Role.GUARDIAN] })
@@ -108,6 +123,15 @@ export class GuardianController {
   }
 
   @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
+  @Post('children/:childId/resend-setup')
+  async resendSetup(
+    @CurrentUser() user: User,
+    @Param('childId') childId: string,
+  ) {
+    return this.guardianService.resendSetup(user.id, childId);
+  }
+
+  @ProtectedRoute({ roles: [Role.GUARDIAN], ownershipCheck: true })
   @Get('children/:childId/progress')
   async getChildProgress(
     @CurrentUser() user: User,
@@ -140,11 +164,16 @@ export class GuardianController {
     @CurrentUser() user: User,
     @Param('childId') childId: string,
     @Body() dto: UpdateChildCompanionControlsDto,
+    @Req() req: Request,
   ) {
+    const ip = (req.headers['x-forwarded-for'] as string) ?? req.socket.remoteAddress ?? '';
+    const userAgent = req.headers['user-agent'] ?? '';
     return this.guardianService.updateChildCompanionControls(
       user.id,
       childId,
       dto,
+      ip,
+      userAgent,
     );
   }
 }
