@@ -52,6 +52,7 @@ export function QuizEntryClient() {
     const initialTopic = params.get("topic") ?? "";
 
     const [source, setSource] = useState<Source>("text");
+    const [style, setStyle] = useState<"standard" | "zimsec">("standard");
     const [topic, setTopic] = useState(initialTopic);
     const [questionCount, setQuestionCount] = useState(10);
     const [loading, setLoading] = useState(false);
@@ -170,6 +171,10 @@ export function QuizEntryClient() {
                 body.fromUploadKind = uploadResult.kind;
             }
 
+            if (style === "zimsec") {
+                body.style = "zimsec";
+            }
+
             const response = await browserApiFetch<{ quizId: string }>(ROUTES.QUIZZES.GENERATE, {
                 method: "POST",
                 body: JSON.stringify(body),
@@ -188,6 +193,37 @@ export function QuizEntryClient() {
                 <CardDescription>Build a quiz on this topic.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
+                {/* Question style */}
+                <div>
+                    <Label className="mb-2 block">Question style</Label>
+                    <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-border bg-background-subtle p-1">
+                        {(
+                            [
+                                { id: "standard", label: "Standard" },
+                                { id: "zimsec", label: "ZIMSEC" },
+                            ] as const
+                        ).map((opt) => (
+                            <button
+                                className={`rounded-lg px-3 py-2 text-xs font-medium transition-all ${
+                                    style === opt.id
+                                        ? "bg-white text-text-primary shadow-sm"
+                                        : "text-text-tertiary hover:text-text-secondary"
+                                }`}
+                                key={opt.id}
+                                onClick={() => setStyle(opt.id)}
+                                type="button"
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                    {style === "zimsec" ? (
+                        <p className="mt-1.5 text-xs text-text-tertiary">
+                            Structured multi-part exam-style questions with marking schemes
+                        </p>
+                    ) : null}
+                </div>
+
                 {/* Source tabs */}
                 <div>
                     <Label className="mb-2 block">Generate quiz from</Label>
