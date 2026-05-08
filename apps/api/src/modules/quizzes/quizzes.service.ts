@@ -529,7 +529,7 @@ export class QuizzesService {
       const ratio = correct / total;
       if (ratio >= 0.8) strong.push(sub);
       else if (ratio < 0.5) needsWork.push(sub);
-      else revisitSoon.push(sub);
+      else revisitSoon.push(sub); 
     }
 
     await (this.prisma as any).quiz.update({
