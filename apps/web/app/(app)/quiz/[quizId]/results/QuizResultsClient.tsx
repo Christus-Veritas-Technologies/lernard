@@ -39,8 +39,7 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
         <div className="flex flex-col gap-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>Lernard debrief</CardTitle>
-                    <CardDescription>You are improving with every attempt.</CardDescription>
+                    <CardTitle>{result.debriefText}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                     <Progress value={percentage} />
@@ -73,16 +72,36 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
                     <CardTitle>Question Review</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    {result.questions.map((question, index) => (
-                        <div className="rounded-2xl border border-border p-4" key={`${index}-${question.text}`}>
-                            <p className="font-medium text-text-primary">{question.text}</p>
-                            <p className="mt-2 text-sm text-text-secondary">Your answer: {question.studentAnswer}</p>
-                            {question.correctAnswer ? (
-                                <p className="text-sm text-text-secondary">Correct: {question.correctAnswer}</p>
-                            ) : null}
-                            <p className="mt-1 text-sm text-text-secondary">{question.explanation}</p>
-                        </div>
-                    ))}
+                    {result.questions.map((question, index) => {
+                        const evalColor =
+                            question.evaluationResult === "correct"
+                                ? "border-green-200"
+                                : question.evaluationResult === "partial"
+                                  ? "border-amber-200"
+                                  : question.isCorrect
+                                    ? "border-green-200"
+                                    : "border-red-200";
+                        return (
+                            <div className={`rounded-2xl border p-4 ${evalColor}`} key={`${index}-${question.text}`}>
+                                <div className="flex items-start justify-between gap-2">
+                                    <p className="font-medium text-text-primary">{question.text}</p>
+                                    {question.subtopic ? (
+                                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-text-tertiary">
+                                            {question.subtopic}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                <p className="mt-2 text-sm text-text-secondary">Your answer: {question.studentAnswer}</p>
+                                {question.correctAnswer ? (
+                                    <p className="text-sm text-text-secondary">Correct: {question.correctAnswer}</p>
+                                ) : null}
+                                {question.feedback ? (
+                                    <p className="mt-1 text-sm font-medium text-text-secondary">{question.feedback}</p>
+                                ) : null}
+                                <p className="mt-1 text-sm text-text-secondary">{question.explanation}</p>
+                            </div>
+                        );
+                    })}
                 </CardContent>
             </Card>
 

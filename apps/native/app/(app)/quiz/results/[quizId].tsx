@@ -46,8 +46,7 @@ export default function QuizResultsScreen() {
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Score card */}
         <View className="mx-4 mt-6 rounded-2xl border border-slate-100 bg-slate-50 p-5">
-          <Text className="mb-1 text-lg font-bold text-slate-900">Lernard debrief</Text>
-          <Text className="mb-4 text-sm text-slate-500">You are improving with every attempt.</Text>
+          <Text className="mb-4 text-sm font-semibold text-slate-900">{result.debriefText}</Text>
           {/* Progress bar */}
           <View className="mb-2 h-2 w-full rounded-full bg-slate-200">
             <View
@@ -66,21 +65,36 @@ export default function QuizResultsScreen() {
         {/* Question review */}
         <View className="mx-4 mt-5">
           <Text className="mb-3 text-base font-semibold text-slate-900">Question Review</Text>
-          {result.questions.map((q, index) => (
-            <View
-              key={index}
-              className={`mb-3 rounded-2xl border p-4 ${q.isCorrect ? 'border-green-100 bg-green-50' : 'border-red-100 bg-red-50'}`}
-            >
-              <Text className="mb-1 text-sm font-semibold text-slate-900">
-                {index + 1}. {q.text}
-              </Text>
-              <Text className="text-xs text-slate-500">Your answer: {q.studentAnswer}</Text>
-              {q.correctAnswer ? (
-                <Text className="text-xs text-slate-500">Correct: {q.correctAnswer}</Text>
-              ) : null}
-              <Text className="mt-1 text-xs text-slate-600">{q.explanation}</Text>
-            </View>
-          ))}
+          {result.questions.map((q, index) => {
+            const borderColor =
+              q.evaluationResult === 'correct' || q.isCorrect
+                ? 'border-green-100 bg-green-50'
+                : q.evaluationResult === 'partial'
+                  ? 'border-amber-100 bg-amber-50'
+                  : 'border-red-100 bg-red-50';
+            return (
+              <View key={index} className={`mb-3 rounded-2xl border p-4 ${borderColor}`}>
+                <View className="flex-row items-start justify-between mb-1">
+                  <Text className="flex-1 text-sm font-semibold text-slate-900">
+                    {index + 1}. {q.text}
+                  </Text>
+                </View>
+                {q.subtopic ? (
+                  <View className="mb-1 self-start rounded-full bg-slate-100 px-2 py-0.5">
+                    <Text className="text-xs text-slate-500">{q.subtopic}</Text>
+                  </View>
+                ) : null}
+                <Text className="text-xs text-slate-500">Your answer: {q.studentAnswer}</Text>
+                {q.correctAnswer ? (
+                  <Text className="text-xs text-slate-500">Correct: {q.correctAnswer}</Text>
+                ) : null}
+                {q.feedback ? (
+                  <Text className="mt-1 text-xs font-medium text-slate-700">{q.feedback}</Text>
+                ) : null}
+                <Text className="mt-1 text-xs text-slate-600">{q.explanation}</Text>
+              </View>
+            );
+          })}
         </View>
 
         <View className="h-6" />
