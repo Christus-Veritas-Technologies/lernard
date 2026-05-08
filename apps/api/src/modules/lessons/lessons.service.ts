@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { LessonContent, PostLessonResult } from '@lernard/shared-types';
 import type { User } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -13,6 +13,8 @@ import {
 
 @Injectable()
 export class LessonsService {
+  private readonly logger = new Logger(LessonsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mastraService: MastraService,
@@ -23,30 +25,79 @@ export class LessonsService {
     user: User,
     dto: GenerateLessonDto,
   ): Promise<{ lessonId: string; status: string }> {
-    const studentContext = await this.studentContextBuilder.buildForUser(
-      user.id,
+    const startedAt = Date.now();
+    const idempotencyKeyShort = dto.idempotencyKey.slice(0, 8);
+    const subject = dto.subject ?? 'General';
+    const topicPreview = dto.topic.trim().slice(0, 80);
+    let stage = 'build_student_context';
+
+    this.logger.log(
+      `[lesson.generate] start userId=${user.id} key=${idempotencyKeyShort} depth=${dto.depth} subject="${subject}" topic="${topicPreview}"`,
     );
-    const generated = await this.mastraService.generateLesson({
-      topic: dto.topic,
-      depth: dto.depth,
-      subjectName: dto.subject,
-      studentContext,
-    });
 
-    await validateGeneratedContent(generated, this.mastraService);
+    try {
+      const contextStartedAt = Date.now();
+      const studentContext = await this.studentContextBuilder.buildForUser(
+        user.id,
+      );
+      this.logger.log(
+        `[lesson.generate] context_ready userId=${user.id} key=${idempotencyKeyShort} durationMs=${Date.now() - contextStartedAt}`,
+      );
 
-    const lesson = await (this.prisma as any).lesson.create({
-      data: {
-        userId: user.id,
-        topic: generated.topic,
-        depth: generated.depth,
-        status: 'READY',
-        estimatedMinutes: generated.estimatedMinutes,
-        sections: generated.sections,
-      },
-    });
+      stage = 'generate_lesson';
+      const generateStartedAt = Date.now();
+      const generated = await this.mastraService.generateLesson({
+        topic: dto.topic,
+        depth: dto.depth,
+        subjectName: dto.subject,
+        studentContext,
+      });
+      this.logger.log(
+        `[lesson.generate] generated userId=${user.id} key=${idempotencyKeyShort} sections=${generated.sections.length} estimatedMinutes=${generated.estimatedMinutes} durationMs=${Date.now() - generateStartedAt}`,
+      );
 
-    return { lessonId: lesson.id, status: 'ready' };
+      stage = 'validate_generated_content';
+      const validateStartedAt = Date.now();
+      await validateGeneratedContent(generated, this.mastraService);
+      this.logger.log(
+        `[lesson.generate] validated userId=${user.id} key=${idempotencyKeyShort} durationMs=${Date.now() - validateStartedAt}`,
+      );
+
+      stage = 'persist_lesson';
+      const persistStartedAt = Date.now();
+      const lesson = await (this.prisma as any).lesson.create({
+        data: {
+          userId: user.id,
+          topic: generated.topic,
+          depth: generated.depth,
+          status: 'READY',
+          estimatedMinutes: generated.estimatedMinutes,
+          sections: generated.sections,
+        },
+      });
+      this.logger.log(
+        `[lesson.generate] persisted userId=${user.id} key=${idempotencyKeyShort} lessonId=${lesson.id} durationMs=${Date.now() - persistStartedAt}`,
+      );
+
+      this.logger.log(
+        `[lesson.generate] success userId=${user.id} key=${idempotencyKeyShort} lessonId=${lesson.id} totalMs=${Date.now() - startedAt}`,
+      );
+
+      return { lessonId: lesson.id, status: 'ready' };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : 'Unknown error';
+      const stack = error instanceof Error ? error.stack : undefined;
+
+      this.logger.error(
+        `[lesson.generate] failed userId=${user.id} key=${idempotencyKeyShort} stage=${stage} totalMs=${Date.now() - startedAt} error="${message}"`,
+        stack,
+      );
+
+      throw error;
+    }
   }
 
   async list(user: User): Promise<

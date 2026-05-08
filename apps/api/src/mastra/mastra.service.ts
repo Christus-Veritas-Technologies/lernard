@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type {
   ChatMessageBlock,
@@ -138,6 +138,7 @@ const CHAT_TOOLS = [
 
 @Injectable()
 export class MastraService {
+  private readonly logger = new Logger(MastraService.name);
   private readonly apiKey: string;
 
   constructor(private readonly configService: ConfigService) {
@@ -542,6 +543,11 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
         baseDelayMs: 400,
       });
     } catch (error) {
+      const message =
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : 'Unknown error';
+      this.logger.error(`[mastra.retry] exhausted error="${message}"`);
       if (error instanceof ContentValidationError) {
         throw new InternalServerErrorException(LERNARD_OUTAGE_MESSAGE);
       }
@@ -555,22 +561,43 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
     systemPrompt: string;
     messages: ClaudeMessage[];
   }): Promise<string> {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: input.model,
-        max_tokens: input.maxTokens,
-        system: input.systemPrompt,
-        messages: input.messages,
-      }),
-    });
+    const startedAt = Date.now();
+    this.logger.log(
+      `[mastra.completeText] request_start model=${input.model} maxTokens=${input.maxTokens} messageCount=${input.messages.length}`,
+    );
+
+    let response: Response;
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: input.model,
+          max_tokens: input.maxTokens,
+          system: input.systemPrompt,
+          messages: input.messages,
+        }),
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : 'Unknown fetch error';
+      this.logger.error(
+        `[mastra.completeText] request_error model=${input.model} durationMs=${Date.now() - startedAt} error="${message}"`,
+      );
+      throw error;
+    }
 
     if (!response.ok) {
+      const bodyText = await response.text().catch(() => '<unavailable>');
+      this.logger.error(
+        `[mastra.completeText] request_failed model=${input.model} status=${response.status} statusText="${response.statusText}" durationMs=${Date.now() - startedAt} body="${truncateForLog(bodyText, 1200)}"`,
+      );
       throw new InternalServerErrorException('Claude completion failed');
     }
 
@@ -580,10 +607,17 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
 
     const text = json.content?.find((block) => block.type === 'text')?.text;
     if (!text) {
+      this.logger.error(
+        `[mastra.completeText] empty_text_response model=${input.model} durationMs=${Date.now() - startedAt}`,
+      );
       throw new InternalServerErrorException(
         'Claude completion returned empty text',
       );
     }
+
+    this.logger.log(
+      `[mastra.completeText] request_success model=${input.model} durationMs=${Date.now() - startedAt} textChars=${text.length}`,
+    );
 
     return text;
   }
@@ -966,6 +1000,13 @@ function safeJsonParse<T>(value: string): T | null {
   } catch {
     return null;
   }
+}
+
+function truncateForLog(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength)}...`;
 }
 
 function splitMarkdownAndCodeBlocks(content: string): ChatMessageBlock[] {
