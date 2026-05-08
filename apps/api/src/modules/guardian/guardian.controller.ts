@@ -16,6 +16,8 @@ import {
   DeclineInviteDto,
   UpdateChildCompanionControlsDto,
   UpdateChildSettingsDto,
+  UpdateGuardianProfileDto,
+  UpdateGuardianNotificationsDto,
 } from './dto/guardian.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
@@ -175,5 +177,25 @@ export class GuardianController {
       ip,
       userAgent,
     );
+  }
+
+  @ProtectedRoute({ roles: [Role.GUARDIAN] })
+  @Patch('settings/profile')
+  async updateGuardianProfile(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateGuardianProfileDto,
+  ) {
+    await this.guardianService.updateGuardianProfile(user.id, dto);
+    return { ok: true };
+  }
+
+  @ProtectedRoute({ roles: [Role.GUARDIAN] })
+  @Patch('settings/notifications')
+  async updateGuardianNotifications(
+    @CurrentUser() user: User,
+    @Body() dto: UpdateGuardianNotificationsDto,
+  ) {
+    await this.guardianService.updateGuardianNotifications(user.id, dto);
+    return { ok: true };
   }
 }

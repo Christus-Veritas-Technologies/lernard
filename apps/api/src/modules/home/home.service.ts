@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import { Plan } from '@prisma/client';
 import type {
   DayActivity,
   HomeContent,
   PagePayload,
+  PlanUsage,
   ScopedPermission,
   SlotAssignments,
   StrengthBreakdown,
@@ -10,6 +12,7 @@ import type {
   TopicSummary,
 } from '@lernard/shared-types';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../redis/redis.service';
 import {
   buildNullSlots,
   buildPagePayload,
@@ -20,7 +23,10 @@ const FIRST_LOOK_BASELINE_KEY = '__first_look__';
 
 @Injectable()
 export class HomeService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
 
   async getPayload(userId: string): Promise<PagePayload<HomeContent>> {
     const [user, userSubjects, subjectProgress, recentSessions, sessionsToday] =
@@ -34,6 +40,8 @@ export class HomeService {
             dailyGoal: true,
             sessionCount: true,
             firstLookComplete: true,
+            plan: true,
+            billingAnchorDay: true,
           },
         }),
         this.prisma.userSubject.findMany({
@@ -200,6 +208,8 @@ export class HomeService {
       };
     });
 
+    const planUsage = await this.getPlanUsage(userId, user.plan, user.billingAnchorDay);
+
     const content: HomeContent = {
       greeting: buildGreeting(user.name),
       streak: user.streakDays,
@@ -233,6 +243,7 @@ export class HomeService {
         subjectName: session.subjectName ?? 'General',
         completedAt: session.completedAt.toISOString(),
       })),
+      planUsage,
     };
 
     return buildPagePayload(content, {
@@ -240,6 +251,86 @@ export class HomeService {
       slots: buildHomeSlots(user.firstLookComplete),
     });
   }
+
+  private async getPlanUsage(
+    userId: string,
+    plan: Plan,
+    billingAnchorDay: number | null,
+  ): Promise<PlanUsage> {
+    const anchor = billingAnchorDay ?? 1;
+    const isDaily = plan === Plan.EXPLORER;
+
+    const lessonsKey = isDaily
+      ? `rate:${userId}:lessons:day:${todayKey()}`
+      : `rate:${userId}:lessons:month:${billingPeriodKey(anchor)}`;
+    const quizzesKey = isDaily
+      ? `rate:${userId}:quizzes:day:${todayKey()}`
+      : `rate:${userId}:quizzes:month:${billingPeriodKey(anchor)}`;
+
+    const [lessonsUsed, quizzesUsed] = await Promise.all([
+      this.redis.getCount(lessonsKey),
+      this.redis.getCount(quizzesKey),
+    ]);
+
+    const limits: Record<Plan, { lessons: number; quizzes: number }> = {
+      [Plan.EXPLORER]: { lessons: 2, quizzes: 0 },
+      [Plan.SCHOLAR]: { lessons: 80, quizzes: 80 },
+      [Plan.HOUSEHOLD]: { lessons: 100, quizzes: 100 },
+      [Plan.CAMPUS]: { lessons: 200, quizzes: 200 },
+    };
+
+    const { lessons: lessonsLimit, quizzes: quizzesLimit } = limits[plan];
+    const resetAt = isDaily ? tomorrowMidnightIso() : nextBillingAnchorIso(anchor);
+
+    return {
+      plan: plan.toLowerCase() as PlanUsage['plan'],
+      lessonsUsed,
+      lessonsLimit,
+      quizzesUsed,
+      quizzesLimit,
+      resetAt,
+    };
+  }
+}
+
+function todayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function billingPeriodKey(anchorDay: number): string {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const day = now.getUTCDate();
+
+  let pYear = year;
+  let pMonth = month;
+  if (day < anchorDay) {
+    pMonth = month - 1;
+    if (pMonth < 0) { pMonth = 11; pYear = year - 1; }
+  }
+  const mm = String(pMonth + 1).padStart(2, '0');
+  const dd = String(anchorDay).padStart(2, '0');
+  return `${pYear}-${mm}-${dd}`;
+}
+
+function tomorrowMidnightIso(): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + 1);
+  d.setUTCHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+function nextBillingAnchorIso(anchorDay: number): string {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const day = now.getUTCDate();
+
+  let nextYear = year;
+  let nextMonth = day < anchorDay ? month : month + 1;
+  if (nextMonth > 11) { nextMonth = 0; nextYear = year + 1; }
+  return new Date(Date.UTC(nextYear, nextMonth, anchorDay)).toISOString();
 }
 
 function buildGreeting(name: string): string {

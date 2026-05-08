@@ -427,6 +427,73 @@ export class MastraService {
     }
   }
 
+  async generateProgressSummary(input: {
+    recentLessons: Array<{ topic: string; subjectName: string; confidenceRating: number | null }>;
+    recentQuizzes: Array<{ topic: string; subjectName: string; score: number; totalQuestions: number }>;
+    growthAreas: Array<{ topic: string; subjectName: string; score: number; flagCount: number }>;
+    topSubjects: string[];
+    streak: number;
+    plan: string;
+  }): Promise<import('@lernard/shared-types').ProgressSummary | null> {
+    if (this.devMode) {
+      return {
+        strengthTopic: input.recentLessons[0]?.topic ?? null,
+        strengthEvidence: 'Dev mode — no real evidence available.',
+        gapTopic: input.growthAreas[0]?.topic ?? 'a topic',
+        gapEvidence: `Score ${input.growthAreas[0]?.score ?? 0}%`,
+        nextActionTopic: input.growthAreas[0]?.topic ?? input.recentLessons[0]?.topic ?? 'any topic',
+        nextActionDepth: 'standard',
+        nextActionSubject: input.growthAreas[0]?.subjectName ?? input.topSubjects[0] ?? 'General',
+        summaryParagraph: 'Dev mode progress summary. Generate a lesson to get started.',
+      };
+    }
+
+    const isExplorer = input.plan === 'explorer';
+    const systemPrompt = isExplorer
+      ? `You are Lernard's progress analyst. Return ONLY valid JSON with this shape:
+{"gapTopic":"...","gapEvidence":"...","nextActionTopic":"...","nextActionDepth":"standard","nextActionSubject":"...","summaryParagraph":"..."}
+Be specific. Name exact topics. Keep each field concise (1-2 sentences max for summaryParagraph).`
+      : `You are Lernard's progress analyst. Return ONLY valid JSON with this shape:
+{"strengthTopic":"...","strengthEvidence":"...","gapTopic":"...","gapEvidence":"...","nextActionTopic":"...","nextActionDepth":"standard","nextActionSubject":"...","summaryParagraph":"..."}
+Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering strength, gap, and next step.`;
+
+    const text = await completeWithRetry(() =>
+      this.completeText({
+        model: HAIKU_MODEL,
+        maxTokens: 400,
+        systemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: JSON.stringify({
+              recentLessons: input.recentLessons,
+              recentQuizzes: input.recentQuizzes,
+              growthAreas: input.growthAreas,
+              topSubjects: input.topSubjects,
+              streak: input.streak,
+            }),
+          },
+        ],
+      }),
+    );
+
+    const parsed = safeJsonParse<Record<string, string>>(text);
+    if (!parsed || !parsed.gapTopic || !parsed.nextActionTopic) {
+      return null;
+    }
+
+    return {
+      strengthTopic: parsed.strengthTopic ?? null,
+      strengthEvidence: parsed.strengthEvidence ?? null,
+      gapTopic: parsed.gapTopic,
+      gapEvidence: parsed.gapEvidence ?? '',
+      nextActionTopic: parsed.nextActionTopic,
+      nextActionDepth: (parsed.nextActionDepth as 'quick' | 'standard' | 'deep') ?? 'standard',
+      nextActionSubject: parsed.nextActionSubject ?? input.topSubjects[0] ?? 'General',
+      summaryParagraph: parsed.summaryParagraph ?? '',
+    };
+  }
+
   async generateSlotContent(input: {
     slotType: string;
     context: Record<string, unknown>;

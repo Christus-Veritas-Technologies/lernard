@@ -732,6 +732,55 @@ export class GuardianService {
     if (!child) throw new NotFoundException('Child not found');
     return child;
   }
+
+  async updateGuardianProfile(
+    userId: string,
+    dto: { name?: string; contactPreference?: 'email' | 'push' | 'both'; dashboardDefault?: 'overview' | 'last_viewed' | 'most_recent' },
+  ): Promise<void> {
+    const guardian = await this.getGuardianByUserId(userId);
+    await Promise.all([
+      dto.name !== undefined
+        ? this.prisma.user.update({ where: { id: userId }, data: { name: dto.name } })
+        : Promise.resolve(),
+      (dto.contactPreference !== undefined || dto.dashboardDefault !== undefined)
+        ? this.prisma.guardian.update({
+            where: { id: guardian.id },
+            data: {
+              ...(dto.contactPreference !== undefined && { contactPreference: dto.contactPreference }),
+              ...(dto.dashboardDefault !== undefined && { dashboardDefault: dto.dashboardDefault }),
+            },
+          })
+        : Promise.resolve(),
+    ]);
+  }
+
+  async updateGuardianNotifications(
+    userId: string,
+    dto: { weeklyFamilySummary?: boolean; unsubscribeAll?: boolean; perChildAlerts?: Array<{ childId: string; enabled: boolean; frequency?: string; streakAlert?: boolean }> },
+  ): Promise<void> {
+    const guardian = await this.getGuardianByUserId(userId);
+    if (dto.weeklyFamilySummary !== undefined || dto.unsubscribeAll !== undefined) {
+      await this.prisma.guardian.update({
+        where: { id: guardian.id },
+        data: {
+          ...(dto.weeklyFamilySummary !== undefined && { weeklyFamilySummary: dto.weeklyFamilySummary }),
+          ...(dto.unsubscribeAll !== undefined && { unsubscribeAll: dto.unsubscribeAll }),
+        },
+      });
+    }
+    // perChildAlerts: stored as lockedSettings or future child notification prefs — stored on child user notificationsEnabled for now
+    if (dto.perChildAlerts?.length) {
+      await Promise.all(
+        dto.perChildAlerts.map(async (alert) => {
+          const child = await this.getChildForGuardian(userId, alert.childId);
+          await this.prisma.user.update({
+            where: { id: child.id },
+            data: { notificationsEnabled: alert.enabled },
+          });
+        }),
+      );
+    }
+  }
 }
 
 function buildGuardianPermissions(

@@ -9,7 +9,10 @@ import {
   Min,
   Max,
   IsArray,
+  IsBoolean,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class InviteChildDto {
   @IsEmail()
@@ -57,4 +60,52 @@ export class UpdateChildSettingsDto {
   @MinLength(1)
   @MaxLength(50)
   name: string;
+}
+
+export class UpdateGuardianProfileDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(50)
+  @IsOptional()
+  name?: string;
+
+  @IsIn(['email', 'push', 'both'])
+  @IsOptional()
+  contactPreference?: 'email' | 'push' | 'both';
+
+  @IsIn(['overview', 'last_viewed', 'most_recent'])
+  @IsOptional()
+  dashboardDefault?: 'overview' | 'last_viewed' | 'most_recent';
+}
+
+export class PerChildAlertDto {
+  @IsString()
+  childId: string;
+
+  @IsBoolean()
+  enabled: boolean;
+
+  @IsIn(['every_session', 'daily_summary', 'weekly_summary'])
+  @IsOptional()
+  frequency?: 'every_session' | 'daily_summary' | 'weekly_summary';
+
+  @IsBoolean()
+  @IsOptional()
+  streakAlert?: boolean;
+}
+
+export class UpdateGuardianNotificationsDto {
+  @IsBoolean()
+  @IsOptional()
+  weeklyFamilySummary?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  unsubscribeAll?: boolean;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PerChildAlertDto)
+  @IsOptional()
+  perChildAlerts?: PerChildAlertDto[];
 }

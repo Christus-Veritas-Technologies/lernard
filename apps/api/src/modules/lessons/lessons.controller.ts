@@ -1,7 +1,11 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
+import {
+  CheckPlanLimit,
+  PlanLimitsGuard,
+} from '../../common/guards/plan-limits.guard';
 import {
   CompleteLessonDto,
   GenerateLessonDto,
@@ -20,6 +24,8 @@ export class LessonsController {
   }
 
   @ProtectedRoute()
+  @UseGuards(PlanLimitsGuard)
+  @CheckPlanLimit('lessons')
   @Post('generate')
   async generate(@CurrentUser() user: User, @Body() dto: GenerateLessonDto) {
     return this.lessonsService.generate(user, dto);

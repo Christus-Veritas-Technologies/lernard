@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Query } from '@nestjs/common';
 import { ProgressService } from './progress.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
@@ -36,13 +36,45 @@ export class ProgressController {
   }
 
   @ProtectedRoute()
+  @Delete('growth-areas/:subjectId/:topic')
+  async dismissGrowthArea(
+    @CurrentUser() user: User,
+    @Param('subjectId') subjectId: string,
+    @Param('topic') topic: string,
+  ) {
+    await this.progressService.dismissGrowthArea(user.id, subjectId, decodeURIComponent(topic));
+    return { ok: true };
+  }
+
+  @ProtectedRoute()
+  @Get('summary')
+  async getSummary(@CurrentUser() user: User) {
+    return this.progressService.getSummary(user.id);
+  }
+
+  @ProtectedRoute()
   @Get('history')
   async getHistory(
     @CurrentUser() user: User,
     @Query('cursor') cursor?: string,
     @Query('subjectName') subjectName?: string,
     @Query('type') type?: 'lesson' | 'quiz',
+    @Query('dateFilter') dateFilter?: '7d' | 'month' | '3m' | 'all',
   ) {
-    return this.progressService.getHistory(user.id, cursor, subjectName, type);
+    return this.progressService.getHistory(
+      user.id,
+      cursor,
+      subjectName,
+      type,
+      dateFilter,
+    );
+  }
+
+  @ProtectedRoute()
+  @Delete('reset')
+  async resetProgress(@CurrentUser() user: User) {
+    await this.progressService.resetProgress(user.id);
+    return { ok: true };
   }
 }
+
