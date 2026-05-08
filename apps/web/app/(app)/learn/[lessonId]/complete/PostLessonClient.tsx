@@ -20,16 +20,17 @@ export function PostLessonClient({ lessonId }: PostLessonClientProps) {
     const topic = params.get("topic") ?? "";
     const [rating, setRating] = useState(3);
     const [saving, setSaving] = useState(false);
+    const [xpEarned, setXpEarned] = useState<number | null>(null);
 
     async function onSave() {
+        if (xpEarned !== null) return;
         setSaving(true);
         try {
-            await browserApiFetch(ROUTES.LESSONS.COMPLETE(lessonId), {
+            const result = await browserApiFetch<{ xpEarned: number }>(ROUTES.LESSONS.COMPLETE(lessonId), {
                 method: "POST",
                 body: JSON.stringify({ confidenceRating: rating }),
             });
-            const quizUrl = `/quiz?lessonId=${lessonId}${topic ? `&topic=${encodeURIComponent(topic)}` : ""}`;
-            router.push(quizUrl);
+            setXpEarned(result.xpEarned);
         } finally {
             setSaving(false);
         }
@@ -38,8 +39,8 @@ export function PostLessonClient({ lessonId }: PostLessonClientProps) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Nice work.</CardTitle>
-                <CardDescription>You just completed your lesson.</CardDescription>
+                <CardTitle>{topic || "Nice work."}</CardTitle>
+                <CardDescription>Rate your confidence, then choose your next step.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="flex gap-2">
@@ -55,11 +56,18 @@ export function PostLessonClient({ lessonId }: PostLessonClientProps) {
                     ))}
                 </div>
 
-                <Badge tone="success">XP incoming</Badge>
+                <Badge tone="success">XP earned: {xpEarned ?? "Save rating to calculate"}</Badge>
+
+                <Button disabled={saving || xpEarned !== null} onClick={onSave}>
+                    {saving ? "Saving..." : xpEarned !== null ? "Saved" : "Save lesson result"}
+                </Button>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <Button disabled={saving} onClick={onSave}>
-                        {saving ? "Saving..." : "Quiz me on this"}
+                    <Button onClick={() => {
+                        const quizUrl = `/quiz?lessonId=${lessonId}${topic ? `&topic=${encodeURIComponent(topic)}` : ""}`;
+                        router.push(quizUrl);
+                    }}>
+                        Quiz me on this
                     </Button>
                     <Button onClick={() => router.push("/home")} variant="secondary">
                         What&apos;s next?
