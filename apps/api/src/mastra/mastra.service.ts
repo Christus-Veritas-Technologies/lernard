@@ -1036,11 +1036,15 @@ function lessonMaxTokens(depth: 'quick' | 'standard' | 'deep'): number {
 }
 
 function quizMaxTokens(questionCount: number, style?: 'standard' | 'zimsec'): number {
-  // ZIMSEC structured questions are much more verbose (parts, marking points, model answers)
-  const multiplier = style === 'zimsec' ? 2.5 : 1;
-  if (questionCount >= 15) return Math.round(6000 * multiplier);
-  if (questionCount >= 10) return Math.round(4500 * multiplier);
-  return Math.round(2500 * multiplier);
+  if (style === 'zimsec') {
+    // ZIMSEC generates 2–5 structured questions, each with 3–6 sub-parts, marking points,
+    // model answers, and explanations — far more tokens than standard questions.
+    if (questionCount >= 5) return 16000;
+    return 12000;
+  }
+  if (questionCount >= 15) return 6000;
+  if (questionCount >= 10) return 4500;
+  return 2500;
 }
 
 function isResponseTruncated(text: string): boolean {
