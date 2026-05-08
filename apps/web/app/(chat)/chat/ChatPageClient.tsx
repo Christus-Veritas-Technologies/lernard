@@ -14,6 +14,7 @@ import {
     SparklesIcon,
 } from "hugeicons-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -27,6 +28,7 @@ import type {
     ChatConversationMessage,
     ChatLessonAttachmentOption,
     ChatMessageBlock,
+    ChatQuizAttachmentOption,
     ConversationListItem,
 } from "@lernard/shared-types";
 
@@ -47,15 +49,21 @@ interface MessageResponse {
     blocks: ChatMessageBlock[];
 }
 
+const ATTACHABLE_QUIZZES_ROUTE = (ROUTES.CHAT as typeof ROUTES.CHAT & { ATTACHABLE_QUIZZES: string }).ATTACHABLE_QUIZZES;
+
 export function ChatPageClient() {
+    const searchParams = useSearchParams();
     const [conversationId, setConversationId] = useState<string | null>(null);
     const [conversationTitle, setConversationTitle] = useState("New chat");
     const [conversations, setConversations] = useState<ConversationListItem[]>([]);
     const [lessons, setLessons] = useState<ChatLessonAttachmentOption[]>([]);
+    const [quizzes, setQuizzes] = useState<ChatQuizAttachmentOption[]>([]);
     const [messages, setMessages] = useState<ChatConversationMessage[]>([]);
     const [input, setInput] = useState("");
     const [lessonQuery, setLessonQuery] = useState("");
+    const [quizQuery, setQuizQuery] = useState("");
     const [selectedLessons, setSelectedLessons] = useState<ChatLessonAttachmentOption[]>([]);
+    const [selectedQuizzes, setSelectedQuizzes] = useState<ChatQuizAttachmentOption[]>([]);
     const [uploadedFiles, setUploadedFiles] = useState<UploadAttachmentInput[]>([]);
     const [sending, setSending] = useState(false);
     const [uploading, setUploading] = useState(false);
@@ -67,7 +75,11 @@ export function ChatPageClient() {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const deepLinkAppliedRef = useRef(false);
     const deferredLessonQuery = useDeferredValue(lessonQuery);
+
+    const attachQuizId = searchParams.get("attachQuizId");
+    const prefillMessage = searchParams.get("prompt");
 
     function applySuggestedPrompt(prefill: string) {
         setInput(prefill);
@@ -84,7 +96,8 @@ export function ChatPageClient() {
         void Promise.allSettled([
             browserApiFetch<ConversationListItem[]>(ROUTES.CHAT.CONVERSATIONS),
             browserApiFetch<ChatLessonAttachmentOption[]>(ROUTES.CHAT.ATTACHABLE_LESSONS),
-        ]).then(([conversationResult, lessonResult]) => {
+            browserApiFetch<ChatQuizAttachmentOption[]>(ATTACHABLE_QUIZZES_ROUTE),
+        ]).then(([conversationResult, lessonResult, quizResult]) => {
             if (isDisposed) {
                 return;
             }
@@ -95,6 +108,10 @@ export function ChatPageClient() {
 
             if (lessonResult.status === "fulfilled") {
                 setLessons(lessonResult.value);
+            }
+
+            if (quizResult.status === "fulfilled") {
+                setQuizzes(quizResult.value);
             }
         });
 
@@ -107,6 +124,36 @@ export function ChatPageClient() {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
+    useEffect(() => {
+        if (deepLinkAppliedRef.current) {
+            return;
+        }
+
+        let applied = false;
+
+        if (attachQuizId && quizzes.length > 0) {
+            const match = quizzes.find((quiz) => quiz.quizId === attachQuizId);
+            if (match) {
+                setSelectedQuizzes((current) => {
+                    if (current.some((item) => item.quizId === match.quizId)) {
+                        return current;
+                    }
+                    return [...current, match].slice(0, 6);
+                });
+                applied = true;
+            }
+        }
+
+        if (prefillMessage && !input.trim()) {
+            setInput(prefillMessage);
+            applied = true;
+        }
+
+        if (applied || (!attachQuizId && !prefillMessage)) {
+            deepLinkAppliedRef.current = true;
+        }
+    }, [attachQuizId, prefillMessage, quizzes, input]);
+
     const filteredLessons = lessons.filter((lesson) => {
         const normalizedQuery = deferredLessonQuery.trim().toLowerCase();
         if (!normalizedQuery) {
@@ -116,7 +163,16 @@ export function ChatPageClient() {
         return `${lesson.title} ${lesson.subjectName}`.toLowerCase().includes(normalizedQuery);
     });
 
-    const attachmentCount = uploadedFiles.length + selectedLessons.length;
+    const filteredQuizzes = quizzes.filter((quiz) => {
+        const normalizedQuery = quizQuery.trim().toLowerCase();
+        if (!normalizedQuery) {
+            return true;
+        }
+
+        return `${quiz.title} ${quiz.subjectName}`.toLowerCase().includes(normalizedQuery);
+    });
+
+    const attachmentCount = uploadedFiles.length + selectedLessons.length + selectedQuizzes.length;
 
     async function loadConversation(nextConversationId: string) {
         setMobileSidebarOpen(false);
@@ -145,8 +201,9 @@ export function ChatPageClient() {
         const trimmed = input.trim();
         const sentUploads = uploadedFiles;
         const sentLessons = selectedLessons;
+        const sentQuizzes = selectedQuizzes;
 
-        const optimisticBlocks = buildOptimisticUserBlocks(trimmed, sentUploads, sentLessons);
+        const optimisticBlocks = buildOptimisticUserBlocks(trimmed, sentUploads, sentLessons, sentQuizzes);
         const nextUserMessage: ChatConversationMessage = {
             id: crypto.randomUUID(),
             role: "user",
@@ -159,6 +216,7 @@ export function ChatPageClient() {
         setInput("");
         setUploadedFiles([]);
         setSelectedLessons([]);
+        setSelectedQuizzes([]);
         setAttachmentMenuOpen(false);
         setSending(true);
 
@@ -168,7 +226,7 @@ export function ChatPageClient() {
                 body: JSON.stringify({
                     conversationId,
                     message: trimmed,
-                    attachments: buildAttachmentPayload(sentUploads, sentLessons),
+                    attachments: buildAttachmentPayload(sentUploads, sentLessons, sentQuizzes),
                 }),
             });
 
@@ -259,6 +317,22 @@ export function ChatPageClient() {
         setSelectedLessons((current) => [...current, lesson]);
     }
 
+    function onSelectQuiz(quiz: ChatQuizAttachmentOption) {
+        setErrorMessage(null);
+
+        if (selectedQuizzes.some((item) => item.quizId === quiz.quizId)) {
+            setSelectedQuizzes((current) => current.filter((item) => item.quizId !== quiz.quizId));
+            return;
+        }
+
+        if (attachmentCount >= 6) {
+            setErrorMessage("Keep each message to six attachments or fewer.");
+            return;
+        }
+
+        setSelectedQuizzes((current) => [...current, quiz]);
+    }
+
     function onStartNewChat() {
         setMobileSidebarOpen(false);
         startTransition(() => {
@@ -267,6 +341,7 @@ export function ChatPageClient() {
             setMessages([]);
             setInput("");
             setSelectedLessons([]);
+            setSelectedQuizzes([]);
             setUploadedFiles([]);
             setAttachmentMenuOpen(false);
             setErrorMessage(null);
@@ -449,6 +524,60 @@ export function ChatPageClient() {
                                     </div>
                                 </ScrollArea>
                             </div>
+
+                            <div className="space-y-3 rounded-3xl border border-border bg-background p-4">
+                                <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
+                                    <SchoolBell01Icon size={18} strokeWidth={1.8} />
+                                    Attach a quiz
+                                </div>
+                                <Input
+                                    onChange={(event) => setQuizQuery(event.target.value)}
+                                    placeholder="Search your recent quizzes"
+                                    value={quizQuery}
+                                />
+                                <ScrollArea className="h-52 pr-2">
+                                    <div className="space-y-2">
+                                        {filteredQuizzes.map((quiz) => {
+                                            const isSelected = selectedQuizzes.some((item) => item.quizId === quiz.quizId);
+
+                                            return (
+                                                <button
+                                                    className={cn(
+                                                        "w-full rounded-[20px] border px-3 py-3 text-left transition",
+                                                        isSelected
+                                                            ? "border-primary-300 bg-primary-100/70"
+                                                            : "border-border bg-white hover:border-primary-200 hover:bg-accent-cool-100/50",
+                                                    )}
+                                                    key={quiz.quizId}
+                                                    onClick={() => onSelectQuiz(quiz)}
+                                                    type="button"
+                                                >
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <div>
+                                                            <p className="text-sm font-medium text-text-primary">{quiz.title}</p>
+                                                            <p className="text-xs text-text-secondary">
+                                                                {quiz.subjectName} · {quiz.totalQuestions} questions
+                                                                {typeof quiz.score === "number"
+                                                                    ? ` · score ${quiz.score}/${quiz.totalQuestions}`
+                                                                    : " · not completed"}
+                                                            </p>
+                                                        </div>
+                                                        <Badge tone={isSelected ? "primary" : "muted"}>
+                                                            {isSelected ? "Attached" : "Attach"}
+                                                        </Badge>
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+
+                                        {filteredQuizzes.length === 0 ? (
+                                            <div className="rounded-[20px] border border-dashed border-border bg-surface p-4 text-xs text-text-secondary">
+                                                No matching quizzes yet. Complete a quiz and it will appear here.
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </ScrollArea>
+                            </div>
                         </div>
                     </div>
                 ) : null}
@@ -613,6 +742,21 @@ export function ChatPageClient() {
                                         </button>
                                     </Badge>
                                 ))}
+                                {selectedQuizzes.map((quiz) => (
+                                    <Badge className="gap-2" key={quiz.quizId} tone="warm">
+                                        <SchoolBell01Icon size={14} strokeWidth={1.8} />
+                                        <span className="max-w-40 truncate">{quiz.title}</span>
+                                        <button
+                                            className="text-xs font-semibold text-text-primary"
+                                            onClick={() => {
+                                                setSelectedQuizzes((current) => current.filter((item) => item.quizId !== quiz.quizId));
+                                            }}
+                                            type="button"
+                                        >
+                                            Remove
+                                        </button>
+                                    </Badge>
+                                ))}
                             </div>
                         ) : null}
 
@@ -744,32 +888,47 @@ function MessageBlock({ block, role }: { block: ChatMessageBlock; role: "user" |
     if (block.type === "attachments") {
         return (
             <div className="space-y-2">
-                {block.items.map((attachment) => (
-                    <div
-                        className={cn(
-                            "rounded-[20px] border px-3 py-3 text-sm",
-                            role === "user"
-                                ? "border-white/20 bg-white/10 text-white"
-                                : "border-border bg-background text-text-primary",
-                        )}
-                        key={attachment.type === "lesson" ? attachment.lessonId : attachment.uploadId}
-                    >
-                        <div className="flex items-center gap-2 font-semibold">
-                            <BookOpen01Icon size={16} strokeWidth={1.8} />
-                            {attachment.type === "lesson" ? attachment.title : attachment.fileName}
-                        </div>
-                        <p
+                {block.items.map((attachment) => {
+                    const key =
+                        attachment.type === "lesson"
+                            ? attachment.lessonId
+                            : attachment.type === "quiz"
+                              ? attachment.quizId
+                              : attachment.uploadId;
+                    const title =
+                        attachment.type === "lesson" || attachment.type === "quiz"
+                            ? attachment.title
+                            : attachment.fileName;
+
+                    return (
+                        <div
                             className={cn(
-                                "mt-1 text-xs leading-5",
-                                role === "user" ? "text-white/80" : "text-text-secondary",
+                                "rounded-[20px] border px-3 py-3 text-sm",
+                                role === "user"
+                                    ? "border-white/20 bg-white/10 text-white"
+                                    : "border-border bg-background text-text-primary",
                             )}
+                            key={key}
                         >
-                            {attachment.type === "lesson"
-                                ? `${attachment.subjectName ?? "General"} lesson attached for context.`
-                                : `${attachment.kind.toUpperCase()} attached for this turn.`}
-                        </p>
-                    </div>
-                ))}
+                            <div className="flex items-center gap-2 font-semibold">
+                                <BookOpen01Icon size={16} strokeWidth={1.8} />
+                                {title}
+                            </div>
+                            <p
+                                className={cn(
+                                    "mt-1 text-xs leading-5",
+                                    role === "user" ? "text-white/80" : "text-text-secondary",
+                                )}
+                            >
+                                {attachment.type === "lesson"
+                                    ? `${attachment.subjectName ?? "General"} lesson attached for context.`
+                                    : attachment.type === "quiz"
+                                      ? `${attachment.subjectName ?? "General"} quiz attached for discussion context.`
+                                      : `${attachment.kind.toUpperCase()} attached for this turn.`}
+                            </p>
+                        </div>
+                    );
+                })}
             </div>
         );
     }
@@ -872,12 +1031,17 @@ function MessageBlock({ block, role }: { block: ChatMessageBlock; role: "user" |
 function buildAttachmentPayload(
     uploadedFiles: UploadAttachmentInput[],
     selectedLessons: ChatLessonAttachmentOption[],
+    selectedQuizzes: ChatQuizAttachmentOption[],
 ): ChatAttachmentInput[] {
     return [
         ...uploadedFiles,
         ...selectedLessons.map((lesson) => ({
             type: "lesson" as const,
             lessonId: lesson.lessonId,
+        })),
+        ...selectedQuizzes.map((quiz) => ({
+            type: "quiz" as const,
+            quizId: quiz.quizId,
         })),
     ];
 }
@@ -886,6 +1050,7 @@ function buildOptimisticUserBlocks(
     message: string,
     uploadedFiles: UploadAttachmentInput[],
     selectedLessons: ChatLessonAttachmentOption[],
+    selectedQuizzes: ChatQuizAttachmentOption[],
 ): ChatMessageBlock[] {
     const attachments: ChatAttachment[] = [
         ...uploadedFiles,
@@ -894,6 +1059,14 @@ function buildOptimisticUserBlocks(
             lessonId: lesson.lessonId,
             title: lesson.title,
             subjectName: lesson.subjectName,
+        })),
+        ...selectedQuizzes.map((quiz) => ({
+            type: "quiz" as const,
+            quizId: quiz.quizId,
+            title: quiz.title,
+            subjectName: quiz.subjectName,
+            totalQuestions: quiz.totalQuestions,
+            score: quiz.score,
         })),
     ];
 

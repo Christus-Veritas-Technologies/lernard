@@ -25,6 +25,15 @@ export interface ChatLessonAttachmentOption {
   updatedAt: string
 }
 
+export interface ChatQuizAttachmentOption {
+  quizId: string
+  title: string
+  subjectName: string
+  totalQuestions: number
+  score?: number
+  updatedAt: string
+}
+
 export interface QuizCardProps {
   title: string
   summary: string
@@ -73,7 +82,15 @@ export interface LessonChatAttachmentInput {
   lessonId: string
 }
 
-export type ChatAttachmentInput = UploadedChatAttachmentInput | LessonChatAttachmentInput
+export interface QuizChatAttachmentInput {
+  type: 'quiz'
+  quizId: string
+}
+
+export type ChatAttachmentInput =
+  | UploadedChatAttachmentInput
+  | LessonChatAttachmentInput
+  | QuizChatAttachmentInput
 
 export interface UploadedChatAttachment {
   type: 'upload'
@@ -91,7 +108,20 @@ export interface LessonChatAttachment {
   subjectName?: string
 }
 
-export type ChatAttachment = UploadedChatAttachment | LessonChatAttachment
+export interface QuizChatAttachment {
+  type: 'quiz'
+  quizId: string
+  title: string
+  subjectName?: string
+  totalQuestions: number
+  score?: number
+  weakTopics?: string[]
+}
+
+export type ChatAttachment =
+  | UploadedChatAttachment
+  | LessonChatAttachment
+  | QuizChatAttachment
 
 export type ChatMessageBlock =
   | { type: 'text'; content: string }

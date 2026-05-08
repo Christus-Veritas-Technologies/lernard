@@ -45,6 +45,12 @@ export class ChatController {
   }
 
   @ProtectedRoute()
+  @Get('attachments/quizzes')
+  async getAttachableQuizzes(@CurrentUser() user: User) {
+    return this.chatService.getAttachableQuizzes(user);
+  }
+
+  @ProtectedRoute()
   @Post('attachments/upload')
   @UseInterceptors(
     FileInterceptor('file', {

@@ -14,12 +14,12 @@ import {
   ValidateNested,
 } from 'class-validator';
 
-const CHAT_ATTACHMENT_TYPES = ['upload', 'lesson'] as const;
+const CHAT_ATTACHMENT_TYPES = ['upload', 'lesson', 'quiz'] as const;
 const CHAT_UPLOAD_KINDS = ['image', 'pdf'] as const;
 
 class ChatAttachmentDto {
   @IsEnum(CHAT_ATTACHMENT_TYPES)
-  type!: 'upload' | 'lesson';
+  type!: 'upload' | 'lesson' | 'quiz';
 
   @ValidateIf((value: ChatAttachmentDto) => value.type === 'upload')
   @IsString()
@@ -54,6 +54,12 @@ class ChatAttachmentDto {
   @MinLength(1)
   @MaxLength(120)
   lessonId?: string;
+
+  @ValidateIf((value: ChatAttachmentDto) => value.type === 'quiz')
+  @IsString()
+  @MinLength(1)
+  @MaxLength(120)
+  quizId?: string;
 }
 
 export class SendMessageDto {

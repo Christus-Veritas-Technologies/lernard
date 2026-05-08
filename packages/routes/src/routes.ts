@@ -75,6 +75,7 @@ export const ROUTES = {
     CONVERSATION: (conversationId: string) => `/v1/chat/conversations/${conversationId}` as const,
     ATTACHMENTS_UPLOAD: '/v1/chat/attachments/upload',
     ATTACHABLE_LESSONS: '/v1/chat/attachments/lessons',
+    ATTACHABLE_QUIZZES: '/v1/chat/attachments/quizzes',
     MESSAGE: '/v1/chat/message',
     MESSAGE_STREAM: '/v1/chat/message/stream',
   },

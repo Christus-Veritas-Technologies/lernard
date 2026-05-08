@@ -68,6 +68,7 @@ export type {
   ChatConversationDetail,
   ChatConversationMessage,
   ChatLessonAttachmentOption,
+  ChatQuizAttachmentOption,
   ChatMessageBlock,
   ChatUploadKind,
   QuizCardProps,

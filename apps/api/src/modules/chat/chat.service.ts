@@ -5,6 +5,7 @@ import type {
   ChatAttachmentInput,
   ChatConversationDetail,
   ChatLessonAttachmentOption,
+  ChatQuizAttachmentOption,
   ChatMessageBlock,
   ConversationListItem,
   LessonRefCardProps,
@@ -114,6 +115,37 @@ export class ChatService {
       title: lesson.topic,
       subjectName: lesson.subjectName ?? 'General',
       updatedAt: lesson.updatedAt.toISOString(),
+    }));
+  }
+
+  async getAttachableQuizzes(
+    user: User,
+  ): Promise<ChatQuizAttachmentOption[]> {
+    const quizzes = await (this.prisma as any).quiz.findMany({
+      where: {
+        userId: user.id,
+        status: 'READY',
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 12,
+      select: {
+        id: true,
+        topic: true,
+        subjectName: true,
+        totalQuestions: true,
+        score: true,
+        completedAt: true,
+        updatedAt: true,
+      },
+    });
+
+    return quizzes.map((quiz: any) => ({
+      quizId: quiz.id,
+      title: quiz.topic,
+      subjectName: quiz.subjectName ?? 'General',
+      totalQuestions: quiz.totalQuestions,
+      score: quiz.completedAt ? quiz.score : undefined,
+      updatedAt: quiz.updatedAt.toISOString(),
     }));
   }
 
@@ -334,6 +366,47 @@ export class ChatService {
         continue;
       }
 
+      if (attachment.type === 'quiz') {
+        const quiz = await (this.prisma as any).quiz.findFirst({
+          where: {
+            id: attachment.quizId,
+            userId: user.id,
+          },
+          select: {
+            id: true,
+            topic: true,
+            subjectName: true,
+            totalQuestions: true,
+            score: true,
+            weakTopics: true,
+            completedAt: true,
+          },
+        });
+
+        if (!quiz) {
+          continue;
+        }
+
+        const weakTopics = Array.isArray(quiz.weakTopics)
+          ? quiz.weakTopics
+              .filter((topic: unknown): topic is string => typeof topic === 'string')
+              .map((topic: string) => topic.trim())
+              .filter(Boolean)
+              .slice(0, 4)
+          : [];
+
+        resolved.push({
+          type: 'quiz',
+          quizId: quiz.id,
+          title: quiz.topic,
+          subjectName: quiz.subjectName ?? undefined,
+          totalQuestions: quiz.totalQuestions,
+          score: quiz.completedAt ? quiz.score : undefined,
+          weakTopics,
+        });
+        continue;
+      }
+
       if (!(await chatUploadExists(this.r2, user.id, attachment.uploadId))) {
         continue;
       }
@@ -433,13 +506,14 @@ export class ChatService {
 
 function normalizeAttachmentInputs(
   attachments: Array<{
-    type: 'upload' | 'lesson';
+    type: 'upload' | 'lesson' | 'quiz';
     uploadId?: string;
     kind?: 'image' | 'pdf';
     fileName?: string;
     mimeType?: string;
     size?: number;
     lessonId?: string;
+    quizId?: string;
   }>,
 ): ChatAttachmentInput[] {
   const normalized: ChatAttachmentInput[] = [];
@@ -449,6 +523,14 @@ function normalizeAttachmentInputs(
       normalized.push({
         type: 'lesson',
         lessonId: attachment.lessonId,
+      });
+      continue;
+    }
+
+    if (attachment.type === 'quiz' && attachment.quizId) {
+      normalized.push({
+        type: 'quiz',
+        quizId: attachment.quizId,
       });
       continue;
     }
@@ -588,6 +670,17 @@ function summarizeAttachments(attachments: ChatAttachment[]): string {
   const summaryLines = attachments.map((attachment) => {
     if (attachment.type === 'lesson') {
       return `- Attached lesson: ${attachment.title}${attachment.subjectName ? ` (${attachment.subjectName})` : ''}`;
+    }
+
+    if (attachment.type === 'quiz') {
+      const scoreLine =
+        typeof attachment.score === 'number'
+          ? `, score ${attachment.score}/${attachment.totalQuestions}`
+          : ', not completed yet';
+      const weakLine = attachment.weakTopics?.length
+        ? `, growth areas: ${attachment.weakTopics.join(', ')}`
+        : '';
+      return `- Attached quiz: ${attachment.title}${attachment.subjectName ? ` (${attachment.subjectName})` : ''}${scoreLine}${weakLine}`;
     }
 
     return `- Attached ${attachment.kind}: ${attachment.fileName} (${attachment.mimeType}, ${formatFileSize(attachment.size)})`;
