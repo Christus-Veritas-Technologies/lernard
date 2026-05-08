@@ -116,9 +116,8 @@ export class SettingsService {
   async updateCompanionControls(
     userId: string,
     dto: {
-      showCorrectAnswers: boolean;
-      allowHints: boolean;
-      allowSkip: boolean;
+      answerRevealTiming: 'after_quiz' | 'immediate';
+      quizPassThreshold: number;
     },
   ): Promise<CompanionControls> {
     const user = await this.prisma.user.findUniqueOrThrow({
@@ -129,20 +128,18 @@ export class SettingsService {
       },
     });
 
-    const companionControls = await this.prisma.companionControls.upsert({
+    const companionControls = await (this.prisma.companionControls as any).upsert({
       where: { studentId: userId },
       update: {
-        showCorrectAnswers: dto.showCorrectAnswers,
-        allowHints: dto.allowHints,
-        allowSkip: dto.allowSkip,
+        answerRevealTiming: dto.answerRevealTiming,
+        quizPassThreshold: dto.quizPassThreshold,
         lockedByGuardian: Boolean(user.controlledByGuardianId),
         lastChangedBy: user.name,
       },
       create: {
         studentId: userId,
-        showCorrectAnswers: dto.showCorrectAnswers,
-        allowHints: dto.allowHints,
-        allowSkip: dto.allowSkip,
+        answerRevealTiming: dto.answerRevealTiming,
+        quizPassThreshold: dto.quizPassThreshold,
         lockedByGuardian: Boolean(user.controlledByGuardianId),
         lastChangedBy: user.name,
       },
@@ -332,20 +329,12 @@ function mapViewerSummary(user: {
   };
 }
 
-function mapCompanionControls(companionControls: {
-  showCorrectAnswers: boolean;
-  allowHints: boolean;
-  allowSkip: boolean;
-  lockedByGuardian: boolean;
-  lastChangedAt: Date;
-  lastChangedBy: string;
-}): CompanionControls {
+function mapCompanionControls(companionControls: any): CompanionControls {
   return {
-    showCorrectAnswers: companionControls.showCorrectAnswers,
-    allowHints: companionControls.allowHints,
-    allowSkip: companionControls.allowSkip,
+    answerRevealTiming: companionControls.answerRevealTiming ?? 'after_quiz',
+    quizPassThreshold: companionControls.quizPassThreshold ?? 0.7,
     lockedByGuardian: companionControls.lockedByGuardian,
-    lastChangedAt: companionControls.lastChangedAt.toISOString(),
+    lastChangedAt: (companionControls.lastChangedAt as Date).toISOString(),
     lastChangedBy: companionControls.lastChangedBy,
   };
 }

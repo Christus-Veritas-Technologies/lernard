@@ -13,6 +13,7 @@ import { MastraModule } from './mastra/mastra.module';
 import { LessonsModule } from './modules/lessons/lessons.module';
 import { QuizzesModule } from './modules/quizzes/quizzes.module';
 import { ChatModule } from './modules/chat/chat.module';
+import { JobsModule } from './jobs/jobs.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ChatModule } from './modules/chat/chat.module';
     LessonsModule,
     QuizzesModule,
     ChatModule,
+    JobsModule,
   ],
 })
 export class AppModule implements NestModule {

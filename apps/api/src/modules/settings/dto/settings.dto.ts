@@ -1,4 +1,4 @@
-import { IsEnum, IsNumber, Min, Max, IsBoolean } from 'class-validator';
+import { IsEnum, IsNumber, Min, Max } from 'class-validator';
 
 export class UpdateModeDto {
   @IsEnum(['guide', 'companion'])
@@ -6,14 +6,13 @@ export class UpdateModeDto {
 }
 
 export class CompanionControlsDto {
-  @IsBoolean()
-  showCorrectAnswers: boolean;
+  @IsEnum(['after_quiz', 'immediate'])
+  answerRevealTiming: 'after_quiz' | 'immediate';
 
-  @IsBoolean()
-  allowHints: boolean;
-
-  @IsBoolean()
-  allowSkip: boolean;
+  @IsNumber()
+  @Min(0.5)
+  @Max(1.0)
+  quizPassThreshold: number;
 }
 
 export class UpdateAppearanceDto {
