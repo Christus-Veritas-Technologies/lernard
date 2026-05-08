@@ -7,7 +7,16 @@
       "Bash(bun prisma *)",
       "Bash(bun add *)",
       "Bash(git add *)",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\kinzi\\\\Desktop\\\\lernard\" -Force)",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(findstr -i mastra)",
+      "Bash(findstr -i quiz)",
+      "Bash(npx prisma *)",
+      "Bash(npx tsc *)",
+      "Bash(./node_modules/.bin/tsc --noEmit -p apps/api/tsconfig.json)",
+      "Bash(./node_modules/.bin/tsc --noEmit -p apps/web/tsconfig.json)",
+      "Bash(./node_modules/.bin/tsc --noEmit -p apps/native/tsconfig.json)"
     ],
     "defaultMode": "auto"
   },

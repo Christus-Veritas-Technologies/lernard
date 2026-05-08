@@ -282,17 +282,28 @@ export class MastraService {
     });
 
     return this.runWithRetry(async () => {
-      const text = await this.completeText({
-        model: SONNET_MODEL,
-        maxTokens: quizMaxTokens(input.questionCount, input.style),
-        systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      });
+      let maxTokens = quizMaxTokens(input.questionCount, input.style);
+      let text = '';
 
-      if (isResponseTruncated(text)) {
-        throw new ContentValidationError(
-          'Quiz response was truncated — retry',
-        );
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        text = await this.completeText({
+          model: SONNET_MODEL,
+          maxTokens,
+          systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        });
+
+        if (!isResponseTruncated(text)) {
+          break;
+        }
+
+        if (attempt === 3) {
+          throw new ContentValidationError(
+            'Quiz response was truncated — retry',
+          );
+        }
+
+        maxTokens = Math.min(Math.round(maxTokens * 1.6), 28000);
       }
 
       const parsed = safeJsonParse<{ questions?: GeneratedQuizQuestion[] }>(
@@ -396,17 +407,28 @@ export class MastraService {
     };
 
     return this.runWithRetry(async () => {
-      const text = await this.completeText({
-        model: SONNET_MODEL,
-        maxTokens: quizMaxTokens(input.questionCount, input.style),
-        systemPrompt,
-        messages: [{ role: 'user', content: [fileBlock, textBlock] }],
-      });
+      let maxTokens = quizMaxTokens(input.questionCount, input.style);
+      let text = '';
 
-      if (isResponseTruncated(text)) {
-        throw new ContentValidationError(
-          'Quiz-from-file response was truncated — retry',
-        );
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        text = await this.completeText({
+          model: SONNET_MODEL,
+          maxTokens,
+          systemPrompt,
+          messages: [{ role: 'user', content: [fileBlock, textBlock] }],
+        });
+
+        if (!isResponseTruncated(text)) {
+          break;
+        }
+
+        if (attempt === 3) {
+          throw new ContentValidationError(
+            'Quiz-from-file response was truncated — retry',
+          );
+        }
+
+        maxTokens = Math.min(Math.round(maxTokens * 1.6), 28000);
       }
 
       const parsed = safeJsonParse<{
@@ -1039,12 +1061,12 @@ function quizMaxTokens(questionCount: number, style?: 'standard' | 'zimsec'): nu
   if (style === 'zimsec') {
     // ZIMSEC generates 2–5 structured questions, each with 3–6 sub-parts, marking points,
     // model answers, and explanations — far more tokens than standard questions.
-    if (questionCount >= 5) return 16000;
-    return 12000;
+    if (questionCount >= 5) return 20000;
+    return 14000;
   }
-  if (questionCount >= 15) return 6000;
-  if (questionCount >= 10) return 4500;
-  return 2500;
+  if (questionCount >= 15) return 10000;
+  if (questionCount >= 10) return 7000;
+  return 4500;
 }
 
 function isResponseTruncated(text: string): boolean {
