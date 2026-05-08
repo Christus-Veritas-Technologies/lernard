@@ -67,6 +67,7 @@ export const ROUTES = {
     ANSWER: (quizId: string) => `/v1/quizzes/${quizId}/answer` as const,
     COMPLETE: (quizId: string) => `/v1/quizzes/${quizId}/complete` as const,
     EVALUATE_SHORT_ANSWER: (quizId: string) => `/v1/quizzes/${quizId}/evaluate-short-answer` as const,
+    ANSWER_PART: (quizId: string) => `/v1/quizzes/${quizId}/answer-part` as const,
   },
 
   CHAT: {
