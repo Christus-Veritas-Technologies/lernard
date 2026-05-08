@@ -14,6 +14,7 @@ interface GeneratedQuizQuestionLike {
   options?: unknown;
   correctAnswer?: unknown;
   correctAnswers?: unknown;
+  explanation?: unknown;
   parts?: unknown;
   totalMarks?: unknown;
 }
@@ -206,6 +207,22 @@ function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
         .map((answer) => answer.trim())
         .filter(Boolean)
     : [];
+  const explanation =
+    typeof question.explanation === 'string' ? question.explanation.trim() : '';
+
+  if (type !== 'structured') {
+    if (!explanation || countWords(explanation) < 10) {
+      throw new ContentValidationError(
+        'Quiz questions require explanations with at least 10 words',
+      );
+    }
+
+    if (!/(because|therefore|which means|so that|this is why)/i.test(explanation)) {
+      throw new ContentValidationError(
+        'Quiz explanations must clearly justify why the answer is correct',
+      );
+    }
+  }
 
   switch (type) {
     case 'multiple_choice':
@@ -225,6 +242,21 @@ function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
       ) {
         throw new ContentValidationError(
           'Multiple choice questions require a correct answer from the options',
+        );
+      }
+
+      const mcCorrectMentioned = explanation
+        .toLowerCase()
+        .includes(correctAnswer.toLowerCase());
+      const mcDistractors = options.filter(
+        (option) => option.toLowerCase() !== correctAnswer.toLowerCase(),
+      );
+      const mcDistractorMentioned = mcDistractors.some((option) =>
+        explanation.toLowerCase().includes(option.toLowerCase()),
+      );
+      if (!mcCorrectMentioned || !mcDistractorMentioned) {
+        throw new ContentValidationError(
+          'Multiple choice explanations must mention the correct option and at least one incorrect option',
         );
       }
       return;
@@ -250,11 +282,26 @@ function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
           'Multiple select questions require 2 or more correct answers from the options',
         );
       }
+
+      const msMentioned = correctAnswers.filter((answer) =>
+        explanation.toLowerCase().includes(answer.toLowerCase()),
+      ).length;
+      if (msMentioned < Math.min(2, correctAnswers.length)) {
+        throw new ContentValidationError(
+          'Multiple select explanations must reference at least two correct answers',
+        );
+      }
       return;
     case 'true_false':
       if (correctAnswer !== 'true' && correctAnswer !== 'false') {
         throw new ContentValidationError(
           'True/false questions require correctAnswer to be true or false',
+        );
+      }
+
+      if (!explanation.toLowerCase().includes(correctAnswer)) {
+        throw new ContentValidationError(
+          'True/false explanations must explicitly state why the statement is true or false',
         );
       }
       return;
