@@ -173,48 +173,60 @@ export class MastraService {
 
     const fallbackEstimatedMinutes = lessonMinutesForDepth(input.depth);
 
-    return this.runWithRetry(async () => {
-      const text = await this.completeText({
-        model: SONNET_MODEL,
-        maxTokens: lessonMaxTokens(input.depth),
-        systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      });
+    return this.runWithRetry(
+      async () => {
+        const text = await this.completeText({
+          model: SONNET_MODEL,
+          maxTokens: lessonMaxTokens(input.depth),
+          systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        });
 
-      const parsed = parseLessonContentFromModelText(text);
-      if (!parsed || !Array.isArray(parsed.sections)) {
-        this.logger.warn(
-          `[mastra.generateLesson] malformed_json_fallback topic="${input.topic}" depth=${input.depth} rawPreview="${truncateForLog(text.replace(/\s+/g, ' '), 600)}"`,
-        );
-        return buildFallbackLesson(input.topic, input.subjectName, input.depth);
-      }
+        const parsed = parseLessonContentFromModelText(text);
+        if (!parsed || !Array.isArray(parsed.sections)) {
+          this.logger.warn(
+            `[mastra.generateLesson] malformed_json_fallback topic="${input.topic}" depth=${input.depth} rawPreview="${truncateForLog(text.replace(/\s+/g, ' '), 600)}"`,
+          );
+          return buildFallbackLesson(input.topic, input.subjectName, input.depth);
+        }
 
-      assertLessonContentValid(parsed);
+        try {
+          assertLessonContentValid(parsed);
+        } catch (validationError) {
+          const hook = parsed.sections?.find((s) => s?.type === 'hook') ?? parsed.sections?.[0];
+          const hookBody = typeof hook?.body === 'string' ? hook.body : '(no body)';
+          this.logger.error(
+            `[mastra.generateLesson] validation_failed topic="${input.topic}" depth=${input.depth} error="${validationError instanceof Error ? validationError.message : String(validationError)}" hookBodyPreview="${truncateForLog(hookBody, 400)}"`,
+          );
+          throw validationError;
+        }
 
-      return {
-        lessonId: 'generated',
-        topic: parsed.topic ?? input.topic,
-        subjectName: parsed.subjectName ?? input.subjectName ?? 'General',
-        depth: parsed.depth ?? input.depth,
-        estimatedMinutes: parsed.estimatedMinutes ?? fallbackEstimatedMinutes,
-        sections: parsed.sections.map((section, index) => ({
-          type: normalizeSectionType(section?.type, index),
-          heading: section?.heading ?? null,
-          body: section?.body ?? '',
-          terms: Array.isArray(section?.terms)
-            ? section.terms
-                .filter((term) => term && typeof term.term === 'string')
-                .map((term) => ({
-                  term: term.term,
-                  explanation:
-                    typeof term.explanation === 'string'
-                      ? term.explanation
-                      : 'Definition unavailable.',
-                }))
-            : [],
-        })),
-      };
-    });
+        return {
+          lessonId: 'generated',
+          topic: parsed.topic ?? input.topic,
+          subjectName: parsed.subjectName ?? input.subjectName ?? 'General',
+          depth: parsed.depth ?? input.depth,
+          estimatedMinutes: parsed.estimatedMinutes ?? fallbackEstimatedMinutes,
+          sections: parsed.sections.map((section, index) => ({
+            type: normalizeSectionType(section?.type, index),
+            heading: section?.heading ?? null,
+            body: section?.body ?? '',
+            terms: Array.isArray(section?.terms)
+              ? section.terms
+                  .filter((term) => term && typeof term.term === 'string')
+                  .map((term) => ({
+                    term: term.term,
+                    explanation:
+                      typeof term.explanation === 'string'
+                        ? term.explanation
+                        : 'Definition unavailable.',
+                  }))
+              : [],
+          })),
+        };
+      },
+      () => buildFallbackLesson(input.topic, input.subjectName, input.depth),
+    );
   }
 
   async generateQuiz(input: {
@@ -252,52 +264,60 @@ export class MastraService {
       mode: input.mode,
     });
 
-    return this.runWithRetry(async () => {
-      const text = await this.completeText({
-        model: SONNET_MODEL,
-        maxTokens: quizMaxTokens(input.questionCount),
-        systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      });
+    return this.runWithRetry(
+      async () => {
+        const text = await this.completeText({
+          model: SONNET_MODEL,
+          maxTokens: quizMaxTokens(input.questionCount),
+          systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        });
 
-      const parsed = safeJsonParse<{ questions?: GeneratedQuizQuestion[] }>(
-        text,
-      );
-      if (!parsed || !Array.isArray(parsed.questions)) {
-        throw new ContentValidationError(
-          'Quiz generation returned malformed JSON',
+        const parsed = safeJsonParse<{ questions?: GeneratedQuizQuestion[] }>(
+          text,
         );
-      }
+        if (!parsed || !Array.isArray(parsed.questions)) {
+          throw new ContentValidationError(
+            'Quiz generation returned malformed JSON',
+          );
+        }
 
-      const normalized = parsed.questions
-        .map((question) => normalizeGeneratedQuestion(question))
-        .filter(isUsableGeneratedQuestion);
+        const normalized = parsed.questions
+          .map((question) => normalizeGeneratedQuestion(question))
+          .filter(isUsableGeneratedQuestion);
 
-      const seen = new Set<string>();
-      const unique: GeneratedQuizQuestion[] = [];
-      for (const question of normalized) {
-        const key = `${question.type}|${normalizeQuestionKey(question.text)}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        unique.push(question);
-      }
+        const seen = new Set<string>();
+        const unique: GeneratedQuizQuestion[] = [];
+        for (const question of normalized) {
+          const key = `${question.type}|${normalizeQuestionKey(question.text)}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          unique.push(question);
+        }
 
-      if (unique.length < input.questionCount) {
-        throw new ContentValidationError(
-          `Quiz generation returned ${unique.length} usable questions, expected ${input.questionCount}`,
-        );
-      }
+        if (unique.length < input.questionCount) {
+          throw new ContentValidationError(
+            `Quiz generation returned ${unique.length} usable questions, expected ${input.questionCount}`,
+          );
+        }
 
-      const finalQuestions = unique.slice(0, input.questionCount);
-      assertQuizContentValid({ questions: finalQuestions });
+        const finalQuestions = unique.slice(0, input.questionCount);
+        assertQuizContentValid({ questions: finalQuestions });
 
-      return {
+        return {
+          topic: input.topic,
+          subjectName: input.subjectName ?? 'General',
+          mode: input.mode,
+          questions: finalQuestions,
+        };
+      },
+      () => ({
         topic: input.topic,
         subjectName: input.subjectName ?? 'General',
         mode: input.mode,
-        questions: finalQuestions,
-      };
-    });
+        questions: buildFallbackQuizQuestions(input.topic, input.questionCount),
+      }),
+    );
   }
 
   async reexplainLessonSection(input: {
@@ -603,7 +623,10 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
     };
   }
 
-  private async runWithRetry<T>(operation: () => Promise<T>): Promise<T> {
+  private async runWithRetry<T>(
+    operation: () => Promise<T>,
+    fallback?: () => T,
+  ): Promise<T> {
     try {
       return await completeWithRetry(operation, {
         maxAttempts: 3,
@@ -615,6 +638,10 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
           ? `${error.name}: ${error.message}`
           : 'Unknown error';
       this.logger.error(`[mastra.retry] exhausted error="${message}"`);
+      if (error instanceof ContentValidationError && fallback) {
+        this.logger.warn(`[mastra.retry] using fallback due to validation error`);
+        return fallback();
+      }
       if (error instanceof ContentValidationError) {
         throw new InternalServerErrorException(LERNARD_OUTAGE_MESSAGE);
       }
