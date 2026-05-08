@@ -155,7 +155,7 @@ export default function CheckEmailScreen() {
                         activeOpacity={0.8}
                     >
                         <Text className="text-base font-bold text-white">
-                            {isVerifying ? 'Verifying…' : 'Verify code'}
+                            {isVerifying ? 'Verifying…' : 'Verify code'};/
                         </Text>
                     </TouchableOpacity>
 
