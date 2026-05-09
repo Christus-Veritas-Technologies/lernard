@@ -23,13 +23,17 @@ export class GenerateQuizDto {
   @MaxLength(100)
   subject?: string;
 
+  @IsOptional()
   @IsIn(['paper1', 'paper2'])
-  paperType!: 'paper1' | 'paper2';
+  paperType?: 'paper1' | 'paper2';
 
   @IsInt()
   @Min(1)
   @Max(20)
   questionCount!: number;
+
+  @IsIn(['multiple_choice', 'structured'])
+  questionType!: 'multiple_choice' | 'structured';
 
   @IsOptional()
   @IsIn(['foundation', 'standard', 'challenging', 'extension'])

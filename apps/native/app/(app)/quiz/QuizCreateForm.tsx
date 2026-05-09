@@ -40,7 +40,8 @@ interface QuizCreateFormProps {
   onGenerated?: () => void;
 }
 
-const COUNTS = [5, 10, 15] as const;
+const MULTIPLE_CHOICE_COUNTS = [5, 10, 15] as const;
+const STRUCTURED_COUNTS = [1, 3, 5] as const;
 
 const SOURCE_TABS: { id: Source; label: string }[] = [
   { id: 'text', label: 'Text' },
@@ -63,8 +64,9 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
   const router = useRouter();
 
   const [source, setSource] = useState<Source>('text');
+  const [questionType, setQuestionType] = useState<'multiple_choice' | 'structured'>('multiple_choice');
   const [topic, setTopic] = useState(initialTopic ?? '');
-  const [questionCount, setQuestionCount] = useState<5 | 10 | 15>(10);
+  const [questionCount, setQuestionCount] = useState<1 | 3 | 5 | 10 | 15>(10);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -173,6 +175,20 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
     return uploadResult !== null;
   })();
 
+  function setQuestionTypeWithCount(next: 'multiple_choice' | 'structured') {
+    setQuestionType(next);
+    if (next === 'structured') {
+      if (![1, 3, 5].includes(questionCount)) {
+        setQuestionCount(5);
+      }
+      return;
+    }
+
+    if (![5, 10, 15].includes(questionCount)) {
+      setQuestionCount(15);
+    }
+  }
+
   async function onGenerate() {
     if (!canGenerate) return;
 
@@ -181,6 +197,8 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
     try {
       const body: Record<string, unknown> = {
         questionCount,
+        paperType: 'paper2',
+        questionType,
         idempotencyKey: Math.random().toString(36).slice(2),
       };
 
@@ -210,6 +228,31 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
 
   return (
     <View className="gap-4">
+      <View>
+        <Text className="mb-2 text-sm font-semibold text-slate-700">Question type</Text>
+        <CardContent className="mt-0 flex-row gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1">
+          {([
+            { id: 'multiple_choice', label: 'Multiple Choice' },
+            { id: 'structured', label: 'Structured Questions' },
+          ] as const).map((option) => (
+            <Pressable
+              className={`flex-1 items-center rounded-lg py-2 ${questionType === option.id ? 'bg-white shadow-sm' : ''}`}
+              key={option.id}
+              onPress={() => setQuestionTypeWithCount(option.id)}
+            >
+              <Text className={`text-[11px] font-semibold ${questionType === option.id ? 'text-slate-900' : 'text-slate-500'}`}>
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+        </CardContent>
+        <Text className="mt-1 text-xs text-slate-500">
+          {questionType === 'structured'
+            ? 'Generates multi-part exam-style questions with marking schemes.'
+            : 'Generates a mix of single-answer and select-all-that-apply questions.'}
+        </Text>
+      </View>
+
       <View>
         <Text className="mb-2 text-sm font-semibold text-slate-700">Generate quiz from</Text>
         <CardContent className="mt-0 flex-row gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1">
@@ -361,7 +404,7 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
       <View>
         <Text className="mb-2 text-sm font-semibold text-slate-700">Number of questions</Text>
         <View className="flex-row gap-3">
-          {COUNTS.map((count) => (
+          {(questionType === 'structured' ? STRUCTURED_COUNTS : MULTIPLE_CHOICE_COUNTS).map((count) => (
             <Button
               className={`flex-1 rounded-xl py-3 ${questionCount === count ? 'border border-indigo-500 bg-indigo-50' : 'border border-slate-200 bg-white'}`}
               key={count}

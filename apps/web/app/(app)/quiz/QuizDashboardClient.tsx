@@ -105,74 +105,100 @@ export function QuizDashboardClient() {
         <div className="space-y-6">
             <Card className="overflow-hidden border-0 bg-[linear-gradient(145deg,#eff5ff_0%,#f9fbff_45%,#ffffff_100%)] shadow-[0_24px_70px_-42px_rgba(37,99,235,0.45)]">
                 <CardHeader className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="space-y-2 flex-1">
-                            <Badge className="w-fit" tone="cool">Quiz Dashboard</Badge>
-                            <CardTitle className="text-2xl">Build momentum with targeted practice</CardTitle>
-                            <CardDescription>
-                                Track activity, revisit unfinished quizzes, and launch fresh practice from one place.
-                            </CardDescription>
+                    {dashboardLoading ? (
+                        <div className="flex animate-pulse flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex-1 space-y-2">
+                                <div className="h-6 w-28 rounded-full bg-sky-100" />
+                                <div className="h-8 w-full max-w-md rounded-lg bg-slate-200" />
+                                <div className="h-4 w-full max-w-xl rounded-lg bg-slate-200" />
+                            </div>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                <div className="h-10 w-36 rounded-lg bg-slate-200" />
+                                <div className="h-10 w-40 rounded-lg bg-slate-200" />
+                                <div className="h-10 w-10 rounded-lg bg-slate-200" />
+                            </div>
                         </div>
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                            <Dialog onOpenChange={setDialogOpen} open={dialogOpen}>
-                                <DialogTrigger asChild>
-                                    <Button>Create new quiz</Button>
-                                </DialogTrigger>
-                                <DialogContent className="max-w-3xl">
-                                    <DialogHeader>
-                                        <DialogTitle>Generate a new quiz</DialogTitle>
-                                        <DialogDescription>
-                                            Pick a source, choose your quiz length, then start immediately.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <QuizCreateForm
-                                        onGenerated={() => {
-                                            setDialogOpen(false);
-                                            void loadDashboard();
-                                        }}
-                                    />
-                                </DialogContent>
-                            </Dialog>
-                            <Link href="/quiz/create">
-                                <Button variant="secondary">Open full create page</Button>
-                            </Link>
-                            <Button className="px-3" onClick={() => void loadDashboard()} variant="ghost">
-                                <RefreshIcon size={14} />
-                            </Button>
+                    ) : (
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="space-y-2 flex-1">
+                                <Badge className="w-fit" tone="cool">Quiz Dashboard</Badge>
+                                <CardTitle className="text-2xl">Build momentum with targeted practice</CardTitle>
+                                <CardDescription>
+                                    Track activity, revisit unfinished quizzes, and launch fresh practice from one place.
+                                </CardDescription>
+                            </div>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                <Dialog onOpenChange={setDialogOpen} open={dialogOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button>Create new quiz</Button>
+                                    </DialogTrigger>
+                                    <DialogContent className="max-w-3xl">
+                                        <DialogHeader>
+                                            <DialogTitle>Generate a new quiz</DialogTitle>
+                                            <DialogDescription>
+                                                Pick a source, choose your quiz length, then start immediately.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <QuizCreateForm
+                                            onGenerated={() => {
+                                                setDialogOpen(false);
+                                                void loadDashboard();
+                                            }}
+                                        />
+                                    </DialogContent>
+                                </Dialog>
+                                <Link href="/quiz/create">
+                                    <Button variant="secondary">Open full create page</Button>
+                                </Link>
+                                <Button className="px-3" onClick={() => void loadDashboard()} variant="ghost">
+                                    <RefreshIcon size={14} />
+                                </Button>
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </CardHeader>
             </Card>
 
             <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <DashboardStatCard
-                    icon={<Rocket01Icon size={20} className="text-orange-600" />}
-                    label="Monthly activity"
-                    value={dashboardLoading ? "..." : monthlyUsageLabel}
-                    bgColor="bg-orange-50"
-                    borderColor="border-orange-200"
-                />
-                <DashboardStatCard
-                    icon={<SchoolReportCardIcon size={20} className="text-green-600" />}
-                    label="Score trend"
-                    value={dashboardLoading ? "..." : avgScoreLabel}
-                    bgColor="bg-green-50"
-                    borderColor="border-green-200"
-                />
-                <DashboardStatCard
-                    icon={<Clock01Icon size={20} className="text-blue-600" />}
-                    label="In progress"
-                    value={dashboardLoading ? "..." : `${stats.quizzesInProgress} quiz${stats.quizzesInProgress === 1 ? "" : "zes"}`}
-                    bgColor="bg-blue-50"
-                    borderColor="border-blue-200"
-                />
-                <DashboardStatCard
-                    icon={<SignalMedium02Icon size={20} className="text-purple-600" />}
-                    label="Growth areas"
-                    value={dashboardLoading ? "..." : `${stats.growthAreasFlagged}`}
-                    bgColor="bg-purple-50"
-                    borderColor="border-purple-200"
-                />
+                {dashboardLoading ? (
+                    <>
+                        <DashboardStatSkeletonCard bgColor="bg-orange-50" borderColor="border-orange-200" />
+                        <DashboardStatSkeletonCard bgColor="bg-green-50" borderColor="border-green-200" />
+                        <DashboardStatSkeletonCard bgColor="bg-blue-50" borderColor="border-blue-200" />
+                        <DashboardStatSkeletonCard bgColor="bg-purple-50" borderColor="border-purple-200" />
+                    </>
+                ) : (
+                    <>
+                        <DashboardStatCard
+                            icon={<Rocket01Icon size={20} className="text-orange-600" />}
+                            label="Monthly activity"
+                            value={monthlyUsageLabel}
+                            bgColor="bg-orange-50"
+                            borderColor="border-orange-200"
+                        />
+                        <DashboardStatCard
+                            icon={<SchoolReportCardIcon size={20} className="text-green-600" />}
+                            label="Score trend"
+                            value={avgScoreLabel}
+                            bgColor="bg-green-50"
+                            borderColor="border-green-200"
+                        />
+                        <DashboardStatCard
+                            icon={<Clock01Icon size={20} className="text-blue-600" />}
+                            label="In progress"
+                            value={`${stats.quizzesInProgress} quiz${stats.quizzesInProgress === 1 ? "" : "zes"}`}
+                            bgColor="bg-blue-50"
+                            borderColor="border-blue-200"
+                        />
+                        <DashboardStatCard
+                            icon={<SignalMedium02Icon size={20} className="text-purple-600" />}
+                            label="Growth areas"
+                            value={`${stats.growthAreasFlagged}`}
+                            bgColor="bg-purple-50"
+                            borderColor="border-purple-200"
+                        />
+                    </>
+                )}
             </section>
 
             <Card>
@@ -189,7 +215,34 @@ export function QuizDashboardClient() {
                         </p>
                     ) : null}
 
-                    {history.length === 0 ? (
+                    {dashboardLoading ? (
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Topic</TableHead>
+                                        <TableHead>Subject</TableHead>
+                                        <TableHead>Difficulty</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Updated</TableHead>
+                                        <TableHead className="text-right">Action</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {Array.from({ length: 5 }).map((_, index) => (
+                                        <TableRow key={`skeleton-${index}`} className="animate-pulse">
+                                            <TableCell><div className="h-4 w-28 rounded bg-slate-200" /></TableCell>
+                                            <TableCell><div className="h-4 w-20 rounded bg-slate-200" /></TableCell>
+                                            <TableCell><div className="h-4 w-20 rounded bg-slate-200" /></TableCell>
+                                            <TableCell><div className="h-5 w-16 rounded-full bg-slate-200" /></TableCell>
+                                            <TableCell><div className="h-4 w-20 rounded bg-slate-200" /></TableCell>
+                                            <TableCell className="text-right"><div className="ml-auto h-8 w-16 rounded bg-slate-200" /></TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    ) : history.length === 0 ? (
                         <p className="rounded-xl border border-border bg-background-subtle px-3 py-4 text-sm text-text-tertiary">
                             No quizzes yet. Use Create new quiz to start your first one.
                         </p>
@@ -253,6 +306,17 @@ function DashboardStatCard({ icon, label, value, bgColor, borderColor }: { icon:
                     <p className="text-xs text-text-tertiary">{label}</p>
                 </div>
                 <p className="text-base font-semibold text-text-primary">{value}</p>
+            </CardContent>
+        </Card>
+    );
+}
+
+function DashboardStatSkeletonCard({ bgColor, borderColor }: { bgColor: string; borderColor: string }) {
+    return (
+        <Card className={`animate-pulse border ${borderColor} ${bgColor}`}>
+            <CardContent className="space-y-2 px-4 py-4">
+                <div className="h-4 w-24 rounded bg-slate-200" />
+                <div className="h-5 w-32 rounded bg-slate-200" />
             </CardContent>
         </Card>
     );

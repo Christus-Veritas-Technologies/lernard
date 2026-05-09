@@ -47,6 +47,9 @@ const SOURCE_TABS: { id: Source; label: string; icon: ReactNode }[] = [
     { id: "document", label: "Document", icon: <DocumentAttachmentIcon size={15} /> },
 ];
 
+const MULTIPLE_CHOICE_COUNTS = [5, 10, 15] as const;
+const STRUCTURED_COUNTS = [1, 3, 5] as const;
+
 export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
     const router = useRouter();
     const params = useSearchParams();
@@ -55,7 +58,7 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
     const initialTopic = params.get("topic") ?? "";
 
     const [source, setSource] = useState<Source>("text");
-    const [style, setStyle] = useState<"standard" | "zimsec">("standard");
+    const [questionType, setQuestionType] = useState<"multiple_choice" | "structured">("multiple_choice");
     const [topic, setTopic] = useState(initialTopic);
     const [questionCount, setQuestionCount] = useState(10);
     const [loading, setLoading] = useState(false);
@@ -153,6 +156,20 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
         return uploadResult !== null;
     })();
 
+    function setQuestionTypeWithCount(next: "multiple_choice" | "structured") {
+        setQuestionType(next);
+        if (next === "structured") {
+            if (![1, 3, 5].includes(questionCount)) {
+                setQuestionCount(5);
+            }
+            return;
+        }
+
+        if (![5, 10, 15].includes(questionCount)) {
+            setQuestionCount(15);
+        }
+    }
+
     async function onGenerate() {
         if (!canGenerate) return;
 
@@ -160,6 +177,8 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
         try {
             const body: Record<string, unknown> = {
                 questionCount,
+                paperType: "paper2",
+                questionType,
                 idempotencyKey: crypto.randomUUID(),
             };
 
@@ -171,10 +190,6 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
             } else if (uploadResult) {
                 body.fromUploadId = uploadResult.uploadId;
                 body.fromUploadKind = uploadResult.kind;
-            }
-
-            if (style === "zimsec") {
-                body.style = "zimsec";
             }
 
             const response = await browserApiFetch<{ quizId: string }>(ROUTES.QUIZZES.GENERATE, {
@@ -192,31 +207,31 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
     return (
         <div className="space-y-5">
             <div>
-                <Label className="mb-2 block">Question style</Label>
+                <Label className="mb-2 block">Question type</Label>
                 <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-border bg-background-subtle p-1">
                     {([
-                        { id: "standard", label: "Standard" },
-                        { id: "zimsec", label: "ZIMSEC" },
+                        { id: "multiple_choice", label: "Multiple Choice" },
+                        { id: "structured", label: "Structured Questions" },
                     ] as const).map((opt) => (
                         <button
                             className={`rounded-lg px-3 py-2 text-xs font-medium transition-all ${
-                                style === opt.id
+                                questionType === opt.id
                                     ? "bg-white text-text-primary shadow-sm"
                                     : "text-text-tertiary hover:text-text-secondary"
                             }`}
                             key={opt.id}
-                            onClick={() => setStyle(opt.id)}
+                            onClick={() => setQuestionTypeWithCount(opt.id)}
                             type="button"
                         >
                             {opt.label}
                         </button>
                     ))}
                 </div>
-                {style === "zimsec" ? (
-                    <p className="mt-1.5 text-xs text-text-tertiary">
-                        Structured multi-part exam-style questions with marking schemes.
-                    </p>
-                ) : null}
+                <p className="mt-1.5 text-xs text-text-tertiary">
+                    {questionType === "structured"
+                        ? "Generates multi-part exam-style questions with marking schemes."
+                        : "Generates a mix of single-answer and select-all-that-apply questions."}
+                </p>
             </div>
 
             <div>
@@ -449,7 +464,7 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
                     onValueChange={(value) => setQuestionCount(Number(value))}
                     value={String(questionCount)}
                 >
-                    {[5, 10, 15].map((value) => (
+                    {(questionType === "structured" ? STRUCTURED_COUNTS : MULTIPLE_CHOICE_COUNTS).map((value) => (
                         <label
                             className="flex cursor-pointer items-center gap-2 rounded-xl border border-border p-3 hover:border-primary-300"
                             key={value}
