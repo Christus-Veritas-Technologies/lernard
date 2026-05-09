@@ -4,7 +4,13 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
-import type { QuizContent, ShortAnswerEvaluation, StructuredPartEvaluation, StructuredQuestion } from "@lernard/shared-types";
+import type {
+    QuizContent,
+    QuizDetailResponse,
+    ShortAnswerEvaluation,
+    StructuredPartEvaluation,
+    StructuredQuestion,
+} from "@lernard/shared-types";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -28,6 +34,9 @@ interface AnswerResult {
 export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     const router = useRouter();
     const [quiz, setQuiz] = useState<QuizContent | null>(null);
+    const [quizMode, setQuizMode] = useState<QuizDetailResponse["mode"] | null>(null);
+    const [queueEstimate, setQueueEstimate] = useState<number | null>(null);
+    const [failureReason, setFailureReason] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
@@ -49,8 +58,31 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
         setLoading(true);
         setError(null);
         try {
-            const data = await browserApiFetch<QuizContent>(ROUTES.QUIZZES.GET(quizId));
-            setQuiz(data);
+            const data = await browserApiFetch<QuizDetailResponse>(ROUTES.QUIZZES.GET(quizId));
+            setQuizMode(data.mode);
+
+            if (data.mode === "queued") {
+                setQueueEstimate(data.estimatedSecondsRemaining);
+                setFailureReason(null);
+                setQuiz(null);
+                return;
+            }
+
+            if (data.mode === "failed") {
+                setFailureReason(data.failureReason);
+                setQueueEstimate(null);
+                setQuiz(null);
+                return;
+            }
+
+            if (data.mode === "review") {
+                router.replace(`/quiz/${quizId}/results`);
+                return;
+            }
+
+            setFailureReason(null);
+            setQueueEstimate(null);
+            setQuiz(data.quiz);
             setAnswer("");
             setSelectedOptions([]);
             setResult(null);
@@ -63,9 +95,17 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
         } finally {
             setLoading(false);
         }
-    }, [quizId]);
+    }, [quizId, router]);
 
     useEffect(() => { void loadQuiz(); }, [loadQuiz]);
+
+    useEffect(() => {
+        if (quizMode !== "queued") return;
+        const timer = window.setInterval(() => {
+            void loadQuiz();
+        }, 3000);
+        return () => window.clearInterval(timer);
+    }, [quizMode, loadQuiz]);
 
     const progressValue = quiz
         ? ((quiz.currentQuestionIndex + 1) / Math.max(quiz.totalQuestions, 1)) * 100
@@ -79,6 +119,48 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     if (loading) return <div className="h-72 rounded-3xl bg-background-subtle" />;
 
     if (error || !quiz) {
+        if (quizMode === "queued") {
+            return (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Preparing your quiz</CardTitle>
+                        <CardDescription>
+                            This usually takes under a minute.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        <p className="text-sm text-text-secondary">
+                            {typeof queueEstimate === "number"
+                                ? `Estimated time remaining: ${Math.max(1, Math.ceil(queueEstimate / 5) * 5)}s`
+                                : "Estimated time remaining: calculating..."}
+                        </p>
+                        <Button onClick={loadQuiz} variant="secondary">
+                            Refresh now
+                        </Button>
+                    </CardContent>
+                </Card>
+            );
+        }
+
+        if (quizMode === "failed") {
+            return (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Quiz generation failed</CardTitle>
+                        <CardDescription>
+                            {failureReason ?? "Something went wrong while generating this quiz."}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex gap-3">
+                        <Button onClick={() => router.push("/quiz")} variant="secondary">
+                            Back to quiz dashboard
+                        </Button>
+                        <Button onClick={loadQuiz}>Try loading again</Button>
+                    </CardContent>
+                </Card>
+            );
+        }
+
         return (
             <Card>
                 <CardHeader>

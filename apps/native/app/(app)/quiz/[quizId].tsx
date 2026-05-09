@@ -4,7 +4,13 @@ import { ScrollView, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
-import type { QuizContent, ShortAnswerEvaluation, StructuredPartEvaluation, StructuredQuestion } from '@lernard/shared-types';
+import type {
+  QuizContent,
+  QuizDetailResponse,
+  ShortAnswerEvaluation,
+  StructuredPartEvaluation,
+  StructuredQuestion,
+} from '@lernard/shared-types';
 
 import { Text } from '@rnr/text';
 
@@ -23,6 +29,9 @@ export default function QuizScreen() {
   const router = useRouter();
 
   const [quiz, setQuiz] = useState<QuizContent | null>(null);
+  const [quizMode, setQuizMode] = useState<QuizDetailResponse['mode'] | null>(null);
+  const [queueEstimate, setQueueEstimate] = useState<number | null>(null);
+  const [failureReason, setFailureReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,8 +50,31 @@ export default function QuizScreen() {
     setLoading(true);
     setError(null);
     try {
-      const data = await nativeApiFetch<QuizContent>(ROUTES.QUIZZES.GET(quizId));
-      setQuiz(data);
+      const data = await nativeApiFetch<QuizDetailResponse>(ROUTES.QUIZZES.GET(quizId));
+      setQuizMode(data.mode);
+
+      if (data.mode === 'queued') {
+        setQueueEstimate(data.estimatedSecondsRemaining);
+        setFailureReason(null);
+        setQuiz(null);
+        return;
+      }
+
+      if (data.mode === 'failed') {
+        setFailureReason(data.failureReason);
+        setQueueEstimate(null);
+        setQuiz(null);
+        return;
+      }
+
+      if (data.mode === 'review') {
+        router.replace({ pathname: '/quiz/results/[quizId]', params: { quizId } });
+        return;
+      }
+
+      setFailureReason(null);
+      setQueueEstimate(null);
+      setQuiz(data.quiz);
       setAnswer('');
       setSelectedOptions([]);
       setResult(null);
@@ -55,9 +87,18 @@ export default function QuizScreen() {
     } finally {
       setLoading(false);
     }
-  }, [quizId]);
+  }, [quizId, router]);
 
   useEffect(() => { void loadQuiz(); }, [loadQuiz]);
+
+  useEffect(() => {
+    if (quizMode !== 'queued') return;
+    const timer = setInterval(() => {
+      void loadQuiz();
+    }, 3000);
+
+    return () => clearInterval(timer);
+  }, [quizMode, loadQuiz]);
 
   function toggleOption(option: string) {
     setSelectedOptions((prev) =>
@@ -136,6 +177,35 @@ export default function QuizScreen() {
   }
 
   if (error || !quiz) {
+    if (quizMode === 'queued') {
+      return (
+        <SafeAreaView className="flex-1 bg-white px-4 pt-6">
+          <Text className="mb-2 text-base font-semibold text-slate-900">Preparing your quiz...</Text>
+          <Text className="mb-4 text-sm text-slate-600">
+            {typeof queueEstimate === 'number'
+              ? `Estimated time remaining: ${Math.max(1, Math.ceil(queueEstimate / 5) * 5)}s`
+              : 'Estimated time remaining: calculating...'}
+          </Text>
+          <Button onPress={loadQuiz} title="Refresh" />
+        </SafeAreaView>
+      );
+    }
+
+    if (quizMode === 'failed') {
+      return (
+        <SafeAreaView className="flex-1 bg-white px-4 pt-6">
+          <Text className="mb-2 text-base font-semibold text-slate-900">Quiz generation failed</Text>
+          <Text className="mb-4 text-sm text-red-600">
+            {failureReason ?? 'Something went wrong while generating this quiz.'}
+          </Text>
+          <View className="gap-3">
+            <Button onPress={() => router.replace('/quiz')} title="Back to quiz" variant="secondary" />
+            <Button onPress={loadQuiz} title="Try again" />
+          </View>
+        </SafeAreaView>
+      );
+    }
+
     return (
       <SafeAreaView className="flex-1 bg-white px-4 pt-6">
         <Text className="mb-4 text-base text-red-600">{error ?? 'Quiz unavailable.'}</Text>
@@ -306,7 +376,7 @@ export default function QuizScreen() {
       <View className="flex-1 px-4 pt-5">
         <Text className="mb-5 text-lg font-semibold text-slate-900">{quiz.question.text}</Text>
 
-        {/* Multiple choice — radio */
+        {/* Multiple choice — radio */}
         {quiz.question.type === 'multiple_choice' && quiz.question.options ? (
           <View className="space-y-2">
             {quiz.question.options.map((option) => (

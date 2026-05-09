@@ -3,15 +3,23 @@
 import {
     BookOpen01Icon,
     Cancel01Icon,
+    Clock01Icon,
     DocumentAttachmentIcon,
     ImageUploadIcon,
+    MoreHorizontalCircle01Icon,
     PencilEdit01Icon,
+    RefreshIcon,
+    Rocket01Icon,
+    SchoolReportCardIcon,
+    SignalMedium02Icon,
     UploadCircle02Icon,
 } from "hugeicons-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
+import type { QuizDashboardStats, QuizHistoryItem, QuizHistoryResponse } from "@lernard/shared-types";
 
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -37,6 +45,16 @@ interface UploadResult {
     size: number;
 }
 
+const EMPTY_STATS: QuizDashboardStats = {
+    quizzesThisMonth: 0,
+    monthlyLimit: null,
+    averageScoreThisMonth: null,
+    quizzesInProgress: 0,
+    growthAreasFlagged: 0,
+    mostQuizzedSubject: null,
+    mostCommonDifficulty: null,
+};
+
 const SOURCE_TABS: { id: Source; label: string; icon: React.ReactNode }[] = [
     { id: "text", label: "Text", icon: <PencilEdit01Icon size={15} /> },
     { id: "lesson", label: "Past lesson", icon: <BookOpen01Icon size={15} /> },
@@ -56,6 +74,13 @@ export function QuizEntryClient() {
     const [topic, setTopic] = useState(initialTopic);
     const [questionCount, setQuestionCount] = useState(10);
     const [loading, setLoading] = useState(false);
+    const [dashboardLoading, setDashboardLoading] = useState(true);
+    const [dashboardError, setDashboardError] = useState<string | null>(null);
+    const [stats, setStats] = useState<QuizDashboardStats>(EMPTY_STATS);
+    const [history, setHistory] = useState<QuizHistoryItem[]>([]);
+    const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+    const [historyHasMore, setHistoryHasMore] = useState(false);
+    const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
 
     // Lesson source
     const [lessonSearch, setLessonSearch] = useState("");
@@ -75,6 +100,30 @@ export function QuizEntryClient() {
 
     const imageInputRef = useRef<HTMLInputElement>(null);
     const docInputRef = useRef<HTMLInputElement>(null);
+
+    const loadDashboard = useCallback(async () => {
+        setDashboardLoading(true);
+        setDashboardError(null);
+        try {
+            const [statsData, historyData] = await Promise.all([
+                browserApiFetch<QuizDashboardStats>(ROUTES.QUIZZES.DASHBOARD_STATS),
+                browserApiFetch<QuizHistoryResponse>(`${ROUTES.QUIZZES.HISTORY}?limit=8`),
+            ]);
+
+            setStats(statsData);
+            setHistory(historyData.quizzes);
+            setHistoryCursor(historyData.nextCursor);
+            setHistoryHasMore(historyData.hasMore);
+        } catch {
+            setDashboardError("Could not load your quiz dashboard yet.");
+        } finally {
+            setDashboardLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void loadDashboard();
+    }, [loadDashboard]);
 
     const loadLessons = useCallback(async () => {
         if (lessonsLoaded) return;
@@ -138,6 +187,22 @@ export function QuizEntryClient() {
         if (docInputRef.current) docInputRef.current.value = "";
     }
 
+    async function loadMoreHistory() {
+        if (!historyHasMore || !historyCursor || historyLoadingMore) return;
+
+        setHistoryLoadingMore(true);
+        try {
+            const nextPage = await browserApiFetch<QuizHistoryResponse>(
+                `${ROUTES.QUIZZES.HISTORY}?limit=8&cursor=${encodeURIComponent(historyCursor)}`,
+            );
+            setHistory((prev) => [...prev, ...nextPage.quizzes]);
+            setHistoryCursor(nextPage.nextCursor);
+            setHistoryHasMore(nextPage.hasMore);
+        } finally {
+            setHistoryLoadingMore(false);
+        }
+    }
+
     const filteredLessons = lessons.filter(
         (l) =>
             l.topic.toLowerCase().includes(lessonSearch.toLowerCase()) ||
@@ -180,19 +245,155 @@ export function QuizEntryClient() {
                 body: JSON.stringify(body),
             });
 
+            void loadDashboard();
             router.push(`/quiz/${response.quizId}`);
         } finally {
             setLoading(false);
         }
     }
 
+    const monthlyUsageLabel =
+        stats.monthlyLimit === null
+            ? `${stats.quizzesThisMonth} quizzes this month`
+            : `${stats.quizzesThisMonth} / ${stats.monthlyLimit} this month`;
+
+    const avgScoreLabel =
+        stats.averageScoreThisMonth === null
+            ? "No completed quizzes"
+            : `${stats.averageScoreThisMonth.toFixed(1)} / 10 average`;
+
+    function statusTone(status: QuizHistoryItem["status"]): string {
+        if (status === "completed") return "text-green-700 bg-green-50 border-green-200";
+        if (status === "in_progress") return "text-blue-700 bg-blue-50 border-blue-200";
+        if (status === "queued") return "text-amber-700 bg-amber-50 border-amber-200";
+        if (status === "failed") return "text-red-700 bg-red-50 border-red-200";
+        return "text-text-secondary bg-background-subtle border-border";
+    }
+
+    function statusLabel(status: QuizHistoryItem["status"]): string {
+        if (status === "in_progress") return "In progress";
+        if (status === "not_started") return "Not started";
+        if (status === "queued") return "Queued";
+        if (status === "failed") return "Failed";
+        return "Completed";
+    }
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Test yourself</CardTitle>
-                <CardDescription>Build a quiz on this topic.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
+        <div className="space-y-6">
+            <Card>
+                <CardHeader className="flex flex-row items-start justify-between gap-3">
+                    <div>
+                        <CardTitle>Quiz Dashboard</CardTitle>
+                        <CardDescription>
+                            Track your momentum and jump back into unfinished quizzes.
+                        </CardDescription>
+                    </div>
+                    <Button
+                        onClick={() => void loadDashboard()}
+                        size="sm"
+                        variant="ghost"
+                    >
+                        <RefreshIcon size={14} />
+                        Refresh
+                    </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    {dashboardError ? (
+                        <p className="rounded-xl border border-destructive/20 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                            {dashboardError}
+                        </p>
+                    ) : null}
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        <div className="rounded-2xl border border-border bg-background-subtle px-4 py-3">
+                            <p className="mb-1 flex items-center gap-1.5 text-xs text-text-tertiary">
+                                <Rocket01Icon size={13} />
+                                Monthly activity
+                            </p>
+                            <p className="text-sm font-semibold text-text-primary">
+                                {dashboardLoading ? "..." : monthlyUsageLabel}
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-background-subtle px-4 py-3">
+                            <p className="mb-1 flex items-center gap-1.5 text-xs text-text-tertiary">
+                                <SchoolReportCardIcon size={13} />
+                                Score trend
+                            </p>
+                            <p className="text-sm font-semibold text-text-primary">
+                                {dashboardLoading ? "..." : avgScoreLabel}
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-background-subtle px-4 py-3">
+                            <p className="mb-1 flex items-center gap-1.5 text-xs text-text-tertiary">
+                                <Clock01Icon size={13} />
+                                In progress
+                            </p>
+                            <p className="text-sm font-semibold text-text-primary">
+                                {dashboardLoading ? "..." : `${stats.quizzesInProgress} quiz${stats.quizzesInProgress === 1 ? "" : "zes"}`}
+                            </p>
+                        </div>
+                        <div className="rounded-2xl border border-border bg-background-subtle px-4 py-3">
+                            <p className="mb-1 flex items-center gap-1.5 text-xs text-text-tertiary">
+                                <SignalMedium02Icon size={13} />
+                                Growth areas
+                            </p>
+                            <p className="text-sm font-semibold text-text-primary">
+                                {dashboardLoading ? "..." : stats.growthAreasFlagged}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="text-sm font-semibold text-text-primary">Recent quizzes</p>
+                        <div className="space-y-2">
+                            {history.length === 0 ? (
+                                <p className="rounded-xl border border-border bg-background-subtle px-3 py-4 text-sm text-text-tertiary">
+                                    No quizzes yet. Generate one below to get started.
+                                </p>
+                            ) : (
+                                history.map((item) => (
+                                    <Link
+                                        className="block rounded-xl border border-border px-3 py-3 transition-colors hover:border-primary-300 hover:bg-primary-50"
+                                        href={`/quiz/${item.quizId}`}
+                                        key={item.quizId}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="truncate text-sm font-semibold text-text-primary">
+                                                    {item.topic}
+                                                </p>
+                                                <p className="mt-0.5 text-xs text-text-tertiary">
+                                                    {item.subjectName} • {item.paperType.toUpperCase()} • {item.difficulty}
+                                                </p>
+                                            </div>
+                                            <span className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${statusTone(item.status)}`}>
+                                                {statusLabel(item.status)}
+                                            </span>
+                                        </div>
+                                    </Link>
+                                ))
+                            )}
+                        </div>
+
+                        {historyHasMore ? (
+                            <Button
+                                onClick={() => void loadMoreHistory()}
+                                size="sm"
+                                variant="secondary"
+                            >
+                                <MoreHorizontalCircle01Icon size={14} />
+                                {historyLoadingMore ? "Loading..." : "Load more"}
+                            </Button>
+                        ) : null}
+                    </div>
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Generate a new quiz</CardTitle>
+                    <CardDescription>Build a fresh quiz on any topic.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
                 {/* Question style */}
                 <div>
                     <Label className="mb-2 block">Question style</Label>
@@ -476,7 +677,8 @@ export function QuizEntryClient() {
                 <Button disabled={!canGenerate} onClick={onGenerate}>
                     {loading ? "Generating…" : "Generate Quiz"}
                 </Button>
-            </CardContent>
-        </Card>
+                </CardContent>
+            </Card>
+        </div>
     );
 }
