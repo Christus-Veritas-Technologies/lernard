@@ -51,7 +51,7 @@ export function StudentFullScreenLoading() {
           </Text>
           <Text className="mt-3 text-2xl font-semibold text-slate-900">Preparing your learning space</Text>
           <Text className="mt-2 text-base leading-7 text-slate-600">
-            Loading lessons, quizzes, progress, and chat.
+            Loading lessons, Practice Exams, progress, and chat.
           </Text>
           <View className="mt-5 flex-row gap-2">
             {[0, 1, 2].map((index) => (

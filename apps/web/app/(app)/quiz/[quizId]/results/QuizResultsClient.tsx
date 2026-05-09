@@ -41,11 +41,11 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
                 }
 
                 if (detail.mode === "failed") {
-                    throw new Error(detail.failureReason ?? "Quiz generation failed.");
+                    throw new Error(detail.failureReason ?? "Practice exam generation failed.");
                 }
 
                 if (detail.mode === "queued") {
-                    throw new Error("Quiz is still being prepared. Please try again in a moment.");
+                    throw new Error("Practice exam is still being prepared. Please try again in a moment.");
                 }
 
                 const completed = await browserApiFetch<QuizCompletionResult>(ROUTES.QUIZZES.COMPLETE(quizId), {
@@ -116,12 +116,12 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Could not load quiz results</CardTitle>
+                    <CardTitle>Could not load practice exam results</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                     <p className="text-sm text-text-secondary">{loadError ?? "Please try again."}</p>
                     <Button onClick={() => router.push(`/quiz/${quizId}`)} variant="secondary">
-                        Back to quiz
+                        Back to practice exam
                     </Button>
                 </CardContent>
             </Card>
@@ -228,7 +228,7 @@ function buildReviewPrompt(remediation: QuizRemediationContext): string {
     const misconception = remediation.misconceptions[0];
 
     return [
-        `Help me review this ${remediation.topic} quiz.`,
+        `Help me review this ${remediation.topic} practice exam.`,
         weakList ? `Focus on these weak areas: ${weakList}.` : "Focus on my incorrect questions.",
         misconception
             ? `I believed "${misconception.studentBelievedX}" but the correct idea is "${misconception.correctAnswerIsY}". Explain this clearly.`

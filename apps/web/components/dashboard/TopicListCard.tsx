@@ -18,7 +18,7 @@ export function TopicListCard({ topics }: TopicListCardProps) {
     if (topics.length === 0) {
         return (
             <div className="flex items-center justify-center py-8 text-sm text-text-secondary">
-                Topics will appear here as you complete lessons and quizzes.
+                Topics will appear here as you complete lessons and Practice Exams.
             </div>
         );
     }

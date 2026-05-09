@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
 import type {
@@ -38,7 +38,9 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     const [queueEstimate, setQueueEstimate] = useState<number | null>(null);
     const [failureReason, setFailureReason] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [queuedRefreshing, setQueuedRefreshing] = useState(false);
     const [error, setError] = useState<Error | null>(null);
+    const loadInFlightRef = useRef(false);
 
     // single-value answer (most types)
     const [answer, setAnswer] = useState("");
@@ -54,9 +56,20 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     const [partSubmitting, setPartSubmitting] = useState<Record<string, boolean>>({});
     const [partResults, setPartResults] = useState<Record<string, StructuredPartEvaluation>>({});
 
-    const loadQuiz = useCallback(async () => {
-        setLoading(true);
+    const loadQuiz = useCallback(async (options?: { poll?: boolean }) => {
+        const isPoll = options?.poll ?? false;
+        if (loadInFlightRef.current) {
+            return;
+        }
+
+        loadInFlightRef.current = true;
+        if (isPoll) {
+            setQueuedRefreshing(true);
+        } else {
+            setLoading(true);
+        }
         setError(null);
+
         try {
             const data = await browserApiFetch<QuizDetailResponse>(ROUTES.QUIZZES.GET(quizId));
             setQuizMode(data.mode);
@@ -93,7 +106,12 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
         } catch (err) {
             setError(err instanceof Error ? err : new Error("Unable to load quiz."));
         } finally {
-            setLoading(false);
+            loadInFlightRef.current = false;
+            if (isPoll) {
+                setQueuedRefreshing(false);
+            } else {
+                setLoading(false);
+            }
         }
     }, [quizId, router]);
 
@@ -101,10 +119,28 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
 
     useEffect(() => {
         if (quizMode !== "queued") return;
-        const timer = window.setInterval(() => {
-            void loadQuiz();
-        }, 3000);
-        return () => window.clearInterval(timer);
+
+        let cancelled = false;
+        let timer: number | null = null;
+
+        const scheduleNextPoll = () => {
+            timer = window.setTimeout(async () => {
+                if (cancelled) return;
+                await loadQuiz({ poll: true });
+                if (!cancelled) {
+                    scheduleNextPoll();
+                }
+            }, 3000);
+        };
+
+        scheduleNextPoll();
+
+        return () => {
+            cancelled = true;
+            if (timer !== null) {
+                window.clearTimeout(timer);
+            }
+        };
     }, [quizMode, loadQuiz]);
 
     const progressValue = quiz
@@ -116,14 +152,14 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
             ? selectedOptions.length > 0
             : answer.trim().length > 0;
 
-    if (loading) return <div className="h-72 rounded-3xl bg-background-subtle" />;
+    if (loading && quizMode === null) return <div className="h-72 rounded-3xl bg-background-subtle" />;
 
     if (error || !quiz) {
         if (quizMode === "queued") {
             return (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Preparing your quiz</CardTitle>
+                        <CardTitle>Preparing your practice exam</CardTitle>
                         <CardDescription>
                             This usually takes under a minute.
                         </CardDescription>
@@ -134,8 +170,8 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                                 ? `Estimated time remaining: ${Math.max(1, Math.ceil(queueEstimate / 5) * 5)}s`
                                 : "Estimated time remaining: calculating..."}
                         </p>
-                        <Button onClick={loadQuiz} variant="secondary">
-                            Refresh now
+                        <Button disabled={queuedRefreshing} onClick={() => void loadQuiz({ poll: true })} variant="secondary">
+                            {queuedRefreshing ? "Refreshing..." : "Refresh now"}
                         </Button>
                     </CardContent>
                 </Card>
@@ -146,14 +182,14 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
             return (
                 <Card>
                     <CardHeader>
-                        <CardTitle>Quiz generation failed</CardTitle>
+                        <CardTitle>Practice exam generation failed</CardTitle>
                         <CardDescription>
-                            {failureReason ?? "Something went wrong while generating this quiz."}
+                            {failureReason ?? "Something went wrong while generating this practice exam."}
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex gap-3">
                         <Button onClick={() => router.push("/quiz")} variant="secondary">
-                            Back to quiz dashboard
+                            Back to Practice Exams dashboard
                         </Button>
                         <Button onClick={loadQuiz}>Try loading again</Button>
                     </CardContent>
@@ -164,7 +200,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
         return (
             <Card>
                 <CardHeader>
-                    <CardTitle>Could not load quiz</CardTitle>
+                    <CardTitle>Could not load practice exam</CardTitle>
                     <CardDescription>{error?.message ?? "Try again"}</CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -258,7 +294,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                     {quiz.currentQuestionIndex + 1} of {quiz.totalQuestions}
                 </Badge>
                 <Progress className="max-w-72" value={progressValue} />
-                <Button onClick={() => router.push("/home")} variant="ghost">
+                <Button onClick={() => router.push("/quiz")} variant="ghost">
                     Exit
                 </Button>
             </div>

@@ -31,11 +31,11 @@ export default function QuizResultsScreen() {
         }
 
         if (detail.mode === 'failed') {
-          throw new Error(detail.failureReason ?? 'Quiz generation failed.');
+          throw new Error(detail.failureReason ?? 'Practice exam generation failed.');
         }
 
         if (detail.mode === 'queued') {
-          throw new Error('Quiz is still being prepared. Please try again in a moment.');
+          throw new Error('Practice exam is still being prepared. Please try again in a moment.');
         }
 
         const completed = await nativeApiFetch<QuizCompletionResult>(ROUTES.QUIZZES.COMPLETE(quizId), {
@@ -63,7 +63,7 @@ export default function QuizResultsScreen() {
         <View className="mt-4">
           <Button
             onPress={() => router.replace({ pathname: '/quiz/[quizId]', params: { quizId } })}
-            title="Back to quiz"
+            title="Back to practice exam"
             variant="secondary"
           />
         </View>

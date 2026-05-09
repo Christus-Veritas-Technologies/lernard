@@ -5,8 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { QuizCreateForm } from "../QuizCreateForm";
 
 export const metadata: Metadata = {
-    title: "Create Quiz — Lernard",
-    description: "Build a fresh quiz from text, lessons, images, or a document.",
+    title: "Create Practice Exam — Lernard",
+    description: "Build a fresh practice exam from text, lessons, images, or a document.",
 };
 
 export default function QuizCreatePage() {
@@ -14,9 +14,9 @@ export default function QuizCreatePage() {
         <div className="mx-auto w-full max-w-3xl">
             <Card>
                 <CardHeader>
-                    <CardTitle>Create quiz</CardTitle>
+                    <CardTitle>Create practice exam</CardTitle>
                     <CardDescription>
-                        Choose your source, configure quiz length, and start practicing.
+                        Choose your source, configure practice exam length, and start practicing.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

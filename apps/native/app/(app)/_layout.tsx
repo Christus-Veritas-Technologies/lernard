@@ -95,13 +95,13 @@ export default function AppLayout() {
             >
                 <Tabs.Screen name="(home)" options={{ title: 'Home', href: role === Role.GUARDIAN ? null : undefined }} />
                 <Tabs.Screen name="learn/index" options={{ title: 'Learn', href: role === Role.GUARDIAN ? null : undefined }} />
+                <Tabs.Screen name="quiz/index" options={{ title: 'Practice Exams', href: role === Role.GUARDIAN ? null : undefined }} />
                 <Tabs.Screen name="(chat)/index" options={{ title: 'Chat', href: role === Role.GUARDIAN ? null : undefined }} />
                 <Tabs.Screen name="(progress)" options={{ title: 'Progress', href: null }} />
                 <Tabs.Screen name="settings" options={{ title: 'Settings', href: role === Role.GUARDIAN ? undefined : null }} />
                 <Tabs.Screen name="guardian" options={{ title: 'Household', href: role === Role.GUARDIAN ? undefined : null }} />
                 <Tabs.Screen name="learn/[lessonId]" options={{ href: null }} />
                 <Tabs.Screen name="learn/complete" options={{ href: null }} />
-                <Tabs.Screen name="quiz/index" options={{ href: null }} />
                 <Tabs.Screen name="quiz/create" options={{ href: null }} />
                 <Tabs.Screen name="quiz/entry" options={{ href: null }} />
                 <Tabs.Screen name="quiz/[quizId]" options={{ href: null }} />

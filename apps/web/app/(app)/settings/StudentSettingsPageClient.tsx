@@ -200,7 +200,7 @@ export function StudentSettingsPageClient({ content, permissions }: StudentSetti
                                 {planUsage.quizzesLimit > 0 && (
                                     <div className="flex flex-col gap-1.5">
                                         <div className="flex justify-between text-xs text-text-secondary">
-                                            <span>Quizzes</span>
+                                            <span>Practice Exams</span>
                                             <span>{planUsage.quizzesUsed} / {planUsage.quizzesLimit}</span>
                                         </div>
                                         <Progress
@@ -223,7 +223,7 @@ export function StudentSettingsPageClient({ content, permissions }: StudentSetti
                             <CardHeader>
                                 <CardTitle>Session defaults</CardTitle>
                                 <CardDescription>
-                                    These stay aligned with your onboarding profile so lessons and quizzes keep the same rhythm.
+                                    These stay aligned with your onboarding profile so lessons and Practice Exams keep the same rhythm.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-0 divide-y divide-border">

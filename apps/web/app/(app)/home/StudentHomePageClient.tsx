@@ -87,7 +87,7 @@ export function StudentHomePageClient() {
                             </div>
                         </div>
                         <p className="max-w-2xl text-sm leading-6 text-white/82">
-                            Your dashboard is built around momentum first: quick progress reads, subject health, and fast actions into lessons, quizzes, and chat.
+                            Your dashboard is built around momentum first: quick progress reads, subject health, and fast actions into lessons, Practice Exams, and chat.
                         </p>
                         <div className="flex flex-wrap gap-2">
                             <Badge className="bg-emerald-100 text-emerald-900" tone="muted">{content.streak}-day streak</Badge>
@@ -145,7 +145,7 @@ export function StudentHomePageClient() {
             </Card>
 
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                <MetricCard description="Completed lessons and quizzes" icon={<BookOpen01Icon size={18} strokeWidth={1.8} />} label="Total sessions" tone="cool" value={`${content.totalSessions}`} />
+                <MetricCard description="Completed lessons and Practice Exams" icon={<BookOpen01Icon size={18} strokeWidth={1.8} />} label="Total sessions" tone="cool" value={`${content.totalSessions}`} />
                 <MetricCard description="Accuracy across tracked topics" icon={<SchoolBell01Icon size={18} strokeWidth={1.8} />} label="Pass rate" tone="primary" value={`${content.passRate}%`} />
                 <MetricCard description="Strong topics out of all tracked" icon={<ChartBarLineIcon size={18} strokeWidth={1.8} />} label="Mastered topics" tone="success" value={`${content.masteredTopicCount}/${content.totalTopicCount}`} />
                 <MetricCard description="Progress toward your daily target" icon={<Message01Icon size={18} strokeWidth={1.8} />} label="Daily goal" tone="warm" value={`${content.dailyGoalProgress}/${content.dailyGoalTarget}`} />
@@ -164,7 +164,7 @@ export function StudentHomePageClient() {
                 <Link href="/quiz/create">
                     <Button className="w-full" variant="secondary">
                         <SchoolBell01Icon size={16} strokeWidth={1.8} />
-                        New quiz
+                        New practice exam
                     </Button>
                 </Link>
                 <Link href="/chat">
@@ -259,7 +259,7 @@ export function StudentHomePageClient() {
                                     </div>
                                 ))
                             ) : (
-                                <p className="text-sm text-text-secondary">Finish one lesson or quiz to unlock topic-level readiness.</p>
+                                <p className="text-sm text-text-secondary">Finish one lesson or Practice Exam to unlock topic-level readiness.</p>
                             )}
                         </CardContent>
                     </Card>
@@ -291,7 +291,7 @@ export function StudentHomePageClient() {
                 <Card>
                     <CardHeader>
                         <CardTitle>Recent sessions</CardTitle>
-                        <CardDescription>Last lessons and quizzes from your activity stream.</CardDescription>
+                        <CardDescription>Last lessons and Practice Exams from your activity stream.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         {content.recentSessions.length ? (
@@ -307,7 +307,7 @@ export function StudentHomePageClient() {
                                 <TableBody>
                                     {content.recentSessions.map((session) => (
                                         <TableRow key={session.id}>
-                                            <TableCell><Badge tone={session.type === "quiz" ? "warm" : "cool"}>{session.type === "quiz" ? "Quiz" : "Lesson"}</Badge></TableCell>
+                                            <TableCell><Badge tone={session.type === "quiz" ? "warm" : "cool"}>{session.type === "quiz" ? "Practice Exam" : "Lesson"}</Badge></TableCell>
                                             <TableCell className="font-medium">{session.topic}</TableCell>
                                             <TableCell>{session.subjectName}</TableCell>
                                             <TableCell>{formatRelativeTime(session.completedAt)}</TableCell>
@@ -386,7 +386,7 @@ function PlanUsageRow({ planUsage }: { planUsage: PlanUsage }) {
             )}
             {showQuizzes && (
                 <div className="flex flex-1 min-w-[140px] items-center gap-2">
-                    <span className="text-xs text-text-secondary whitespace-nowrap">Quizzes</span>
+                    <span className="text-xs text-text-secondary whitespace-nowrap">Practice Exams</span>
                     <Progress
                         value={quizPct}
                         className={`flex-1 ${quizPct >= 100 ? "[&>div]:bg-destructive" : "[&>div]:bg-primary"}`}

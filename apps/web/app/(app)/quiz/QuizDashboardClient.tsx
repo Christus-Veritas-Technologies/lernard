@@ -65,7 +65,7 @@ export function QuizDashboardClient() {
             setHistoryCursor(historyData.nextCursor);
             setHistoryHasMore(historyData.hasMore);
         } catch {
-            setDashboardError("Could not load your quiz dashboard yet.");
+            setDashboardError("Could not load your Practice Exams dashboard yet.");
         } finally {
             setDashboardLoading(false);
         }
@@ -93,12 +93,12 @@ export function QuizDashboardClient() {
 
     const monthlyUsageLabel =
         stats.monthlyLimit === null
-            ? `${stats.quizzesThisMonth} quizzes this month`
+            ? `${stats.quizzesThisMonth} practice exams this month`
             : `${stats.quizzesThisMonth} / ${stats.monthlyLimit} this month`;
 
     const avgScoreLabel =
         stats.averageScoreThisMonth === null
-            ? "No completed quizzes"
+            ? "No completed practice exams"
             : `${stats.averageScoreThisMonth.toFixed(1)} / 10 average`;
 
     return (
@@ -121,20 +121,20 @@ export function QuizDashboardClient() {
                     ) : (
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                             <div className="space-y-2 flex-1">
-                                <Badge className="w-fit" tone="cool">Quiz Dashboard</Badge>
+                                <Badge className="w-fit" tone="cool">Practice Exams Dashboard</Badge>
                                 <CardTitle className="text-2xl">Build momentum with targeted practice</CardTitle>
                                 <CardDescription>
-                                    Track activity, revisit unfinished quizzes, and launch fresh practice from one place.
+                                    Track activity, revisit unfinished practice exams, and launch fresh practice from one place.
                                 </CardDescription>
                                 <Dialog onOpenChange={setDialogOpen} open={dialogOpen}>
                                     <DialogTrigger asChild>
-                                        <Button className="w-fit">Create new quiz</Button>
+                                        <Button className="w-fit">Create new practice exam</Button>
                                     </DialogTrigger>
                                     <DialogContent className="max-w-3xl">
                                         <DialogHeader>
-                                            <DialogTitle>Generate a new quiz</DialogTitle>
+                                            <DialogTitle>Generate a new practice exam</DialogTitle>
                                             <DialogDescription>
-                                                Pick a source, choose your quiz length, then start immediately.
+                                                Pick a source, choose your practice exam length, then start immediately.
                                             </DialogDescription>
                                         </DialogHeader>
                                         <QuizCreateForm
@@ -183,7 +183,7 @@ export function QuizDashboardClient() {
                         <DashboardStatCard
                             icon={<Clock01Icon size={20} className="text-blue-600" />}
                             label="In progress"
-                            value={`${stats.quizzesInProgress} quiz${stats.quizzesInProgress === 1 ? "" : "zes"}`}
+                            value={`${stats.quizzesInProgress} practice exam${stats.quizzesInProgress === 1 ? "" : "s"}`}
                             bgColor="bg-blue-50"
                             borderColor="border-blue-200"
                         />
@@ -200,9 +200,9 @@ export function QuizDashboardClient() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Recent quiz history</CardTitle>
+                    <CardTitle>Recent Practice Exams history</CardTitle>
                     <CardDescription>
-                        Every generated quiz appears here so you can resume, review, or retry quickly.
+                        Every generated practice exam appears here so you can resume, review, or retry quickly.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -241,7 +241,7 @@ export function QuizDashboardClient() {
                         </div>
                     ) : history.length === 0 ? (
                         <p className="rounded-xl border border-border bg-background-subtle px-3 py-4 text-sm text-text-tertiary">
-                            No quizzes yet. Use Create new quiz to start your first one.
+                            No practice exams yet. Use Create new practice exam to start your first one.
                         </p>
                     ) : (
                         <div className="overflow-x-auto">

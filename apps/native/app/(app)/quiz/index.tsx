@@ -58,7 +58,7 @@ export default function QuizDashboardScreen() {
       setHistoryCursor(historyData.nextCursor);
       setHistoryHasMore(historyData.hasMore);
     } catch {
-      setDashboardError('Could not load your quiz dashboard yet.');
+      setDashboardError('Could not load your Practice Exams dashboard yet.');
     } finally {
       setDashboardLoading(false);
     }
@@ -86,12 +86,12 @@ export default function QuizDashboardScreen() {
 
   const monthlyUsageLabel =
     stats.monthlyLimit === null
-      ? `${stats.quizzesThisMonth} quizzes this month`
+      ? `${stats.quizzesThisMonth} practice exams this month`
       : `${stats.quizzesThisMonth} / ${stats.monthlyLimit} this month`;
 
   const avgScoreLabel =
     stats.averageScoreThisMonth === null
-      ? 'No completed quizzes'
+      ? 'No completed practice exams'
       : `${stats.averageScoreThisMonth.toFixed(1)} / 10 average`;
 
   return (
@@ -118,16 +118,16 @@ export default function QuizDashboardScreen() {
               <CardHeader className="gap-3">
                 <View className="flex-row items-start justify-between gap-3">
                   <View className="flex-1">
-                    <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-700">Quiz Dashboard</Text>
+                    <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-700">Practice Exams Dashboard</Text>
                     <CardTitle className="text-2xl">Build momentum with targeted practice</CardTitle>
                     <Text className="text-sm leading-6 text-slate-600">
-                      Check your progress, review history, and launch a new quiz only when you choose to.
+                      Check your progress, review history, and launch a new practice exam only when you choose to.
                     </Text>
                   </View>
                 </View>
               </CardHeader>
               <CardContent className="mt-3 gap-2">
-                <Button onPress={() => setShowCreateModal(true)} title="Create new quiz" />
+                <Button onPress={() => setShowCreateModal(true)} title="Create new practice exam" />
                 <Button onPress={() => router.push('/quiz/create')} title="Open full create page" variant="secondary" />
                 <Button
                   iconLeft={<RefreshIcon color="#334155" size={16} strokeWidth={1.8} />}
@@ -161,7 +161,7 @@ export default function QuizDashboardScreen() {
               <MetricCard
                 icon={<Clock01Icon color="#2563eb" size={18} />}
                 label="In progress"
-                value={`${stats.quizzesInProgress} quiz${stats.quizzesInProgress === 1 ? '' : 'zes'}`}
+                value={`${stats.quizzesInProgress} practice exam${stats.quizzesInProgress === 1 ? '' : 's'}`}
                 bgColor="bg-blue-50"
                 borderColor="border-blue-200"
               />
@@ -172,7 +172,7 @@ export default function QuizDashboardScreen() {
 
         <Card className="p-4">
           <CardHeader className="gap-1">
-            <CardTitle className="text-lg">Recent quiz history</CardTitle>
+            <CardTitle className="text-lg">Recent Practice Exams history</CardTitle>
             <Text className="text-sm text-slate-500">Open any row to continue or review.</Text>
           </CardHeader>
           <CardContent className="gap-2">
@@ -198,7 +198,7 @@ export default function QuizDashboardScreen() {
               ))
             ) : history.length === 0 ? (
               <View className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
-                <Text className="text-sm text-slate-500">No quizzes yet. Tap Create new quiz to start your first one.</Text>
+                <Text className="text-sm text-slate-500">No practice exams yet. Tap Create new practice exam to start your first one.</Text>
               </View>
             ) : (
               history.map((item) => (
@@ -229,7 +229,7 @@ export default function QuizDashboardScreen() {
           <View className="max-h-[88%] rounded-t-[28px] bg-white px-4 pb-8 pt-5">
             <View className="mb-4 flex-row items-center justify-between">
               <View>
-                <Text className="text-lg font-semibold text-slate-900">Create new quiz</Text>
+                <Text className="text-lg font-semibold text-slate-900">Create new practice exam</Text>
                 <Text className="text-sm text-slate-500">This opens only when you choose it.</Text>
               </View>
               <Button onPress={() => setShowCreateModal(false)} title="Close" variant="ghost" />

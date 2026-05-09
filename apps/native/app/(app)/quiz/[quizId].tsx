@@ -180,7 +180,7 @@ export default function QuizScreen() {
     if (quizMode === 'queued') {
       return (
         <SafeAreaView className="flex-1 bg-white px-4 pt-6">
-          <Text className="mb-2 text-base font-semibold text-slate-900">Preparing your quiz...</Text>
+          <Text className="mb-2 text-base font-semibold text-slate-900">Preparing your practice exam...</Text>
           <Text className="mb-4 text-sm text-slate-600">
             {typeof queueEstimate === 'number'
               ? `Estimated time remaining: ${Math.max(1, Math.ceil(queueEstimate / 5) * 5)}s`
@@ -194,12 +194,12 @@ export default function QuizScreen() {
     if (quizMode === 'failed') {
       return (
         <SafeAreaView className="flex-1 bg-white px-4 pt-6">
-          <Text className="mb-2 text-base font-semibold text-slate-900">Quiz generation failed</Text>
+          <Text className="mb-2 text-base font-semibold text-slate-900">Practice exam generation failed</Text>
           <Text className="mb-4 text-sm text-red-600">
-            {failureReason ?? 'Something went wrong while generating this quiz.'}
+            {failureReason ?? 'Something went wrong while generating this practice exam.'}
           </Text>
           <View className="gap-3">
-            <Button onPress={() => router.replace('/quiz')} title="Back to quiz" variant="secondary" />
+            <Button onPress={() => router.replace('/quiz')} title="Back to Practice Exams" variant="secondary" />
             <Button onPress={loadQuiz} title="Try again" />
           </View>
         </SafeAreaView>
@@ -208,7 +208,7 @@ export default function QuizScreen() {
 
     return (
       <SafeAreaView className="flex-1 bg-white px-4 pt-6">
-        <Text className="mb-4 text-base text-red-600">{error ?? 'Quiz unavailable.'}</Text>
+        <Text className="mb-4 text-base text-red-600">{error ?? 'Practice exam unavailable.'}</Text>
         <Button onPress={loadQuiz} title="Try again" />
       </SafeAreaView>
     );
@@ -226,7 +226,7 @@ export default function QuizScreen() {
               {quiz.currentQuestionIndex + 1} of {quiz.totalQuestions}
             </Text>
           </View>
-          <TouchableOpacity onPress={() => router.replace('/')}>
+          <TouchableOpacity onPress={() => router.replace('/quiz')}>
             <Text className="text-sm text-slate-600">Exit</Text>
           </TouchableOpacity>
         </View>
