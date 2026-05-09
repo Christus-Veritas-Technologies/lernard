@@ -273,7 +273,7 @@ export class QuizzesService {
 
       await (this.prisma as any).quiz.update({
         where: { id: input.quizId },
-        data: {
+        data: { 
           status: 'FAILED',
           failedAt: new Date(),
           failureReason: message.slice(0, 500),
