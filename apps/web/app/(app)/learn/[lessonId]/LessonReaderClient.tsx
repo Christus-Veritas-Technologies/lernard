@@ -315,7 +315,12 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
                                 {section.heading ?? sectionLabel(section.type, index)}
                             </h2>
 
-                            <MarkdownSection body={section.body} section={section} />
+                            <MarkdownSection
+                                body={section.body}
+                                section={section}
+                                copiedCodeIndex={copiedCodeIndex}
+                                setCopiedCodeIndex={setCopiedCodeIndex}
+                            />
 
                             {section.type !== "recap" && (
                                 <div className="mt-6 border-t border-slate-200 pt-4">
@@ -389,7 +394,17 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
     );
 }
 
-function MarkdownSection({ body, section }: { body: string; section: LessonSection }) {
+function MarkdownSection({
+    body,
+    section,
+    copiedCodeIndex,
+    setCopiedCodeIndex,
+}: {
+    body: string;
+    section: LessonSection;
+    copiedCodeIndex: string | null;
+    setCopiedCodeIndex: (value: string | null) => void;
+}) {
     const decorated = useMemo(() => decorateBodyMarkdown(body, section.terms), [body, section.terms]);
 
     if (section.type === "recap") {
@@ -426,6 +441,7 @@ function MarkdownSection({ body, section }: { body: string; section: LessonSecti
                         const match = /language-(\w+)/.exec(className || "");
                         const language = match?.[1] ?? "text";
                         const isInline = !className;
+                        const codeId = `code-${language}-${content.slice(0, 24)}-${content.length}`;
 
                         if (isInline) {
                             return (
@@ -442,14 +458,13 @@ function MarkdownSection({ body, section }: { body: string; section: LessonSecti
                                     <button
                                         className="rounded border border-slate-600 px-2 py-1 text-[11px] transition-all hover:border-slate-500 hover:bg-slate-800 active:scale-95 disabled:opacity-50"
                                         onClick={() => {
-                                            const codeId = `code-${Date.now()}-${Math.random()}`;
                                             void navigator.clipboard.writeText(content);
                                             setCopiedCodeIndex(codeId);
                                             setTimeout(() => setCopiedCodeIndex(null), 2000);
                                         }}
                                         type="button"
                                     >
-                                        {copiedCodeIndex && copiedCodeIndex.startsWith(`code-`) ? "Copied!" : "Copy"}
+                                        {copiedCodeIndex === codeId ? "Copied!" : "Copy"}
                                     </button>
                                 </div>
                                 <pre className="overflow-x-auto p-3 text-sm text-slate-100">

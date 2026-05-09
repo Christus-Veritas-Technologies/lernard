@@ -92,7 +92,9 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
         <div className="flex flex-col gap-6">
             <Card>
                 <CardHeader>
-                    <CardTitle>{result.debriefText}</CardTitle>
+                    <CardTitle className="text-base leading-6 sm:text-lg sm:leading-7">
+                        {formatDebriefText(result.debriefText)}
+                    </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                     <Progress value={percentage} />
@@ -136,10 +138,10 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
                                         : "border-red-200";
                         return (
                             <div className={`rounded-2xl border p-4 ${evalColor}`} key={`${index}-${question.text}`}>
-                                <div className="flex items-start justify-between gap-2">
-                                    <p className="font-medium text-text-primary">{question.text}</p>
+                                <div className="flex flex-wrap items-start gap-2">
+                                    <p className="min-w-0 flex-1 text-sm font-medium text-text-primary sm:text-base">{question.text}</p>
                                     {question.subtopic ? (
-                                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-text-tertiary">
+                                        <span className="max-w-full rounded-full bg-slate-100 px-2 py-0.5 text-xs text-text-tertiary break-words">
                                             {question.subtopic}
                                         </span>
                                     ) : null}
@@ -173,6 +175,10 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
             </div>
         </div>
     );
+}
+
+function formatDebriefText(value: string): string {
+    return value.replace(/\s+—\s+/g, "\n\n");
 }
 
 function buildReviewPrompt(remediation: QuizRemediationContext): string {
