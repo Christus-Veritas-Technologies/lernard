@@ -8,7 +8,6 @@ import {
     SchoolReportCardIcon,
     SignalMedium02Icon,
 } from "hugeicons-react";
-import Link from "next/link";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
@@ -126,11 +125,9 @@ export function QuizDashboardClient() {
                                 <CardDescription>
                                     Track activity, revisit unfinished quizzes, and launch fresh practice from one place.
                                 </CardDescription>
-                            </div>
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                 <Dialog onOpenChange={setDialogOpen} open={dialogOpen}>
                                     <DialogTrigger asChild>
-                                        <Button>Create new quiz</Button>
+                                        <Button className="w-fit">Create new quiz</Button>
                                     </DialogTrigger>
                                     <DialogContent className="max-w-3xl">
                                         <DialogHeader>
@@ -147,9 +144,8 @@ export function QuizDashboardClient() {
                                         />
                                     </DialogContent>
                                 </Dialog>
-                                <Link href="/quiz/create">
-                                    <Button variant="secondary">Open full create page</Button>
-                                </Link>
+                            </div>
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                                 <Button className="px-3" onClick={() => void loadDashboard()} variant="ghost">
                                     <RefreshIcon size={14} />
                                 </Button>
