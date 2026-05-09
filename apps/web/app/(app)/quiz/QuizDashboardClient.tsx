@@ -8,6 +8,7 @@ import {
     SchoolReportCardIcon,
     SignalMedium02Icon,
 } from "hugeicons-react";
+import Link from "next/link";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
