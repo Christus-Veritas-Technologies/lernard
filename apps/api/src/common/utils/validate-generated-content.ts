@@ -217,7 +217,7 @@ function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
       );
     }
 
-    if (!/(because|therefore|which means|so that|this is why)/i.test(explanation)) {
+    if (!hasExplanationJustificationSignal(explanation)) {
       throw new ContentValidationError(
         'Quiz explanations must clearly justify why the answer is correct',
       );
@@ -431,6 +431,12 @@ function isLessonPayload(
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasExplanationJustificationSignal(text: string): boolean {
+  return /\b(because|therefore|which means|so that|this is why|since|due to|as a result|allows|prevents|causes|ensures|keeps|leads to|results in)\b/i.test(
+    text,
+  );
 }
 
 function countWords(text: string): number {

@@ -87,6 +87,12 @@ interface RefinedQuizPrompt {
   mustCover: string[];
 }
 
+interface QuizOutputPayload {
+  topic?: string;
+  subjectName?: string;
+  questions?: GeneratedQuizQuestion[];
+}
+
 export interface ChatToolExecutor {
   createLesson(input: {
     topic: string;
@@ -288,34 +294,42 @@ export class MastraService {
 
     return this.runWithRetry(async () => {
       let maxTokens = quizMaxTokens(input.questionCount, input.style);
-      let parsed: { questions?: GeneratedQuizQuestion[] } | null = null;
-      let lastText = '';
+      let parsed: QuizOutputPayload | null = null;
+      let lastRawOutput = '';
+      const attemptRawOutputs: string[] = [];
 
       for (let attempt = 1; attempt <= 3; attempt++) {
-        const text = await this.completeText({
+        const structured = await this.completeStructuredQuizPayload({
           model: SONNET_MODEL,
           maxTokens,
           systemPrompt,
           messages: [{ role: 'user', content: refinedPrompt }],
+          includeTopicAndSubject: false,
+          contextTag: 'generateQuiz',
         });
 
-        lastText = text;
-        const candidates = buildJsonCandidates(text);
-        const parseResult = parseQuizPayloadFromModelText(text);
-        const truncatedByHeuristic = isResponseTruncated(text);
+        lastRawOutput = structured.rawOutput;
+        attemptRawOutputs.push(
+          `attempt=${attempt} raw=${structured.rawOutput}`,
+        );
+        const parseResult = structured.payload;
 
         this.logger.log(
-          `[mastra.generateQuiz] attempt=${attempt} maxTokens=${maxTokens} textChars=${text.length} candidateCount=${candidates.length} parsed=${parseResult ? 'yes' : 'no'} truncatedHeuristic=${truncatedByHeuristic} tail="${truncateForLog(text.slice(Math.max(0, text.length - 220)).replace(/\s+/g, ' '), 220)}"`,
+          `[mastra.generateQuiz] attempt=${attempt} maxTokens=${maxTokens} parsed=${Array.isArray(parseResult?.questions) ? 'yes' : 'no'} rawChars=${structured.rawOutput.length}`,
         );
 
-        if (parseResult && Array.isArray(parseResult.questions)) {
+        if (Array.isArray(parseResult?.questions)) {
           parsed = parseResult;
           break;
         }
 
         if (attempt === 3) {
+          this.logRawAiOutputsOnError(
+            'mastra.generateQuiz.parse_failed_after_retries',
+            attemptRawOutputs,
+          );
           throw new ContentValidationError(
-            'Quiz generation returned malformed JSON after retries',
+            'Quiz generation returned malformed structured output after retries',
           );
         }
 
@@ -323,11 +337,15 @@ export class MastraService {
       }
 
       if (!parsed || !Array.isArray(parsed.questions)) {
+        this.logRawAiOutputsOnError(
+          'mastra.generateQuiz.parse_failed_after_retries',
+          attemptRawOutputs,
+        );
         this.logger.error(
-          `[mastra.generateQuiz] parse_failed_after_retries textChars=${lastText.length} tail="${truncateForLog(lastText.slice(Math.max(0, lastText.length - 320)).replace(/\s+/g, ' '), 320)}"`,
+          `[mastra.generateQuiz] parse_failed_after_retries rawChars=${lastRawOutput.length}`,
         );
         throw new ContentValidationError(
-          'Quiz generation returned malformed JSON',
+          'Quiz generation returned malformed structured output',
         );
       }
 
@@ -354,13 +372,25 @@ export class MastraService {
       });
 
       if (completed.length < input.questionCount) {
+        this.logRawAiOutputsOnError(
+          'mastra.generateQuiz.insufficient_usable_questions',
+          attemptRawOutputs,
+        );
         throw new ContentValidationError(
           `Quiz generation returned ${completed.length} usable questions, expected ${input.questionCount}`,
         );
       }
 
       const finalQuestions = completed.slice(0, input.questionCount);
-      assertQuizContentValid({ questions: finalQuestions });
+      try {
+        assertQuizContentValid({ questions: finalQuestions });
+      } catch (error) {
+        this.logRawAiOutputsOnError(
+          'mastra.generateQuiz.validation_failed',
+          attemptRawOutputs,
+        );
+        throw error;
+      }
 
       return {
         topic: input.topic,
@@ -530,19 +560,28 @@ export class MastraService {
         : [input.baseUserContent, supplementInstruction].join('\n\n'),
     };
 
-    const supplementText = await this.completeText({
+    const structuredSupplement = await this.completeStructuredQuizPayload({
       model: SONNET_MODEL,
       maxTokens: Math.min(Math.round(input.baseMaxTokens * 1.2), 28000),
       systemPrompt: input.systemPrompt,
       messages: [supplementMessage],
+      includeTopicAndSubject: false,
+      contextTag: `${input.contextTag}.supplement`,
     });
 
-    const parsed = parseQuizPayloadFromModelText(supplementText);
+    const parsed = structuredSupplement.payload;
     const supplementalQuestions = Array.isArray(parsed?.questions)
       ? parsed.questions
           .map((question) => normalizeGeneratedQuestion(question))
           .filter(isUsableGeneratedQuestion)
       : [];
+
+    if (supplementalQuestions.length === 0) {
+      this.logRawAiOutputsOnError(
+        `mastra.${input.contextTag}.supplement_no_usable_questions`,
+        [structuredSupplement.rawOutput],
+      );
+    }
 
     const merged = [...input.existingQuestions];
     for (const question of supplementalQuestions) {
@@ -629,42 +668,42 @@ export class MastraService {
 
     return this.runWithRetry(async () => {
       let maxTokens = quizMaxTokens(input.questionCount, input.style);
-      let parsed: {
-        topic?: string;
-        subjectName?: string;
-        questions?: GeneratedQuizQuestion[];
-      } | null = null;
-      let lastText = '';
+      let parsed: QuizOutputPayload | null = null;
+      let lastRawOutput = '';
+      const attemptRawOutputs: string[] = [];
 
       for (let attempt = 1; attempt <= 3; attempt++) {
-        const text = await this.completeText({
+        const structured = await this.completeStructuredQuizPayload({
           model: SONNET_MODEL,
           maxTokens,
           systemPrompt,
           messages: [{ role: 'user', content: [fileBlock, textBlock] }],
+          includeTopicAndSubject: true,
+          contextTag: 'generateQuizFromFile',
         });
 
-        lastText = text;
-        const candidates = buildJsonCandidates(text);
-        const parseResult = parseQuizPayloadFromModelText(text) as {
-          topic?: string;
-          subjectName?: string;
-          questions?: GeneratedQuizQuestion[];
-        } | null;
-        const truncatedByHeuristic = isResponseTruncated(text);
+        lastRawOutput = structured.rawOutput;
+        attemptRawOutputs.push(
+          `attempt=${attempt} raw=${structured.rawOutput}`,
+        );
+        const parseResult = structured.payload;
 
         this.logger.log(
-          `[mastra.generateQuizFromFile] attempt=${attempt} maxTokens=${maxTokens} textChars=${text.length} candidateCount=${candidates.length} parsed=${parseResult ? 'yes' : 'no'} truncatedHeuristic=${truncatedByHeuristic} tail="${truncateForLog(text.slice(Math.max(0, text.length - 220)).replace(/\s+/g, ' '), 220)}"`,
+          `[mastra.generateQuizFromFile] attempt=${attempt} maxTokens=${maxTokens} parsed=${Array.isArray(parseResult?.questions) ? 'yes' : 'no'} rawChars=${structured.rawOutput.length}`,
         );
 
-        if (parseResult && Array.isArray(parseResult.questions)) {
+        if (Array.isArray(parseResult?.questions)) {
           parsed = parseResult;
           break;
         }
 
         if (attempt === 3) {
+          this.logRawAiOutputsOnError(
+            'mastra.generateQuizFromFile.parse_failed_after_retries',
+            attemptRawOutputs,
+          );
           throw new ContentValidationError(
-            'Quiz-from-file generation returned malformed JSON after retries',
+            'Quiz-from-file generation returned malformed structured output after retries',
           );
         }
 
@@ -672,11 +711,15 @@ export class MastraService {
       }
 
       if (!parsed || !Array.isArray(parsed.questions)) {
+        this.logRawAiOutputsOnError(
+          'mastra.generateQuizFromFile.parse_failed_after_retries',
+          attemptRawOutputs,
+        );
         this.logger.error(
-          `[mastra.generateQuizFromFile] parse_failed_after_retries textChars=${lastText.length} tail="${truncateForLog(lastText.slice(Math.max(0, lastText.length - 320)).replace(/\s+/g, ' '), 320)}"`,
+          `[mastra.generateQuizFromFile] parse_failed_after_retries rawChars=${lastRawOutput.length}`,
         );
         throw new ContentValidationError(
-          'Quiz-from-file generation returned malformed JSON',
+          'Quiz-from-file generation returned malformed structured output',
         );
       }
 
@@ -703,13 +746,25 @@ export class MastraService {
       });
 
       if (completed.length < input.questionCount) {
+        this.logRawAiOutputsOnError(
+          'mastra.generateQuizFromFile.insufficient_usable_questions',
+          attemptRawOutputs,
+        );
         throw new ContentValidationError(
           `Quiz-from-file returned ${completed.length} usable questions, expected ${input.questionCount}`,
         );
       }
 
       const finalQuestions = completed.slice(0, input.questionCount);
-      assertQuizContentValid({ questions: finalQuestions });
+      try {
+        assertQuizContentValid({ questions: finalQuestions });
+      } catch (error) {
+        this.logRawAiOutputsOnError(
+          'mastra.generateQuizFromFile.validation_failed',
+          attemptRawOutputs,
+        );
+        throw error;
+      }
 
       return {
         topic: parsed.topic ?? 'Uploaded content',
@@ -1256,6 +1311,195 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
     return text;
   }
 
+  private async completeStructuredQuizPayload(input: {
+    model: string;
+    maxTokens: number;
+    systemPrompt: string;
+    messages: ClaudeMessage[];
+    includeTopicAndSubject: boolean;
+    contextTag: string;
+  }): Promise<{ payload: QuizOutputPayload | null; rawOutput: string }> {
+    const toolName = input.includeTopicAndSubject
+      ? 'return_quiz_payload_with_topic'
+      : 'return_quiz_payload';
+
+    const questionItemSchema = {
+      type: 'object' as const,
+      additionalProperties: false,
+      required: ['type', 'text', 'explanation'],
+      properties: {
+        type: {
+          type: 'string' as const,
+          enum: [
+            'multiple_choice',
+            'multiple_select',
+            'true_false',
+            'fill_blank',
+            'short_answer',
+            'ordering',
+            'structured',
+          ],
+        },
+        text: { type: 'string' as const },
+        options: { type: 'array' as const, items: { type: 'string' as const } },
+        correctAnswer: {
+          oneOf: [
+            { type: 'string' as const },
+            { type: 'boolean' as const },
+          ],
+        },
+        correctAnswers: {
+          type: 'array' as const,
+          items: {
+            oneOf: [{ type: 'string' as const }, { type: 'boolean' as const }],
+          },
+        },
+        explanation: { type: 'string' as const },
+        subtopic: { type: 'string' as const },
+        parts: { type: 'array' as const, items: { type: 'object' as const } },
+        totalMarks: { type: 'number' as const },
+      },
+    };
+
+    const toolSchema = input.includeTopicAndSubject
+      ? {
+          type: 'object' as const,
+          additionalProperties: false,
+          required: ['topic', 'subjectName', 'questions'],
+          properties: {
+            topic: { type: 'string' as const },
+            subjectName: { type: 'string' as const },
+            questions: { type: 'array' as const, items: questionItemSchema },
+          },
+        }
+      : {
+          type: 'object' as const,
+          additionalProperties: false,
+          required: ['questions'],
+          properties: {
+            questions: { type: 'array' as const, items: questionItemSchema },
+          },
+        };
+
+    const startedAt = Date.now();
+    this.logger.log(
+      `[mastra.completeStructuredQuizPayload] request_start context=${input.contextTag} model=${input.model} maxTokens=${input.maxTokens} messageCount=${input.messages.length}`,
+    );
+
+    let response: Response;
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: input.model,
+          max_tokens: input.maxTokens,
+          system: input.systemPrompt,
+          messages: input.messages,
+          tools: [
+            {
+              name: toolName,
+              description:
+                'Return the quiz payload in exact structured form. Do not use free text.',
+              input_schema: toolSchema,
+            },
+          ],
+          tool_choice: { type: 'tool', name: toolName },
+        }),
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? `${error.name}: ${error.message}`
+          : 'Unknown fetch error';
+      this.logger.error(
+        `[mastra.completeStructuredQuizPayload] request_error context=${input.contextTag} model=${input.model} durationMs=${Date.now() - startedAt} error="${message}"`,
+      );
+      throw error;
+    }
+
+    if (!response.ok) {
+      const bodyText = await response.text().catch(() => '<unavailable>');
+      this.logger.error(
+        `[mastra.completeStructuredQuizPayload] request_failed context=${input.contextTag} model=${input.model} status=${response.status} statusText="${response.statusText}" durationMs=${Date.now() - startedAt} body="${truncateForLog(bodyText, 3000)}"`,
+      );
+      throw new InternalServerErrorException('Claude structured completion failed');
+    }
+
+    const json = (await response.json()) as {
+      content?: Array<
+        | { type: 'text'; text?: string }
+        | {
+            type: 'tool_use';
+            id: string;
+            name: string;
+            input?: Record<string, unknown>;
+          }
+      >;
+    };
+
+    const rawOutput = JSON.stringify(json.content ?? []);
+    const toolUse = json.content?.find(
+      (
+        block,
+      ): block is {
+        type: 'tool_use';
+        id: string;
+        name: string;
+        input?: Record<string, unknown>;
+      } => block.type === 'tool_use' && block.name === toolName,
+    );
+
+    this.logger.log(
+      `[mastra.completeStructuredQuizPayload] request_success context=${input.contextTag} model=${input.model} durationMs=${Date.now() - startedAt} rawChars=${rawOutput.length}`,
+    );
+
+    if (!toolUse || !toolUse.input || typeof toolUse.input !== 'object') {
+      this.logRawAiOutputsOnError(
+        `mastra.completeStructuredQuizPayload.${input.contextTag}.missing_tool_use`,
+        [rawOutput],
+      );
+      return { payload: null, rawOutput };
+    }
+
+    return {
+      payload: toolUse.input as unknown as QuizOutputPayload,
+      rawOutput,
+    };
+  }
+
+  private logRawAiOutputsOnError(contextTag: string, outputs: string[]): void {
+    if (!outputs.length) {
+      this.logger.error(`[${contextTag}] raw_ai_output=<none>`);
+      return;
+    }
+
+    outputs.forEach((output, index) => {
+      const safeOutput = output && output.trim() ? output : '<empty>';
+      const chunkSize = 3500;
+      if (safeOutput.length <= chunkSize) {
+        this.logger.error(
+          `[${contextTag}] raw_ai_output[${index + 1}][chunk=1/1]="${safeOutput}"`,
+        );
+        return;
+      }
+
+      const chunkCount = Math.ceil(safeOutput.length / chunkSize);
+      for (let chunkIndex = 0; chunkIndex < chunkCount; chunkIndex++) {
+        const start = chunkIndex * chunkSize;
+        const end = start + chunkSize;
+        const chunk = safeOutput.slice(start, end);
+        this.logger.error(
+          `[${contextTag}] raw_ai_output[${index + 1}][chunk=${chunkIndex + 1}/${chunkCount}]="${chunk}"`,
+        );
+      }
+    });
+  }
+
   private async completeMessage(input: {
     model: string;
     maxTokens: number;
@@ -1540,41 +1784,108 @@ function buildFallbackQuizQuestions(
 function normalizeGeneratedQuestion(
   question: GeneratedQuizQuestion,
 ): GeneratedQuizQuestion {
+  const raw = question as unknown as Record<string, unknown>;
+  const rawType = pickString(raw, ['type', 'question_type']);
+  const rawText = pickString(raw, ['text', 'question_text']);
+  const rawSubtopic = pickString(raw, ['subtopic']);
+  const rawExplanation = pickString(raw, ['explanation']);
+
+  const rawOptions = pickStringArray(raw, ['options']);
+  const rawCorrectAnswerValue = pickUnknown(raw, [
+    'correctAnswer',
+    'correct_answer',
+    'sample_answer',
+  ]);
+  const rawCorrectAnswersValue = pickUnknown(raw, [
+    'correctAnswers',
+    'correct_answers',
+    'acceptable_answers',
+  ]);
+
+  const normalizedCorrectAnswer = normalizeScalarAnswer(rawCorrectAnswerValue);
+  const normalizedCorrectAnswers = normalizeArrayAnswers(rawCorrectAnswersValue);
+
   return {
-    type: normalizeQuestionType(question.type),
-    text:
-      typeof question.text === 'string'
-        ? question.text.trim()
-        : String(question.text ?? ''),
-    options: Array.isArray(question.options)
-      ? question.options
-          .filter((option): option is string => typeof option === 'string')
-          .map((option) => option.trim())
-          .filter(Boolean)
-      : undefined,
-    correctAnswer:
-      typeof question.correctAnswer === 'string'
-        ? question.correctAnswer.trim()
-        : undefined,
-    correctAnswers: Array.isArray(question.correctAnswers)
-      ? question.correctAnswers
-          .filter((answer): answer is string => typeof answer === 'string')
-          .map((answer) => answer.trim())
-          .filter(Boolean)
-      : undefined,
-    explanation:
-      typeof question.explanation === 'string'
-        ? question.explanation.trim()
-        : undefined,
-    subtopic:
-      typeof question.subtopic === 'string'
-        ? question.subtopic.trim()
-        : undefined,
+    type: normalizeQuestionType(rawType ?? question.type),
+    text: rawText ?? String(question.text ?? ''),
+    options: rawOptions,
+    correctAnswer: normalizedCorrectAnswer,
+    correctAnswers: normalizedCorrectAnswers,
+    explanation: rawExplanation,
+    subtopic: rawSubtopic,
     // Preserve parts for structured questions
-    ...(question.type === 'structured' && Array.isArray(question.parts)
-      ? { parts: question.parts, totalMarks: question.totalMarks ?? 0, correctAnswer: 'structured' }
+    ...(normalizeQuestionType(rawType ?? question.type) === 'structured' &&
+    Array.isArray(raw['parts'])
+      ? {
+          parts: raw['parts'] as unknown[],
+          totalMarks:
+            typeof raw['totalMarks'] === 'number'
+              ? raw['totalMarks']
+              : typeof question.totalMarks === 'number'
+                ? question.totalMarks
+                : 0,
+          correctAnswer: 'structured',
+        }
       : {}),
   };
+}
+
+function pickUnknown(
+  source: Record<string, unknown>,
+  keys: string[],
+): unknown {
+  for (const key of keys) {
+    if (key in source) return source[key];
+  }
+  return undefined;
+}
+
+function pickString(
+  source: Record<string, unknown>,
+  keys: string[],
+): string | undefined {
+  const value = pickUnknown(source, keys);
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
+function pickStringArray(
+  source: Record<string, unknown>,
+  keys: string[],
+): string[] | undefined {
+  const value = pickUnknown(source, keys);
+  if (!Array.isArray(value)) return undefined;
+  const normalized = value
+    .map((item) => normalizeScalarAnswer(item))
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return normalized.length ? normalized : undefined;
+}
+
+function normalizeScalarAnswer(value: unknown): string | undefined {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'true' : 'false';
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return undefined;
+}
+
+function normalizeArrayAnswers(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const normalized = value
+    .map((item) => normalizeScalarAnswer(item))
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return normalized.length ? normalized : undefined;
 }
 
 function isUsableGeneratedQuestion(question: GeneratedQuizQuestion): boolean {

@@ -852,7 +852,6 @@ function compareAcceptedAnswers(
     .split(/\||\n|;/)
     .map(normalizeFreeTextAnswer)
     .filter(Boolean);
-
   if (acceptedAnswers.length === 0) {
     return false;
   }
