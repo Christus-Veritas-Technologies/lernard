@@ -98,27 +98,46 @@ export default function QuizDashboardScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-5">
         <Card className="rounded-[32px] border border-sky-100 bg-[rgb(244,249,255)] p-6">
-          <CardHeader className="gap-3">
-            <View className="flex-row items-start justify-between gap-3">
-              <View className="flex-1">
-                <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-700">Quiz Dashboard</Text>
-                <CardTitle className="text-2xl">Build momentum with targeted practice</CardTitle>
-                <Text className="text-sm leading-6 text-slate-600">
-                  Check your progress, review history, and launch a new quiz only when you choose to.
-                </Text>
-              </View>
-            </View>
-          </CardHeader>
-          <CardContent className="mt-3 gap-2">
-            <Button onPress={() => setShowCreateModal(true)} title="Create new quiz" />
-            <Button onPress={() => router.push('/quiz/create')} title="Open full create page" variant="secondary" />
-            <Button
-              iconLeft={<RefreshIcon color="#334155" size={16} strokeWidth={1.8} />}
-              onPress={() => void loadDashboard()}
-              title="Refresh dashboard"
-              variant="ghost"
-            />
-          </CardContent>
+          {dashboardLoading ? (
+            <>
+              <CardHeader className="gap-3">
+                <View className="gap-2 animate-pulse">
+                  <View className="h-4 w-28 rounded-full bg-sky-100" />
+                  <View className="h-8 w-[90%] rounded-lg bg-slate-200" />
+                  <View className="h-4 w-[95%] rounded-lg bg-slate-200" />
+                </View>
+              </CardHeader>
+              <CardContent className="mt-3 gap-2 animate-pulse">
+                <View className="h-11 rounded-xl bg-slate-200" />
+                <View className="h-11 rounded-xl bg-slate-200" />
+                <View className="h-11 rounded-xl bg-slate-200" />
+              </CardContent>
+            </>
+          ) : (
+            <>
+              <CardHeader className="gap-3">
+                <View className="flex-row items-start justify-between gap-3">
+                  <View className="flex-1">
+                    <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-700">Quiz Dashboard</Text>
+                    <CardTitle className="text-2xl">Build momentum with targeted practice</CardTitle>
+                    <Text className="text-sm leading-6 text-slate-600">
+                      Check your progress, review history, and launch a new quiz only when you choose to.
+                    </Text>
+                  </View>
+                </View>
+              </CardHeader>
+              <CardContent className="mt-3 gap-2">
+                <Button onPress={() => setShowCreateModal(true)} title="Create new quiz" />
+                <Button onPress={() => router.push('/quiz/create')} title="Open full create page" variant="secondary" />
+                <Button
+                  iconLeft={<RefreshIcon color="#334155" size={16} strokeWidth={1.8} />}
+                  onPress={() => void loadDashboard()}
+                  title="Refresh dashboard"
+                  variant="ghost"
+                />
+              </CardContent>
+            </>
+          )}
         </Card>
 
         {dashboardError ? (
@@ -128,16 +147,27 @@ export default function QuizDashboardScreen() {
         ) : null}
 
         <View className="flex-row flex-wrap gap-2">
-          <MetricCard icon={<Rocket01Icon color="#ea580c" size={18} />} label="Monthly activity" value={dashboardLoading ? '...' : monthlyUsageLabel} bgColor="bg-orange-50" borderColor="border-orange-200" />
-          <MetricCard icon={<SchoolReportCardIcon color="#16a34a" size={18} />} label="Score trend" value={dashboardLoading ? '...' : avgScoreLabel} bgColor="bg-green-50" borderColor="border-green-200" />
-          <MetricCard
-            icon={<Clock01Icon color="#2563eb" size={18} />}
-            label="In progress"
-            value={dashboardLoading ? '...' : `${stats.quizzesInProgress} quiz${stats.quizzesInProgress === 1 ? '' : 'zes'}`}
-            bgColor="bg-blue-50"
-            borderColor="border-blue-200"
-          />
-          <MetricCard icon={<SignalMedium02Icon color="#9333ea" size={18} />} label="Growth areas" value={dashboardLoading ? '...' : `${stats.growthAreasFlagged}`} bgColor="bg-purple-50" borderColor="border-purple-200" />
+          {dashboardLoading ? (
+            <>
+              <MetricSkeletonCard bgColor="bg-orange-50" borderColor="border-orange-200" />
+              <MetricSkeletonCard bgColor="bg-green-50" borderColor="border-green-200" />
+              <MetricSkeletonCard bgColor="bg-blue-50" borderColor="border-blue-200" />
+              <MetricSkeletonCard bgColor="bg-purple-50" borderColor="border-purple-200" />
+            </>
+          ) : (
+            <>
+              <MetricCard icon={<Rocket01Icon color="#ea580c" size={18} />} label="Monthly activity" value={monthlyUsageLabel} bgColor="bg-orange-50" borderColor="border-orange-200" />
+              <MetricCard icon={<SchoolReportCardIcon color="#16a34a" size={18} />} label="Score trend" value={avgScoreLabel} bgColor="bg-green-50" borderColor="border-green-200" />
+              <MetricCard
+                icon={<Clock01Icon color="#2563eb" size={18} />}
+                label="In progress"
+                value={`${stats.quizzesInProgress} quiz${stats.quizzesInProgress === 1 ? '' : 'zes'}`}
+                bgColor="bg-blue-50"
+                borderColor="border-blue-200"
+              />
+              <MetricCard icon={<SignalMedium02Icon color="#9333ea" size={18} />} label="Growth areas" value={`${stats.growthAreasFlagged}`} bgColor="bg-purple-50" borderColor="border-purple-200" />
+            </>
+          )}
         </View>
 
         <Card className="p-4">
@@ -155,7 +185,18 @@ export default function QuizDashboardScreen() {
               </View>
             </View>
 
-            {history.length === 0 ? (
+            {dashboardLoading ? (
+              Array.from({ length: 5 }).map((_, index) => (
+                <View className="animate-pulse rounded-xl border border-slate-200 bg-white px-3 py-3" key={`history-skeleton-${index}`}>
+                  <View className="flex-row items-center">
+                    <View className="h-4 w-[35%] rounded bg-slate-200" />
+                    <View className="ml-2 h-4 w-[18%] rounded bg-slate-200" />
+                    <View className="ml-2 h-4 w-[17%] rounded bg-slate-200" />
+                    <View className="ml-auto h-4 w-[12%] rounded bg-slate-200" />
+                  </View>
+                </View>
+              ))
+            ) : history.length === 0 ? (
               <View className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
                 <Text className="text-sm text-slate-500">No quizzes yet. Tap Create new quiz to start your first one.</Text>
               </View>
@@ -216,6 +257,15 @@ function MetricCard({ icon, label, value, bgColor, borderColor }: { icon: ReactN
         <Text className="text-[11px] text-slate-700">{label}</Text>
       </View>
       <Text className="text-xs font-semibold text-slate-900">{value}</Text>
+    </View>
+  );
+}
+
+function MetricSkeletonCard({ bgColor, borderColor }: { bgColor: string; borderColor: string }) {
+  return (
+    <View className={`min-w-[47%] flex-1 rounded-xl border ${borderColor} ${bgColor} px-3 py-2.5`}>
+      <View className="mb-1.5 h-4 w-20 rounded bg-slate-200" />
+      <View className="h-4 w-28 rounded bg-slate-200" />
     </View>
   );
 }

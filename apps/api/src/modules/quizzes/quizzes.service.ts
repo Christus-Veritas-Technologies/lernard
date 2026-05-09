@@ -55,21 +55,27 @@ export class QuizzesService {
       throw new BadRequestException('topic or fromUploadId is required');
     }
 
-    // Validate questionCount based on paperType
-    if (dto.paperType === 'paper1') {
+    const paperType: 'paper1' | 'paper2' = dto.paperType ?? 'paper2';
+    // Question count constraints are based on question type.
+    if (dto.questionType === 'multiple_choice') {
       const validCounts = [5, 10, 15, 20];
       if (!validCounts.includes(dto.questionCount)) {
-        throw new BadRequestException(`Paper 1 questionCount must be one of: ${validCounts.join(', ')}`);
+        throw new BadRequestException(
+          `Multiple Choice questionCount must be one of: ${validCounts.join(', ')}`,
+        );
       }
-    } else if (dto.paperType === 'paper2') {
+    } else {
       const validCounts = [1, 3, 5];
       if (!validCounts.includes(dto.questionCount)) {
-        throw new BadRequestException(`Paper 2 questionCount must be one of: ${validCounts.join(', ')}`);
+        throw new BadRequestException(
+          `Structured Questions questionCount must be one of: ${validCounts.join(', ')}`,
+        );
       }
     }
 
     const mode = normalizeMode(user.learningMode);
-    const difficulty = dto.difficulty ?? 'standard';
+    const difficulty: 'foundation' | 'standard' | 'challenging' | 'extension' =
+      dto.difficulty ?? 'standard';
 
     const jobId = uuidv4();
     const queuedQuiz = await (this.prisma as any).quiz.create({
@@ -79,7 +85,7 @@ export class QuizzesService {
         subjectName: dto.subject ?? 'General',
         totalQuestions: dto.questionCount,
         mode: user.learningMode,
-        paperType: dto.paperType.toUpperCase(),
+        paperType: paperType.toUpperCase(),
         difficulty: difficulty.toUpperCase(),
         status: 'QUEUED',
         fromLessonId: dto.fromLessonId ?? null,
@@ -134,6 +140,8 @@ export class QuizzesService {
       };
 
       const dto = input.dto;
+      const generationPaperType: 'paper1' | 'paper2' =
+        dto.questionType === 'structured' ? 'paper2' : 'paper1';
 
       if (dto.fromUploadId) {
         if (!dto.fromUploadKind) {
@@ -154,7 +162,8 @@ export class QuizzesService {
           kind: upload.kind,
           mimeType: upload.mimeType,
           questionCount: dto.questionCount,
-          paperType: dto.paperType,
+          paperType: generationPaperType,
+          questionType: dto.questionType,
           difficulty: input.difficulty,
           mode: input.mode,
           studentContext,
@@ -180,7 +189,8 @@ export class QuizzesService {
 
         generated = await this.mastraService.generateQuiz({
           topic: dto.topic!,
-          paperType: dto.paperType,
+          paperType: generationPaperType,
+          questionType: dto.questionType,
           questionCount: dto.questionCount,
           difficulty: input.difficulty,
           subjectName: dto.subject,
