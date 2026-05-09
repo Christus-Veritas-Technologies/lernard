@@ -14,6 +14,7 @@ import { MastraService } from '../../mastra/mastra.service';
 import { StudentContextBuilder } from '../../mastra/student-context.builder';
 import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
 import { R2Service } from '../../r2/r2.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { GenerateQuizDto, SubmitAnswerDto, AnswerPartDto } from './dto/quizzes.dto';
 import { deleteQuizUpload, readQuizUpload } from './quiz-uploads';
 
@@ -33,6 +34,7 @@ export class QuizzesService {
     private readonly mastraService: MastraService,
     private readonly studentContextBuilder: StudentContextBuilder,
     private readonly r2: R2Service,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async generate(
@@ -230,6 +232,14 @@ export class QuizzesService {
         },
       });
 
+      await this.notificationsService.sendToUser(input.userId, {
+        type: 'quiz_ready',
+        title: 'Quiz ready',
+        body: `Your quiz on ${generated.topic} is ready.`,
+        url: `/quiz/${input.quizId}`,
+        quizId: input.quizId,
+      });
+
       this.logger.log(
         `[quiz.generate] success quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
       );
@@ -248,6 +258,14 @@ export class QuizzesService {
           failedAt: new Date(),
           failureReason: message.slice(0, 500),
         },
+      });
+
+      await this.notificationsService.sendToUser(input.userId, {
+        type: 'quiz_failed',
+        title: 'Quiz generation failed',
+        body: 'Please retry generating your quiz.',
+        url: '/quiz',
+        quizId: input.quizId,
       });
     }
   }

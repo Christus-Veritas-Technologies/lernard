@@ -82,6 +82,11 @@ export const ROUTES = {
     MESSAGE_STREAM: '/v1/chat/message/stream',
   },
 
+  NOTIFICATIONS: {
+    SUBSCRIPTIONS: '/v1/notifications/subscriptions',
+    TEST: '/v1/notifications/test',
+  },
+
   SETTINGS: {
     GET: '/v1/settings',
     PAYLOAD: '/v1/settings/payload',

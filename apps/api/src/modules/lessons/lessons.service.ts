@@ -6,6 +6,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { MastraService } from '../../mastra/mastra.service';
 import { StudentContextBuilder } from '../../mastra/student-context.builder';
 import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   CompleteLessonDto,
   GenerateLessonDto,
@@ -20,6 +21,7 @@ export class LessonsService {
     private readonly prisma: PrismaService,
     private readonly mastraService: MastraService,
     private readonly studentContextBuilder: StudentContextBuilder,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async generate(
@@ -117,6 +119,14 @@ export class LessonsService {
       this.logger.log(
         `[lesson.generate] success userId=${userId} lessonId=${lessonId} totalMs=${Date.now() - startedAt}`,
       );
+
+      await this.notificationsService.sendToUser(userId, {
+        type: 'lesson_ready',
+        title: 'Lesson ready',
+        body: `Your lesson on ${generated.topic} is ready.`,
+        url: `/learn/${lessonId}`,
+        lessonId,
+      });
     } catch (error) {
       const message =
         error instanceof Error
@@ -136,6 +146,14 @@ export class LessonsService {
           failedAt: new Date(),
           failureReason: message.slice(0, 500),
         },
+      });
+
+      await this.notificationsService.sendToUser(userId, {
+        type: 'lesson_failed',
+        title: 'Lesson generation failed',
+        body: 'Please retry generating your lesson.',
+        url: '/learn',
+        lessonId,
       });
     }
   }
