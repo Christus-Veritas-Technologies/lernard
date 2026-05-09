@@ -98,14 +98,18 @@ export default function QuizDashboardScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-5">
         <Card className="rounded-[32px] border border-sky-100 bg-[rgb(244,249,255)] p-6">
-          <CardHeader className="gap-2">
-            <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-700">Quiz Dashboard</Text>
-            <CardTitle className="text-2xl">Build momentum with targeted practice</CardTitle>
-            <Text className="text-sm leading-6 text-slate-600">
-              Check your progress, review history, and launch a new quiz only when you choose to.
-            </Text>
+          <CardHeader className="gap-3">
+            <View className="flex-row items-start justify-between gap-3">
+              <View className="flex-1">
+                <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-700">Quiz Dashboard</Text>
+                <CardTitle className="text-2xl">Build momentum with targeted practice</CardTitle>
+                <Text className="text-sm leading-6 text-slate-600">
+                  Check your progress, review history, and launch a new quiz only when you choose to.
+                </Text>
+              </View>
+            </View>
           </CardHeader>
-          <CardContent className="mt-1 gap-3">
+          <CardContent className="mt-3 gap-2">
             <Button onPress={() => setShowCreateModal(true)} title="Create new quiz" />
             <Button onPress={() => router.push('/quiz/create')} title="Open full create page" variant="secondary" />
             <Button
@@ -124,14 +128,16 @@ export default function QuizDashboardScreen() {
         ) : null}
 
         <View className="flex-row flex-wrap gap-2">
-          <MetricCard icon={<Rocket01Icon color="#64748b" size={14} />} label="Monthly activity" value={dashboardLoading ? '...' : monthlyUsageLabel} />
-          <MetricCard icon={<SchoolReportCardIcon color="#64748b" size={14} />} label="Score trend" value={dashboardLoading ? '...' : avgScoreLabel} />
+          <MetricCard icon={<Rocket01Icon color="#ea580c" size={18} />} label="Monthly activity" value={dashboardLoading ? '...' : monthlyUsageLabel} bgColor="bg-orange-50" borderColor="border-orange-200" />
+          <MetricCard icon={<SchoolReportCardIcon color="#16a34a" size={18} />} label="Score trend" value={dashboardLoading ? '...' : avgScoreLabel} bgColor="bg-green-50" borderColor="border-green-200" />
           <MetricCard
-            icon={<Clock01Icon color="#64748b" size={14} />}
+            icon={<Clock01Icon color="#2563eb" size={18} />}
             label="In progress"
             value={dashboardLoading ? '...' : `${stats.quizzesInProgress} quiz${stats.quizzesInProgress === 1 ? '' : 'zes'}`}
+            bgColor="bg-blue-50"
+            borderColor="border-blue-200"
           />
-          <MetricCard icon={<SignalMedium02Icon color="#64748b" size={14} />} label="Growth areas" value={dashboardLoading ? '...' : `${stats.growthAreasFlagged}`} />
+          <MetricCard icon={<SignalMedium02Icon color="#9333ea" size={18} />} label="Growth areas" value={dashboardLoading ? '...' : `${stats.growthAreasFlagged}`} bgColor="bg-purple-50" borderColor="border-purple-200" />
         </View>
 
         <Card className="p-4">
@@ -202,14 +208,14 @@ export default function QuizDashboardScreen() {
   );
 }
 
-function MetricCard({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function MetricCard({ icon, label, value, bgColor, borderColor }: { icon: ReactNode; label: string; value: string; bgColor: string; borderColor: string }) {
   return (
-    <View className="min-w-[47%] flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-      <View className="mb-1 flex-row items-center gap-1.5">
+    <View className={`min-w-[47%] flex-1 rounded-xl border ${borderColor} ${bgColor} px-3 py-2.5`}>
+      <View className="mb-1.5 flex-row items-center gap-2">
         {icon}
-        <Text className="text-[11px] text-slate-500">{label}</Text>
+        <Text className="text-[11px] text-slate-700">{label}</Text>
       </View>
-      <Text className="text-xs font-semibold text-slate-800">{value}</Text>
+      <Text className="text-xs font-semibold text-slate-900">{value}</Text>
     </View>
   );
 }
