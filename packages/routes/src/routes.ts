@@ -63,7 +63,10 @@ export const ROUTES = {
   QUIZZES: {
     GENERATE: '/v1/quizzes/generate',
     ATTACHMENTS_UPLOAD: '/v1/quizzes/attachments/upload',
+    DASHBOARD_STATS: '/v1/quizzes/dashboard-stats',
+    HISTORY: '/v1/quizzes/history',
     GET: (quizId: string) => `/v1/quizzes/${quizId}` as const,
+    STATUS: (quizId: string) => `/v1/quizzes/${quizId}/status` as const,
     REMEDIATION_CONTEXT: (quizId: string) =>
       `/v1/quizzes/${quizId}/remediation-context` as const,
     ANSWER: (quizId: string) => `/v1/quizzes/${quizId}/answer` as const,

@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -17,7 +18,13 @@ import {
   PlanLimitsGuard,
 } from '../../common/guards/plan-limits.guard';
 import { R2Service } from '../../r2/r2.service';
-import { EvaluateShortAnswerDto, GenerateQuizDto, SubmitAnswerDto, AnswerPartDto } from './dto/quizzes.dto';
+import {
+  EvaluateShortAnswerDto,
+  GenerateQuizDto,
+  SubmitAnswerDto,
+  AnswerPartDto,
+  QuizHistoryQueryDto,
+} from './dto/quizzes.dto';
 import {
   MAX_QUIZ_UPLOAD_SIZE,
   QuizUploadFile,
@@ -50,6 +57,27 @@ export class QuizzesController {
   @Post('generate')
   async generate(@CurrentUser() user: User, @Body() dto: GenerateQuizDto) {
     return this.quizzesService.generate(user, dto);
+  }
+
+  @ProtectedRoute()
+  @Get('dashboard-stats')
+  async getDashboardStats(@CurrentUser() user: User) {
+    return this.quizzesService.getDashboardStats(user);
+  }
+
+  @ProtectedRoute()
+  @Get('history')
+  async getHistory(
+    @CurrentUser() user: User,
+    @Query() query: QuizHistoryQueryDto,
+  ) {
+    return this.quizzesService.getHistory(user, query);
+  }
+
+  @ProtectedRoute()
+  @Get(':quizId/status')
+  async getStatus(@CurrentUser() user: User, @Param('quizId') quizId: string) {
+    return this.quizzesService.getQuizStatus(user, quizId);
   }
 
   @ProtectedRoute()
