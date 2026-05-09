@@ -119,7 +119,7 @@ export class QuizzesService {
         userId: user.id,
         topic: generated.topic,
         subjectName: generated.subjectName,
-        totalQuestions: generated.questions.length,
+        totalQuestions: dto.questionCount,
         mode: user.learningMode,
         status: 'READY',
         fromLessonId: dto.fromLessonId ?? null,
@@ -127,8 +127,10 @@ export class QuizzesService {
       },
     });
 
-    for (let i = 0; i < generated.questions.length; i++) {
-      const question = generated.questions[i];
+    // Ensure we create exactly the requested number of questions, no more
+    const questionsToCreate = generated.questions.slice(0, dto.questionCount);
+    for (let i = 0; i < questionsToCreate.length; i++) {
+      const question = questionsToCreate[i];
 
       const correctAnswer = serializeCorrectAnswer(question);
 
@@ -171,7 +173,7 @@ export class QuizzesService {
 
     const index = Math.min(
       Math.max(quiz.currentIndex, 0),
-      Math.max(quiz.questions.length - 1, 0),
+      Math.max(Math.min(quiz.questions.length, quiz.totalQuestions) - 1, 0),
     );
     const currentQuestion = quiz.questions[index];
 
@@ -219,6 +221,11 @@ export class QuizzesService {
 
     if (!quiz || !quiz.questions[0]) {
       throw new NotFoundException('Quiz question not found');
+    }
+
+    // Ensure the question index is within the allowed totalQuestions range
+    if (dto.questionIndex >= quiz.totalQuestions) {
+      throw new BadRequestException(`Question index ${dto.questionIndex} exceeds total questions ${quiz.totalQuestions}`);
     }
 
     const question = quiz.questions[0];
@@ -287,6 +294,11 @@ export class QuizzesService {
       throw new NotFoundException('Quiz question not found');
     }
 
+    // Ensure the question index is within the allowed totalQuestions range
+    if (dto.questionIndex >= quiz.totalQuestions) {
+      throw new BadRequestException(`Question index ${dto.questionIndex} exceeds total questions ${quiz.totalQuestions}`);
+    }
+
     const question = quiz.questions[0];
     if (question.type !== 'SHORT_ANSWER') {
       throw new BadRequestException('This endpoint is only for short_answer questions');
@@ -345,6 +357,11 @@ export class QuizzesService {
 
     if (!quiz || !quiz.questions[0]) {
       throw new NotFoundException('Quiz question not found');
+    }
+
+    // Ensure the question index is within the allowed totalQuestions range
+    if (dto.questionIndex >= quiz.totalQuestions) {
+      throw new BadRequestException(`Question index ${dto.questionIndex} exceeds total questions ${quiz.totalQuestions}`);
     }
 
     const question = quiz.questions[0];

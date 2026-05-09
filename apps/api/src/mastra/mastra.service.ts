@@ -591,18 +591,21 @@ export class MastraService {
 
     const merged = [...input.existingQuestions];
     for (const question of supplementalQuestions) {
+      if (merged.length >= input.targetCount) break;
       const key = `${question.type}|${normalizeQuestionKey(question.text)}`;
       if (existingKeys.has(key)) continue;
       existingKeys.add(key);
       merged.push(question);
-      if (merged.length >= input.targetCount) break;
     }
 
+    // Ensure we never return more than targetCount
+    const result = merged.slice(0, input.targetCount);
+
     this.logger.log(
-      `[mastra.${input.contextTag}] supplement missing=${missingCount} supplementalUsable=${supplementalQuestions.length} merged=${merged.length}/${input.targetCount}`,
+      `[mastra.${input.contextTag}] supplement missing=${missingCount} supplementalUsable=${supplementalQuestions.length} merged=${merged.length} final=${result.length}/${input.targetCount}`,
     );
 
-    return merged;
+    return result;
   }
 
   async generateQuizFromFile(input: {
