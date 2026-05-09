@@ -101,6 +101,8 @@ export default function AppLayout() {
                 <Tabs.Screen name="guardian" options={{ title: 'Household', href: role === Role.GUARDIAN ? undefined : null }} />
                 <Tabs.Screen name="learn/[lessonId]" options={{ href: null }} />
                 <Tabs.Screen name="learn/complete" options={{ href: null }} />
+                <Tabs.Screen name="quiz/index" options={{ href: null }} />
+                <Tabs.Screen name="quiz/create" options={{ href: null }} />
                 <Tabs.Screen name="quiz/entry" options={{ href: null }} />
                 <Tabs.Screen name="quiz/[quizId]" options={{ href: null }} />
                 <Tabs.Screen name="quiz/results/[quizId]" options={{ href: null }} />

@@ -94,7 +94,15 @@ export default function SubjectDetailScreen() {
                         <Pill label={formatPercent(subject.averageScore)} tone="amber" />
                     </View>
                     <View className="mt-6 flex-row flex-wrap gap-3">
-                        <Button onPress={() => router.push('/quiz')} title="Practice subject" />
+                        <Button
+                            onPress={() =>
+                                router.push({
+                                    pathname: '/quiz/entry',
+                                    params: { topic: subject.subjectName },
+                                })
+                            }
+                            title="Practice subject"
+                        />
                         <Button onPress={() => router.push('/progress')} title="Back to progress" variant="secondary" />
                     </View>
                 </View>

@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
-import { QuizEntryClient } from "./QuizEntryClient";
+import { QuizDashboardClient } from "./QuizDashboardClient";
 
 export const metadata: Metadata = {
-    title: "Quiz — Lernard",
-    description: "Generate a quiz and test your understanding.",
+    title: "Quiz Dashboard — Lernard",
+    description: "Track quiz momentum, review history, and launch new practice.",
 };
 
 export default function QuizPage() {
-    return <QuizEntryClient />;
+    return <QuizDashboardClient />;
 }
