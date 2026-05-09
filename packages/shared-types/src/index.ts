@@ -58,9 +58,27 @@ export type {
   PostLessonResult,
   LessonSectionType,
   SubjectIconKey,
+  LessonRemediationMisconception,
+  LessonRemediationContextInput,
+  LessonRetryContextInput,
 } from './payloads/lessons'
 export { SECTION_COLORS, getSubjectIcon } from './payloads/lessons'
-export type { QuizQuestionType, QuizQuestion, QuizStructuredPart, StructuredQuestion, QuizContent, StructuredPartEvaluation, QuizQuestionReview, QuizCompletionResult, ShortAnswerEvaluation } from './payloads/quizzes'
+export type {
+  QuizQuestionType,
+  QuizQuestion,
+  QuizStructuredPart,
+  StructuredQuestion,
+  QuizContent,
+  StructuredPartEvaluation,
+  QuizQuestionReview,
+  QuizCompletionResult,
+  ShortAnswerEvaluation,
+  QuizRemediationFailedQuestion,
+  QuizRemediationPassedQuestion,
+  QuizRemediationWeakSubtopic,
+  QuizRemediationMisconception,
+  QuizRemediationContext,
+} from './payloads/quizzes'
 export type {
   ConversationListItem,
   ChatAttachment,

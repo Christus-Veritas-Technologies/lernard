@@ -59,6 +59,15 @@ export class QuizzesController {
   }
 
   @ProtectedRoute()
+  @Get(':quizId/remediation-context')
+  async getRemediationContext(
+    @CurrentUser() user: User,
+    @Param('quizId') quizId: string,
+  ) {
+    return this.quizzesService.getRemediationContext(user, quizId);
+  }
+
+  @ProtectedRoute()
   @Post(':quizId/answer')
   async answer(
     @CurrentUser() user: User,

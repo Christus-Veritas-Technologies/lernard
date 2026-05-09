@@ -3,7 +3,9 @@ import { ConfigService } from '@nestjs/config';
 import type {
   ChatMessageBlock,
   LessonContent,
+  LessonRemediationContextInput,
   LessonRefCardProps,
+  LessonRetryContextInput,
   QuizQuestionType,
   QuizRefCardProps,
 } from '@lernard/shared-types';
@@ -177,6 +179,8 @@ export class MastraService {
     depth: 'quick' | 'standard' | 'deep';
     subjectName?: string;
     studentContext: StudentContext;
+    remediationContext?: LessonRemediationContextInput;
+    retryContext?: LessonRetryContextInput;
   }): Promise<LessonContent> {
     if (this.devMode) {
       return buildFallbackLesson(input.topic, input.subjectName, input.depth);
@@ -192,6 +196,8 @@ export class MastraService {
       topic: input.topic,
       subjectName: input.subjectName,
       depth: input.depth,
+      remediationContext: input.remediationContext,
+      retryContext: input.retryContext,
     });
 
     const fallbackEstimatedMinutes = lessonMinutesForDepth(input.depth);

@@ -1,4 +1,8 @@
 import type {
+  LessonRemediationContextInput,
+  LessonRetryContextInput,
+} from '@lernard/shared-types';
+import type {
   DepthKey,
   LearningModeKey,
   StudentContext,
@@ -167,7 +171,13 @@ export function buildModeSection(ctx: StudentContext, mode: AgentMode): string {
 
 export function buildLessonUserPrompt(
   ctx: StudentContext,
-  input: { topic: string; subjectName?: string; depth: DepthKey },
+  input: {
+    topic: string;
+    subjectName?: string;
+    depth: DepthKey;
+    remediationContext?: LessonRemediationContextInput;
+    retryContext?: LessonRetryContextInput;
+  },
 ): string {
   const subject = input.subjectName ?? 'General';
   const subjectStrength =
@@ -198,6 +208,9 @@ export function buildLessonUserPrompt(
           : 'Use standard pacing.'
       : 'Use standard pacing.';
 
+  const remediationBlock = buildLessonRemediationBlock(input.remediationContext);
+  const retryBlock = buildLessonRetryBlock(input.retryContext);
+
   return [
     `Generate a ${input.depth} lesson for ${ctx.name}, a ${ctx.grade ?? ctx.ageGroup ?? 'student'} student.`,
     '',
@@ -211,6 +224,8 @@ export function buildLessonUserPrompt(
     '',
     `Goal framing: ${goalFraming}`,
     `Pacing directive: ${confidenceDirective}`,
+    remediationBlock,
+    retryBlock,
     '',
     'DEPTH GUIDE:',
     '- quick: 300–400 words total. One concept, one example. Student is in a hurry.',
@@ -287,6 +302,73 @@ export function buildLessonUserPrompt(
     '',
     'Return JSON only. No markdown fences. No prose before or after the JSON.',
   ].join('\n');
+}
+
+function buildLessonRemediationBlock(
+  remediation: LessonRemediationContextInput | undefined,
+): string {
+  if (!remediation) {
+    return 'No quiz remediation context provided. Build a standard lesson based on the topic request.';
+  }
+
+  const weak = remediation.weakSubtopics.length
+    ? remediation.weakSubtopics.join(', ')
+    : 'none listed';
+  const strong = remediation.strongSubtopics.length
+    ? remediation.strongSubtopics.join(', ')
+    : 'none listed';
+  const misconceptions = remediation.misconceptions.length
+    ? remediation.misconceptions
+        .slice(0, 4)
+        .map(
+          (entry, index) =>
+            `${index + 1}. ${entry.subtopic}: student believed "${entry.studentBelievedX}"; correct is "${entry.correctAnswerIsY}"; implication: ${entry.implication}`,
+        )
+        .join('\n')
+    : 'none captured';
+  const failedPrompts = remediation.failedQuestionPrompts.length
+    ? remediation.failedQuestionPrompts
+        .slice(0, 4)
+        .map((prompt, index) => `${index + 1}. ${prompt}`)
+        .join('\n')
+    : 'none captured';
+
+  return [
+    'QUIZ REMEDIATION CONTEXT:',
+    `Recent quiz id: ${remediation.quizId}`,
+    `Recent quiz score: ${remediation.percentageScore}%`,
+    `Weak subtopics to prioritise: ${weak}`,
+    `Strong subtopics to briefly reinforce: ${strong}`,
+    'Known misconceptions:',
+    misconceptions,
+    'Failed-question prompts to reteach:',
+    failedPrompts,
+    'Remediation directives:',
+    '- Prioritise the weak subtopics before introducing new material.',
+    '- Include at least one worked example that directly corrects a listed misconception.',
+    '- In recap bullets, include one bullet per weak subtopic with the corrected principle.',
+  ].join('\n');
+}
+
+function buildLessonRetryBlock(
+  retryContext: LessonRetryContextInput | undefined,
+): string {
+  if (!retryContext) {
+    return '';
+  }
+
+  return [
+    'RETRY CONTEXT:',
+    `Source: ${retryContext.source}`,
+    retryContext.quizId ? `Related quiz id: ${retryContext.quizId}` : null,
+    retryContext.trigger ? `Trigger: ${retryContext.trigger}` : null,
+    typeof retryContext.previousScore === 'number'
+      ? `Previous score: ${retryContext.previousScore}%`
+      : null,
+    'Treat this as a second-chance lesson and keep explanations concrete and confidence-building.',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 export function buildQuizUserPrompt(

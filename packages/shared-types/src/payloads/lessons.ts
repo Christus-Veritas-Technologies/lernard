@@ -106,6 +106,29 @@ export interface LessonContent {
   sections: LessonSection[]
 }
 
+export interface LessonRemediationMisconception {
+  subtopic: string
+  studentBelievedX: string
+  correctAnswerIsY: string
+  implication: string
+}
+
+export interface LessonRemediationContextInput {
+  quizId: string
+  percentageScore: number
+  weakSubtopics: string[]
+  strongSubtopics: string[]
+  misconceptions: LessonRemediationMisconception[]
+  failedQuestionPrompts: string[]
+}
+
+export interface LessonRetryContextInput {
+  source: 'quiz_remediation' | 'manual_retry' | 'chat_follow_up'
+  quizId?: string
+  trigger?: string
+  previousScore?: number
+}
+
 export interface PostLessonResult {
   lessonId: string
   xpEarned: number

@@ -51,6 +51,8 @@ export class LessonsService {
         depth: dto.depth,
         subjectName: dto.subject,
         studentContext,
+        remediationContext: dto.remediationContext,
+        retryContext: dto.retryContext,
       });
       this.logger.log(
         `[lesson.generate] generated userId=${user.id} key=${idempotencyKeyShort} sections=${generated.sections.length} estimatedMinutes=${generated.estimatedMinutes} durationMs=${Date.now() - generateStartedAt}`,
@@ -69,6 +71,7 @@ export class LessonsService {
         data: {
           userId: user.id,
           topic: generated.topic,
+          subjectName: generated.subjectName,
           depth: generated.depth,
           status: 'READY',
           estimatedMinutes: generated.estimatedMinutes,

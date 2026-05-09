@@ -2,7 +2,9 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import type {
   QuizCompletionResult,
   QuizContent,
+  QuizRemediationContext,
   QuizQuestionReview,
+  QuizQuestionType,
   StructuredPartEvaluation,
 } from '@lernard/shared-types';
 import type { User } from '@prisma/client';
@@ -597,6 +599,25 @@ export class QuizzesService {
     };
   }
 
+  async getRemediationContext(
+    user: User,
+    quizId: string,
+  ): Promise<QuizRemediationContext> {
+    const quiz = await (this.prisma as any).quiz.findFirst({
+      where: { id: quizId, userId: user.id },
+      include: {
+        questions: { orderBy: { questionIndex: 'asc' } },
+        answers: { orderBy: { questionIndex: 'asc' } },
+      },
+    });
+
+    if (!quiz) {
+      throw new NotFoundException('Quiz not found');
+    }
+
+    return buildQuizRemediationContext(quiz);
+  }
+
   private async updateSubjectProgress(input: {
     userId: string;
     subjectId: string | null;
@@ -709,6 +730,298 @@ function summariseQuestionAsTopic(text: string): string {
   const firstSentence = trimmed.split(/[.?!]/)[0] ?? trimmed;
   const words = firstSentence.split(' ').slice(0, 8).join(' ');
   return words.length > 80 ? `${words.slice(0, 77)}…` : words;
+}
+
+function buildQuizRemediationContext(quiz: {
+  id: string;
+  topic: string;
+  subjectName: string | null;
+  score: number;
+  totalQuestions: number;
+  questions: Array<{
+    questionIndex: number;
+    type: string;
+    text: string;
+    correctAnswer: string;
+    explanation: string;
+    subtopic: string | null;
+    options: unknown;
+  }>;
+  answers: Array<{
+    questionIndex: number;
+    answer: string;
+    isCorrect: boolean;
+  }>;
+}): QuizRemediationContext {
+  const answersByIndex = new Map(
+    quiz.answers.map((entry) => [entry.questionIndex, entry]),
+  );
+
+  const failedQuestions: QuizRemediationContext['failedQuestions'] = [];
+  const passedQuestions: QuizRemediationContext['passedQuestions'] = [];
+  const misconceptions: QuizRemediationContext['misconceptions'] = [];
+
+  const bySubtopic = new Map<
+    string,
+    { questionsAttempted: number; questionsFailed: number; misconception: string | null }
+  >();
+
+  for (const question of quiz.questions) {
+    const questionType = fromDbQuestionType(question.type) as QuizQuestionType;
+    const subtopic =
+      question.subtopic?.trim() || summariseQuestionAsTopic(question.text) || quiz.topic;
+    const answer = answersByIndex.get(question.questionIndex);
+    const marksAvailable = marksAvailableForQuestion(question);
+    const marksEarned = marksEarnedForQuestion(question, answer);
+    const studentAnswer = parseStudentAnswerForContext(
+      questionType,
+      answer?.answer,
+    );
+    const correctAnswer = parseCorrectAnswerForContext(question, questionType);
+
+    const aggregate = bySubtopic.get(subtopic) ?? {
+      questionsAttempted: 0,
+      questionsFailed: 0,
+      misconception: null,
+    };
+    aggregate.questionsAttempted += 1;
+
+    if (answer?.isCorrect) {
+      passedQuestions.push({
+        questionIndex: question.questionIndex + 1,
+        subtopic,
+        marksEarned,
+      });
+    } else {
+      aggregate.questionsFailed += 1;
+
+      failedQuestions.push({
+        questionIndex: question.questionIndex + 1,
+        questionText: question.text,
+        subtopic,
+        questionType,
+        studentAnswer,
+        correctAnswer,
+        explanation: question.explanation,
+        marksAvailable,
+        marksEarned,
+      });
+
+      const misconception = buildMisconceptionText(studentAnswer, correctAnswer);
+      if (!aggregate.misconception && misconception) {
+        aggregate.misconception = misconception;
+      }
+
+      if (misconception) {
+        misconceptions.push({
+          subtopic,
+          studentBelievedX: formatAnswerForMisconception(studentAnswer),
+          correctAnswerIsY: formatAnswerForMisconception(correctAnswer),
+          implication: `Their answer pattern suggests confusion in ${subtopic.toLowerCase()}.`,
+        });
+      }
+    }
+
+    bySubtopic.set(subtopic, aggregate);
+  }
+
+  const weakSubtopics = Array.from(bySubtopic.entries())
+    .filter(([, value]) => value.questionsFailed > 0)
+    .map(([name, value]) => ({
+      name,
+      questionsAttempted: value.questionsAttempted,
+      questionsFailed: value.questionsFailed,
+      misconception: value.misconception,
+    }))
+    .sort((a, b) => {
+      if (b.questionsFailed !== a.questionsFailed) {
+        return b.questionsFailed - a.questionsFailed;
+      }
+      if (b.questionsAttempted !== a.questionsAttempted) {
+        return b.questionsAttempted - a.questionsAttempted;
+      }
+      return a.name.localeCompare(b.name);
+    });
+
+  const strongSubtopics = Array.from(bySubtopic.entries())
+    .filter(([, value]) => value.questionsAttempted > 0 && value.questionsFailed === 0)
+    .map(([name]) => name)
+    .sort((a, b) => a.localeCompare(b));
+
+  const total = quiz.totalQuestions || quiz.questions.length;
+  const score = typeof quiz.score === 'number' ? quiz.score : passedQuestions.length;
+  const percentageScore = total > 0 ? Math.round((score / total) * 100) : 0;
+
+  return {
+    quizId: quiz.id,
+    topic: quiz.topic,
+    subjectName: quiz.subjectName ?? 'General',
+    score,
+    total,
+    percentageScore,
+    failedQuestions,
+    passedQuestions,
+    weakSubtopics,
+    misconceptions,
+    strongSubtopics,
+  };
+}
+
+function marksAvailableForQuestion(question: {
+  type: string;
+  options: unknown;
+}): number {
+  if (question.type === 'STRUCTURED' && Array.isArray(question.options)) {
+    const total = question.options.reduce((sum, part) => {
+      const marks =
+        part && typeof part === 'object' && 'marks' in (part as Record<string, unknown>)
+          ? (part as { marks?: unknown }).marks
+          : null;
+      return sum + (typeof marks === 'number' && Number.isFinite(marks) ? marks : 0);
+    }, 0);
+    return total > 0 ? total : 1;
+  }
+
+  return 1;
+}
+
+function marksEarnedForQuestion(
+  question: { type: string; options: unknown },
+  answer:
+    | {
+        answer: string;
+        isCorrect: boolean;
+      }
+    | undefined,
+): number {
+  const available = marksAvailableForQuestion(question);
+  if (!answer) {
+    return 0;
+  }
+
+  if (question.type === 'STRUCTURED') {
+    try {
+      const parsed = JSON.parse(answer.answer) as Record<
+        string,
+        { marksEarned?: unknown }
+      >;
+      const total = Object.values(parsed).reduce((sum, part) => {
+        const marks = part?.marksEarned;
+        return sum + (typeof marks === 'number' && Number.isFinite(marks) ? marks : 0);
+      }, 0);
+      if (total > 0) {
+        return total;
+      }
+    } catch {
+      // Fall through to boolean correctness fallback.
+    }
+  }
+
+  return answer.isCorrect ? available : 0;
+}
+
+function parseStudentAnswerForContext(
+  questionType: QuizQuestionType,
+  rawAnswer: string | undefined,
+): string | string[] {
+  if (!rawAnswer || !rawAnswer.trim()) {
+    return 'No answer';
+  }
+
+  if (questionType === 'multiple_select') {
+    try {
+      const parsed = JSON.parse(rawAnswer) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((value): value is string => typeof value === 'string')
+          .map((value) => value.trim())
+          .filter(Boolean);
+      }
+    } catch {
+      return rawAnswer;
+    }
+  }
+
+  if (questionType === 'structured') {
+    try {
+      const parsed = JSON.parse(rawAnswer) as Record<string, { text?: unknown }>;
+      const lines = Object.entries(parsed)
+        .map(([label, value]) => {
+          const text = typeof value?.text === 'string' ? value.text.trim() : '';
+          return text ? `${label}: ${text}` : null;
+        })
+        .filter((line): line is string => Boolean(line));
+      return lines.length ? lines : rawAnswer;
+    } catch {
+      return rawAnswer;
+    }
+  }
+
+  return rawAnswer;
+}
+
+function parseCorrectAnswerForContext(
+  question: { type: string; correctAnswer: string; options: unknown },
+  questionType: QuizQuestionType,
+): string | string[] {
+  if (questionType === 'multiple_select') {
+    try {
+      const parsed = JSON.parse(question.correctAnswer) as unknown;
+      if (Array.isArray(parsed)) {
+        return parsed
+          .filter((value): value is string => typeof value === 'string')
+          .map((value) => value.trim())
+          .filter(Boolean);
+      }
+    } catch {
+      return question.correctAnswer;
+    }
+  }
+
+  if (questionType === 'structured' && Array.isArray(question.options)) {
+    const modelAnswers = question.options
+      .map((part) => {
+        if (!part || typeof part !== 'object') {
+          return null;
+        }
+        const partObj = part as { label?: unknown; modelAnswer?: unknown };
+        const modelAnswer =
+          typeof partObj.modelAnswer === 'string' ? partObj.modelAnswer.trim() : '';
+        if (!modelAnswer) {
+          return null;
+        }
+        const label = typeof partObj.label === 'string' ? partObj.label.trim() : '';
+        return label ? `${label}: ${modelAnswer}` : modelAnswer;
+      })
+      .filter((value): value is string => Boolean(value));
+
+    if (modelAnswers.length > 0) {
+      return modelAnswers;
+    }
+  }
+
+  return question.correctAnswer || 'No answer provided';
+}
+
+function buildMisconceptionText(
+  studentAnswer: string | string[],
+  correctAnswer: string | string[],
+): string | null {
+  const student = formatAnswerForMisconception(studentAnswer);
+  const correct = formatAnswerForMisconception(correctAnswer);
+  if (!student || student === 'No answer' || student === correct) {
+    return null;
+  }
+  return `Answered "${student}" instead of "${correct}".`;
+}
+
+function formatAnswerForMisconception(answer: string | string[]): string {
+  if (Array.isArray(answer)) {
+    const clean = answer.map((value) => value.trim()).filter(Boolean);
+    return clean.length ? clean.join(', ') : 'No answer';
+  }
+  const clean = answer.trim();
+  return clean || 'No answer';
 }
 
 function strengthFromScore(

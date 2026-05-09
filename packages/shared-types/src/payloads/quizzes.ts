@@ -82,3 +82,49 @@ export interface QuizCompletionResult {
   }
   questions: QuizQuestionReview[]
 }
+
+export interface QuizRemediationFailedQuestion {
+  questionIndex: number
+  questionText: string
+  subtopic: string
+  questionType: QuizQuestionType
+  studentAnswer: string | string[]
+  correctAnswer: string | string[]
+  explanation: string
+  marksAvailable: number
+  marksEarned: number
+}
+
+export interface QuizRemediationPassedQuestion {
+  questionIndex: number
+  subtopic: string
+  marksEarned: number
+}
+
+export interface QuizRemediationWeakSubtopic {
+  name: string
+  questionsAttempted: number
+  questionsFailed: number
+  misconception: string | null
+}
+
+export interface QuizRemediationMisconception {
+  subtopic: string
+  studentBelievedX: string
+  correctAnswerIsY: string
+  implication: string
+}
+
+export interface QuizRemediationContext {
+  quizId: string
+  topic: string
+  subjectName: string
+  score: number
+  total: number
+  percentageScore: number
+  failedQuestions: QuizRemediationFailedQuestion[]
+  passedQuestions: QuizRemediationPassedQuestion[]
+  weakSubtopics: QuizRemediationWeakSubtopic[]
+  misconceptions: QuizRemediationMisconception[]
+  strongSubtopics: string[]
+}
