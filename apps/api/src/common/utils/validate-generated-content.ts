@@ -61,8 +61,29 @@ export async function validateGeneratedContent(
   }
 }
 
-export function assertQuizContentValid(content: unknown): void {
+export function assertQuizContentValid(
+  content: unknown,
+  options?: {
+    paperType?: 'paper1' | 'paper2';
+    difficulty?: 'foundation' | 'standard' | 'challenging' | 'extension';
+  },
+): void {
   validateQuizContent(content);
+  if (
+    options?.paperType &&
+    options?.difficulty &&
+    isQuizPayload(content)
+  ) {
+    validateQuestionDistribution(content.questions, options.paperType, options.difficulty);
+  }
+}
+
+export function validateQuestionDistributionExport(
+  questions: GeneratedQuizQuestionLike[],
+  paperType: 'paper1' | 'paper2',
+  difficulty: 'foundation' | 'standard' | 'challenging' | 'extension',
+): void {
+  return validateQuestionDistribution(questions, paperType, difficulty);
 }
 
 export function assertLessonContentValid(content: unknown): void {
@@ -296,6 +317,82 @@ function isLessonPayload(
     'sections' in content &&
     Array.isArray((content as { sections?: unknown }).sections),
   );
+}
+
+function validateQuestionDistribution(
+  questions: GeneratedQuizQuestionLike[],
+  paperType: 'paper1' | 'paper2',
+  difficulty: 'foundation' | 'standard' | 'challenging' | 'extension',
+): void {
+  if (paperType === 'paper2') {
+    if (!questions.every((question) => question.type === 'structured')) {
+      throw new ContentValidationError(
+        'Paper 2 quizzes must contain only structured questions',
+      );
+    }
+    return;
+  }
+
+  const totalQuestions = questions.length;
+  const expectedByDifficulty: Record<
+    'foundation' | 'standard' | 'challenging' | 'extension',
+    Record<number, { multiple_choice: number; true_false: number; multiple_select: number }>
+  > = {
+    foundation: {
+      5: { multiple_choice: 3, true_false: 1, multiple_select: 1 },
+      10: { multiple_choice: 7, true_false: 2, multiple_select: 1 },
+      15: { multiple_choice: 10, true_false: 3, multiple_select: 2 },
+      20: { multiple_choice: 14, true_false: 4, multiple_select: 2 },
+    },
+    standard: {
+      5: { multiple_choice: 3, true_false: 1, multiple_select: 1 },
+      10: { multiple_choice: 6, true_false: 2, multiple_select: 2 },
+      15: { multiple_choice: 9, true_false: 3, multiple_select: 3 },
+      20: { multiple_choice: 12, true_false: 4, multiple_select: 4 },
+    },
+    challenging: {
+      5: { multiple_choice: 2, true_false: 1, multiple_select: 2 },
+      10: { multiple_choice: 5, true_false: 2, multiple_select: 3 },
+      15: { multiple_choice: 7, true_false: 3, multiple_select: 5 },
+      20: { multiple_choice: 10, true_false: 4, multiple_select: 6 },
+    },
+    extension: {
+      5: { multiple_choice: 2, true_false: 1, multiple_select: 2 },
+      10: { multiple_choice: 4, true_false: 2, multiple_select: 4 },
+      15: { multiple_choice: 6, true_false: 3, multiple_select: 6 },
+      20: { multiple_choice: 8, true_false: 4, multiple_select: 8 },
+    },
+  };
+
+  const expected = expectedByDifficulty[difficulty][totalQuestions];
+  if (!expected) {
+    return;
+  }
+
+  const actual = {
+    multiple_choice: 0,
+    true_false: 0,
+    multiple_select: 0,
+  };
+
+  for (const question of questions) {
+    const type = typeof question.type === 'string' ? question.type : '';
+    if (type === 'multiple_choice') actual.multiple_choice += 1;
+    if (type === 'true_false') actual.true_false += 1;
+    if (type === 'multiple_select') actual.multiple_select += 1;
+  }
+
+  const mismatches = Object.entries(expected).filter(
+    ([type, expectedCount]) => actual[type as keyof typeof actual] !== expectedCount,
+  );
+
+  if (mismatches.length > 0) {
+    const expectedSummary = `multiple_choice=${expected.multiple_choice}, true_false=${expected.true_false}, multiple_select=${expected.multiple_select}`;
+    const actualSummary = `multiple_choice=${actual.multiple_choice}, true_false=${actual.true_false}, multiple_select=${actual.multiple_select}`;
+    throw new ContentValidationError(
+      `Paper 1 ${difficulty} distribution mismatch. Expected ${expectedSummary}; got ${actualSummary}`,
+    );
+  }
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {

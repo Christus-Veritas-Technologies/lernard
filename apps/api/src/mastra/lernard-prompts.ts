@@ -371,6 +371,119 @@ function buildLessonRetryBlock(
     .join('\n');
 }
 
+type PaperTypeKey = 'paper1' | 'paper2';
+type QuizDifficultyKey =
+  | 'foundation'
+  | 'standard'
+  | 'challenging'
+  | 'extension';
+
+function buildDifficultyBlock(difficulty: QuizDifficultyKey): string {
+  switch (difficulty) {
+    case 'foundation':
+      return [
+        'RULE 3 — FOUNDATION DIFFICULTY.',
+        '- Prioritise direct recall and simple one-step application.',
+        '- Use clear wording and familiar contexts.',
+        '- Wrong options should be clearly wrong, not subtle traps.',
+      ].join('\n');
+    case 'challenging':
+      return [
+        'RULE 3 — CHALLENGING DIFFICULTY.',
+        '- Prioritise analysis, evaluation, and multi-step reasoning.',
+        '- Use realistic edge cases and nuanced distractors.',
+        '- All options should be plausible for partially-understanding students.',
+      ].join('\n');
+    case 'extension':
+      return [
+        'RULE 3 — EXTENSION DIFFICULTY.',
+        '- Prioritise synthesis across multiple concepts and why standard methods can fail.',
+        '- Use high-complexity scenarios with subtle trade-offs.',
+        '- Options should be hard to separate for standard-level students but clear to advanced learners.',
+      ].join('\n');
+    case 'standard':
+    default:
+      return [
+        'RULE 3 — STANDARD DIFFICULTY.',
+        '- Prioritise practical application to new but realistic situations.',
+        '- Include common misconceptions as distractors.',
+        '- Balance recall and application with some higher-order items.',
+      ].join('\n');
+  }
+}
+
+function buildPaperTypeBlock(paperType: PaperTypeKey): string {
+  if (paperType === 'paper2') {
+    return [
+      'PAPER TYPE: PAPER 2 (STRUCTURED).',
+      '- Questions are structured and require written responses with reasoning.',
+      '- Mark allocation and marking points must be explicit.',
+    ].join('\n');
+  }
+
+  return [
+    'PAPER TYPE: PAPER 1 (OBJECTIVE).',
+    '- Questions are auto-marked objective questions.',
+    '- Use supported objective formats and return machine-gradable answers.',
+  ].join('\n');
+}
+
+function buildQuestionDistributionBlock(
+  paperType: PaperTypeKey,
+  difficulty: QuizDifficultyKey,
+  questionCount: number,
+): string {
+  if (paperType === 'paper2') {
+    const capped = Math.min(Math.max(questionCount, 1), 5);
+    return [
+      `RULE 4 — PAPER 2 DISTRIBUTION.`,
+      `Generate exactly ${capped} structured questions.`,
+      'Each question must include progressive sub-parts, marks, and marking points.',
+    ].join('\n');
+  }
+
+  const distributions: Record<
+    QuizDifficultyKey,
+    Record<number, { multiple_choice: number; true_false: number; multiple_select: number }>
+  > = {
+    foundation: {
+      5: { multiple_choice: 3, true_false: 1, multiple_select: 1 },
+      10: { multiple_choice: 7, true_false: 2, multiple_select: 1 },
+      15: { multiple_choice: 10, true_false: 3, multiple_select: 2 },
+      20: { multiple_choice: 14, true_false: 4, multiple_select: 2 },
+    },
+    standard: {
+      5: { multiple_choice: 3, true_false: 1, multiple_select: 1 },
+      10: { multiple_choice: 6, true_false: 2, multiple_select: 2 },
+      15: { multiple_choice: 9, true_false: 3, multiple_select: 3 },
+      20: { multiple_choice: 12, true_false: 4, multiple_select: 4 },
+    },
+    challenging: {
+      5: { multiple_choice: 2, true_false: 1, multiple_select: 2 },
+      10: { multiple_choice: 5, true_false: 2, multiple_select: 3 },
+      15: { multiple_choice: 7, true_false: 3, multiple_select: 5 },
+      20: { multiple_choice: 10, true_false: 4, multiple_select: 6 },
+    },
+    extension: {
+      5: { multiple_choice: 2, true_false: 1, multiple_select: 2 },
+      10: { multiple_choice: 4, true_false: 2, multiple_select: 4 },
+      15: { multiple_choice: 6, true_false: 3, multiple_select: 6 },
+      20: { multiple_choice: 8, true_false: 4, multiple_select: 8 },
+    },
+  };
+
+  const dist = distributions[difficulty][questionCount] ?? distributions.standard[10];
+
+  return [
+    `RULE 4 — PAPER 1 DISTRIBUTION (${difficulty.toUpperCase()}).`,
+    `For ${questionCount} questions, use exactly:`,
+    `  ${dist.multiple_choice}× multiple_choice`,
+    `  ${dist.true_false}× true_false`,
+    `  ${dist.multiple_select}× multiple_select`,
+    'Do NOT put the same question type more than twice in a row.',
+  ].join('\n');
+}
+
 export function buildQuizUserPrompt(
   ctx: StudentContext,
   input: {
@@ -378,7 +491,8 @@ export function buildQuizUserPrompt(
     subjectName?: string;
     questionCount: number;
     mode: LearningModeKey;
-    style?: 'standard' | 'zimsec';
+    paperType: PaperTypeKey;
+    difficulty: QuizDifficultyKey;
     lessonSections?: Array<{
       type: string;
       heading: string | null;
@@ -388,8 +502,15 @@ export function buildQuizUserPrompt(
     confidenceRating?: number | null;
   },
 ): string {
-  if (input.style === 'zimsec') {
-    return buildZimsecQuizUserPrompt(ctx, input);
+  if (input.paperType === 'paper2') {
+    return buildZimsecQuizUserPrompt(ctx, {
+      topic: input.topic,
+      subjectName: input.subjectName,
+      questionCount: input.questionCount,
+      mode: input.mode,
+      lessonSections: input.lessonSections,
+      confidenceRating: input.confidenceRating,
+    });
   }
   const subject = input.subjectName ?? 'General';
   const studentLevel = ctx.grade ?? ctx.ageGroup ?? 'student';
@@ -474,62 +595,13 @@ export function buildQuizUserPrompt(
     ].join('\n');
   }
 
-  // ── Distribution table ─────────────────────────────────────────────────────
-  let distributionTable: string;
-  if (input.questionCount >= 15) {
-    distributionTable = [
-      '15 questions:',
-      '  5× multiple_choice',
-      '  3× true_false',
-      '  3× multiple_select',
-      '  2× fill_blank',
-      '  2× short_answer',
-    ].join('\n');
-  } else if (input.questionCount >= 10) {
-    distributionTable = [
-      '10 questions:',
-      '  4× multiple_choice',
-      '  2× true_false',
-      '  2× multiple_select',
-      '  1× fill_blank',
-      '  1× short_answer',
-    ].join('\n');
-  } else {
-    distributionTable = [
-      '5 questions:',
-      '  2× multiple_choice',
-      '  1× true_false',
-      '  1× multiple_select',
-      '  1× fill_blank OR short_answer',
-    ].join('\n');
-  }
-
-  // ── Difficulty calibration ─────────────────────────────────────────────────
-  const difficultyTable = [
-    `RULE 3 — CALIBRATE DIFFICULTY TO THE STUDENT'S LEVEL.`,
-    `${ctx.name} is a ${studentLevel} student. Their current strength on this topic is ${topicStrength}.`,
-    '',
-    'Use this table:',
-    '  needs_work + primary/secondary:',
-    '    → 60% recall questions, 30% basic application, 10% synthesis',
-    '    → Simple scenarios, everyday analogies, direct definitions',
-    '    → Options clearly differentiated (not tricky)',
-    '',
-    '  developing + any level:',
-    '    → 40% recall, 40% application, 20% edge cases',
-    '    → Realistic scenarios, small code snippets, numerical examples',
-    '    → Options require careful reading but are not traps',
-    '',
-    '  strong + secondary/university:',
-    '    → 20% recall, 50% application, 30% synthesis/analysis',
-    '    → Complex scenarios, code that has bugs or edge cases',
-    '    → Options include common professional mistakes',
-    '',
-    '  strong + professional:',
-    '    → 10% recall, 40% application, 50% synthesis/analysis',
-    '    → Real-world architecture decisions, performance trade-offs, subtle correctness issues',
-    '    → Options indistinguishable to a beginner, clear to an expert',
-  ].join('\n');
+  const paperTypeBlock = buildPaperTypeBlock(input.paperType);
+  const difficultyBlock = buildDifficultyBlock(input.difficulty);
+  const distributionBlock = buildQuestionDistributionBlock(
+    input.paperType,
+    input.difficulty,
+    input.questionCount,
+  );
 
   const lessonRuleNote = input.lessonSections && input.lessonSections.length > 0
     ? `\nRULE 7 — IF A LESSON WAS PROVIDED, USE IT.\nAt least ${Math.max(4, Math.floor(input.questionCount * 0.8))} of ${input.questionCount} questions must test concepts, terms, or examples that appeared in the lesson above. The lesson is the source material — the quiz tests whether the student retained it.`
@@ -545,6 +617,8 @@ export function buildQuizUserPrompt(
     '═══════════════════════════════════════════════════════',
     'QUESTION GENERATION RULES',
     '═══════════════════════════════════════════════════════',
+    '',
+    paperTypeBlock,
     '',
     'RULE 1 — EVERY QUESTION MUST TEST SPECIFIC KNOWLEDGE.',
     '',
@@ -566,16 +640,11 @@ export function buildQuizUserPrompt(
     '',
     '───────────────────────────────────────────────────────',
     '',
-    difficultyTable,
+    difficultyBlock,
     '',
     '───────────────────────────────────────────────────────',
     '',
-    `RULE 4 — QUESTION TYPE DISTRIBUTION.`,
-    '',
-    `For ${input.questionCount} questions, use this distribution:`,
-    distributionTable,
-    '',
-    'Do NOT put the same question type more than twice in a row. Vary the order.',
+    distributionBlock,
     '',
     '───────────────────────────────────────────────────────',
     '',
@@ -665,6 +734,8 @@ function buildZimsecQuizUserPrompt(
     subjectName?: string;
     questionCount: number;
     mode: LearningModeKey;
+    paperType?: 'paper1' | 'paper2';
+    difficulty?: 'foundation' | 'standard' | 'challenging' | 'extension';
     lessonSections?: Array<{
       type: string;
       heading: string | null;

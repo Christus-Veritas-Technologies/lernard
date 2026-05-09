@@ -40,10 +40,24 @@ export class QuizzesService {
       throw new BadRequestException('topic or fromUploadId is required');
     }
 
+    // Validate questionCount based on paperType
+    if (dto.paperType === 'paper1') {
+      const validCounts = [5, 10, 15, 20];
+      if (!validCounts.includes(dto.questionCount)) {
+        throw new BadRequestException(`Paper 1 questionCount must be one of: ${validCounts.join(', ')}`);
+      }
+    } else if (dto.paperType === 'paper2') {
+      const validCounts = [1, 3, 5];
+      if (!validCounts.includes(dto.questionCount)) {
+        throw new BadRequestException(`Paper 2 questionCount must be one of: ${validCounts.join(', ')}`);
+      }
+    }
+
     const studentContext = await this.studentContextBuilder.buildForUser(
       user.id,
     );
     const mode = normalizeMode(user.learningMode);
+    const difficulty = dto.difficulty ?? 'standard';
 
     let generated: {
       topic: string;
@@ -72,8 +86,9 @@ export class QuizzesService {
         kind: upload.kind,
         mimeType: upload.mimeType,
         questionCount: dto.questionCount,
+        paperType: dto.paperType,
+        difficulty,
         mode,
-        style: dto.style,
         studentContext,
       });
       // Fire-and-forget: delete the temp upload after generation
@@ -97,10 +112,11 @@ export class QuizzesService {
 
       generated = await this.mastraService.generateQuiz({
         topic: dto.topic!,
+        paperType: dto.paperType,
         questionCount: dto.questionCount,
+        difficulty,
         subjectName: dto.subject,
         mode,
-        style: dto.style,
         studentContext,
         lessonSections,
         confidenceRating,
@@ -121,6 +137,8 @@ export class QuizzesService {
         subjectName: generated.subjectName,
         totalQuestions: dto.questionCount,
         mode: user.learningMode,
+        paperType: dto.paperType.toUpperCase(),
+        difficulty: difficulty.toUpperCase(),
         status: 'READY',
         fromLessonId: dto.fromLessonId ?? null,
         fromConversationId: dto.fromConversationId ?? null,
@@ -182,6 +200,8 @@ export class QuizzesService {
       topic: quiz.topic,
       subjectName: quiz.subjectName ?? 'General',
       mode: normalizeMode(quiz.mode),
+      paperType: (quiz.paperType ?? 'PAPER1').toLowerCase(),
+      difficulty: (quiz.difficulty ?? 'STANDARD').toLowerCase(),
       totalQuestions: quiz.totalQuestions,
       currentQuestionIndex: index,
       question: {

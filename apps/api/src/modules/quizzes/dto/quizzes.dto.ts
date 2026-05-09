@@ -22,10 +22,17 @@ export class GenerateQuizDto {
   @MaxLength(100)
   subject?: string;
 
+  @IsIn(['paper1', 'paper2'])
+  paperType!: 'paper1' | 'paper2';
+
   @IsInt()
-  @Min(5)
-  @Max(15)
-  questionCount = 10;
+  @Min(1)
+  @Max(20)
+  questionCount!: number;
+
+  @IsOptional()
+  @IsIn(['foundation', 'standard', 'challenging', 'extension'])
+  difficulty?: 'foundation' | 'standard' | 'challenging' | 'extension';
 
   @IsUUID()
   idempotencyKey!: string;
@@ -45,10 +52,6 @@ export class GenerateQuizDto {
   @IsOptional()
   @IsIn(['image', 'pdf'])
   fromUploadKind?: 'image' | 'pdf';
-
-  @IsOptional()
-  @IsIn(['standard', 'zimsec'])
-  style?: 'standard' | 'zimsec';
 }
 
 export class SubmitAnswerDto {

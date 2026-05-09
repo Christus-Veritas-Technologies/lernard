@@ -263,7 +263,8 @@ export class MastraService {
     questionCount: number;
     subjectName?: string;
     mode: 'guide' | 'companion';
-    style?: 'standard' | 'zimsec';
+    paperType: 'paper1' | 'paper2';
+    difficulty: 'foundation' | 'standard' | 'challenging' | 'extension';
     studentContext: StudentContext;
     lessonSections?: LessonSectionInput[];
     confidenceRating?: number | null;
@@ -283,23 +284,28 @@ export class MastraService {
     }
 
     const systemPrompt = buildQuizGenerationSystemPrompt(input.studentContext);
+
     const userPrompt = buildQuizUserPrompt(input.studentContext, {
       topic: input.topic,
       subjectName: input.subjectName,
       questionCount: input.questionCount,
       mode: input.mode,
-      style: input.style,
+      paperType: input.paperType,
+      difficulty: input.difficulty,
       lessonSections: input.lessonSections,
       confidenceRating: input.confidenceRating,
     });
-
     const refinedPrompt = await this.buildLessonAwareQuizPrompt(
       input,
       userPrompt,
     );
 
     return this.runWithRetry(async () => {
-      let maxTokens = quizMaxTokens(input.questionCount, input.style);
+      let maxTokens = quizMaxTokens(
+        input.questionCount,
+        input.paperType,
+        input.difficulty,
+      );
       let parsed: QuizOutputPayload | null = null;
       let lastRawOutput = '';
       const attemptRawOutputs: string[] = [];
@@ -389,7 +395,13 @@ export class MastraService {
 
       const finalQuestions = completed.slice(0, input.questionCount);
       try {
-        assertQuizContentValid({ questions: finalQuestions });
+        assertQuizContentValid(
+          { questions: finalQuestions },
+          {
+            paperType: input.paperType,
+            difficulty: input.difficulty,
+          },
+        );
       } catch (error) {
         this.logRawAiOutputsOnError(
           'mastra.generateQuiz.validation_failed',
@@ -413,7 +425,8 @@ export class MastraService {
       questionCount: number;
       subjectName?: string;
       mode: 'guide' | 'companion';
-      style?: 'standard' | 'zimsec';
+      paperType: 'paper1' | 'paper2';
+      difficulty: 'foundation' | 'standard' | 'challenging' | 'extension';
       studentContext: StudentContext;
       lessonSections?: LessonSectionInput[];
       confidenceRating?: number | null;
@@ -427,7 +440,7 @@ export class MastraService {
     const serializedSections = serializeLessonSections(input.lessonSections);
 
     this.logger.log(
-      `[mastra.quizRefiner] start topic="${input.topic}" style=${input.style ?? 'standard'} sectionCount=${input.lessonSections.length} sectionChars=${serializedSections.length}`,
+      `[mastra.quizRefiner] start topic="${input.topic}" difficulty=${input.difficulty} paperType=${input.paperType} sectionCount=${input.lessonSections.length} sectionChars=${serializedSections.length}`,
     );
 
     try {
@@ -446,7 +459,7 @@ export class MastraService {
                 '',
                 'Hard requirements for your rewritten prompt:',
                 '- Preserve all JSON output constraints and format rules from the draft prompt.',
-                '- Preserve question count, style, and distribution constraints.',
+                '- Preserve question count, paper type, difficulty, and distribution constraints.',
                 '- Enforce specificity: each question text must be at least 15 words.',
                 '- Anchor questions to concrete lesson facts, terms, examples, and mechanisms.',
                 '- Keep the prompt actionable and concise.',
@@ -459,7 +472,8 @@ export class MastraService {
                 `Topic: ${input.topic}`,
                 `Subject: ${input.subjectName ?? 'General'}`,
                 `Mode: ${input.mode}`,
-                `Style: ${input.style ?? 'standard'}`,
+                `Paper Type: ${input.paperType === 'paper1' ? 'Paper 1 (Multiple Choice)' : 'Paper 2 (Structured)'}`,
+                `Difficulty: ${input.difficulty}`,
                 `Question count: ${input.questionCount}`,
                 `Confidence rating: ${input.confidenceRating ?? 'unknown'}`,
                 '',
@@ -614,7 +628,8 @@ export class MastraService {
     mimeType: string;
     questionCount: number;
     mode: 'guide' | 'companion';
-    style?: 'standard' | 'zimsec';
+    paperType: 'paper1' | 'paper2';
+    difficulty: 'foundation' | 'standard' | 'challenging' | 'extension';
     studentContext: StudentContext;
   }): Promise<{
     topic: string;
@@ -657,7 +672,8 @@ export class MastraService {
       subjectName: 'General',
       questionCount: input.questionCount,
       mode: input.mode,
-      style: input.style,
+      paperType: input.paperType,
+      difficulty: input.difficulty,
     });
 
     const textBlock: ClaudeContentBlock = {
@@ -676,7 +692,11 @@ export class MastraService {
     };
 
     return this.runWithRetry(async () => {
-      let maxTokens = quizMaxTokens(input.questionCount, input.style);
+      let maxTokens = quizMaxTokens(
+        input.questionCount,
+        input.paperType,
+        input.difficulty,
+      );
       let parsed: QuizOutputPayload | null = null;
       let lastRawOutput = '';
       const attemptRawOutputs: string[] = [];
@@ -766,7 +786,13 @@ export class MastraService {
 
       const finalQuestions = completed.slice(0, input.questionCount);
       try {
-        assertQuizContentValid({ questions: finalQuestions });
+        assertQuizContentValid(
+          { questions: finalQuestions },
+          {
+            paperType: input.paperType,
+            difficulty: input.difficulty,
+          },
+        );
       } catch (error) {
         this.logRawAiOutputsOnError(
           'mastra.generateQuizFromFile.validation_failed',
@@ -1557,13 +1583,17 @@ function lessonMaxTokens(depth: 'quick' | 'standard' | 'deep'): number {
   return 3500;
 }
 
-function quizMaxTokens(questionCount: number, style?: 'standard' | 'zimsec'): number {
-  if (style === 'zimsec') {
-    // ZIMSEC generates 2–5 structured questions, each with 3–6 sub-parts, marking points,
-    // model answers, and explanations — far more tokens than standard questions.
+function quizMaxTokens(
+  questionCount: number,
+  paperType: 'paper1' | 'paper2',
+  _difficulty: 'foundation' | 'standard' | 'challenging' | 'extension',
+): number {
+  if (paperType === 'paper2') {
+    // Paper 2 generates structured questions with marking schemes and explanations — more tokens than Paper 1.
     if (questionCount >= 5) return 20000;
     return 14000;
   }
+  // Paper 1: Multiple choice is more efficient.
   if (questionCount >= 15) return 10000;
   if (questionCount >= 10) return 7000;
   return 4500;

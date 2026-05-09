@@ -53,9 +53,22 @@ enum StrengthLevel {
 }
 
 enum GenerationStatus {
-  GENERATING
+  QUEUED
+  PROCESSING
   READY
   FAILED
+}
+
+enum PaperType {
+  PAPER1
+  PAPER2
+}
+
+enum QuizDifficulty {
+  FOUNDATION
+  STANDARD
+  CHALLENGING
+  EXTENSION
 }
 
 enum SessionType {
@@ -320,11 +333,15 @@ model Lesson {
   subjectName      String?
   topic            String
   depth            String           @default("standard") // quick | standard | deep
-  status           GenerationStatus @default(GENERATING)
+  status           GenerationStatus @default(QUEUED)
   estimatedMinutes Int              @default(10)
   sections         Json             @default("[]")
   sectionChecks    Json             @default("[]")
   confidenceRating Int?
+  jobId            String?
+  readyAt          DateTime?
+  failedAt         DateTime?
+  failureReason    String?
   completedAt      DateTime?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -344,13 +361,19 @@ model Quiz {
   subjectName       String?
   topic             String
   mode              LearningMode     @default(GUIDE)
+  paperType         PaperType        @default(PAPER1)
+  difficulty        QuizDifficulty   @default(STANDARD)
   totalQuestions    Int              @default(10)
-  status            GenerationStatus @default(GENERATING)
+  status            GenerationStatus @default(QUEUED)
   fromLessonId      String?
   fromConversationId String?
   currentIndex      Int              @default(0)
   score             Int              @default(0)
   weakTopics        Json             @default("[]")
+  jobId             String?
+  readyAt           DateTime?
+  failedAt          DateTime?
+  failureReason     String?
   completedAt       DateTime?
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt

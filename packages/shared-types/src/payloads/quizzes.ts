@@ -7,6 +7,9 @@ export type QuizQuestionType =
   | 'ordering'
   | 'structured'
 
+export type PaperType = 'paper1' | 'paper2'
+export type QuizDifficulty = 'foundation' | 'standard' | 'challenging' | 'extension'
+
 export interface QuizQuestion {
   type: QuizQuestionType
   text: string
@@ -19,7 +22,7 @@ export interface QuizStructuredPart {
   text: string
   command: string
   marks: number
-  tier: 'recall' | 'application' | 'analysis'
+  tier: 1 | 2 | 3 | 4
   answerType: 'short' | 'numeric' | 'written'
   markingPoints: string[]
   modelAnswer: string
@@ -37,6 +40,8 @@ export interface QuizContent {
   topic: string
   subjectName: string
   mode: 'guide' | 'companion'
+  paperType: PaperType
+  difficulty: QuizDifficulty
   totalQuestions: number
   currentQuestionIndex: number
   question: QuizQuestion | StructuredQuestion
