@@ -370,6 +370,10 @@ model Quiz {
   currentIndex      Int              @default(0)
   score             Int              @default(0)
   weakTopics        Json             @default("[]")
+  strongTopics      Json             @default("[]")
+  revisitSoonTopics Json             @default("[]")
+  debriefText       String?
+  reviewQuestions   Json             @default("[]")
   jobId             String?
   readyAt           DateTime?
   failedAt          DateTime?

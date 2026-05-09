@@ -7,6 +7,7 @@ import { ROUTES } from "@lernard/routes";
 import type {
     LessonRemediationContextInput,
     LessonRetryContextInput,
+    QuizDetailResponse,
     QuizCompletionResult,
     QuizRemediationContext,
 } from "@lernard/shared-types";
@@ -25,15 +26,40 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
     const router = useRouter();
     const [result, setResult] = useState<QuizCompletionResult | null>(null);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState<"discuss" | "drill" | null>(null);
     const [actionError, setActionError] = useState<string | null>(null);
 
     useEffect(() => {
-        void browserApiFetch<QuizCompletionResult>(ROUTES.QUIZZES.COMPLETE(quizId), {
-            method: "POST",
-        })
-            .then(setResult)
-            .finally(() => setLoading(false));
+        async function loadResults() {
+            try {
+                const detail = await browserApiFetch<QuizDetailResponse>(ROUTES.QUIZZES.GET(quizId));
+
+                if (detail.mode === "review") {
+                    setResult(detail.quiz);
+                    return;
+                }
+
+                if (detail.mode === "failed") {
+                    throw new Error(detail.failureReason ?? "Quiz generation failed.");
+                }
+
+                if (detail.mode === "queued") {
+                    throw new Error("Quiz is still being prepared. Please try again in a moment.");
+                }
+
+                const completed = await browserApiFetch<QuizCompletionResult>(ROUTES.QUIZZES.COMPLETE(quizId), {
+                    method: "POST",
+                });
+                setResult(completed);
+            } catch (error) {
+                setLoadError(error instanceof Error ? error.message : "Could not load results.");
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        void loadResults();
     }, [quizId]);
 
     async function fetchRemediationContext(): Promise<QuizRemediationContext> {
@@ -82,8 +108,24 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
         }
     }
 
-    if (loading || !result) {
+    if (loading) {
         return <div className="h-72 rounded-3xl bg-background-subtle" />;
+    }
+
+    if (!result) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>Could not load quiz results</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    <p className="text-sm text-text-secondary">{loadError ?? "Please try again."}</p>
+                    <Button onClick={() => router.push(`/quiz/${quizId}`)} variant="secondary">
+                        Back to quiz
+                    </Button>
+                </CardContent>
+            </Card>
+        );
     }
 
     const percentage = Math.round((result.score / Math.max(result.totalQuestions, 1)) * 100);

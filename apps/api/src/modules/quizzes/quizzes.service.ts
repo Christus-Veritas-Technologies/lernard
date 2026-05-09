@@ -1,5 +1,10 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type {
+  QuizDashboardStats,
+  QuizDetailResponse,
+  QuizHistoryResponse,
+  QuizHistoryStatus,
+  QuizStatusResponse,
   QuizCompletionResult,
   QuizContent,
   QuizRemediationContext,
@@ -15,7 +20,12 @@ import { StudentContextBuilder } from '../../mastra/student-context.builder';
 import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
 import { R2Service } from '../../r2/r2.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { GenerateQuizDto, SubmitAnswerDto, AnswerPartDto } from './dto/quizzes.dto';
+import {
+  GenerateQuizDto,
+  SubmitAnswerDto,
+  AnswerPartDto,
+  QuizHistoryQueryDto,
+} from './dto/quizzes.dto';
 import { deleteQuizUpload, readQuizUpload } from './quiz-uploads';
 
 type LessonSectionForQuiz = {
@@ -270,19 +280,266 @@ export class QuizzesService {
     }
   }
 
+  async getDashboardStats(user: User): Promise<QuizDashboardStats> {
+    const { periodStart, periodEnd } = getBillingWindowBounds(
+      user.billingAnchorDay ?? 1,
+    );
+
+    const completedThisMonth = await (this.prisma as any).quiz.findMany({
+      where: {
+        userId: user.id,
+        status: 'READY',
+        completedAt: {
+          gte: periodStart,
+          lt: periodEnd,
+        },
+      },
+      include: {
+        answers: true,
+        questions: {
+          select: {
+            type: true,
+            options: true,
+          },
+        },
+      },
+    });
+
+    const quizzesThisMonth = completedThisMonth.length;
+    const monthlyLimit = getMonthlyQuizLimit(user.plan);
+
+    const normalizedScores = completedThisMonth
+      .map((quiz: any) => computeNormalizedScoreOutOfTen(quiz))
+      .filter((score: number | null): score is number => score !== null);
+    const averageScoreThisMonth =
+      normalizedScores.length > 0
+        ? Number(
+            (
+              normalizedScores.reduce((sum, value) => sum + value, 0)
+              / normalizedScores.length
+            ).toFixed(1),
+          )
+        : null;
+
+    const readyQuizzes = await (this.prisma as any).quiz.findMany({
+      where: {
+        userId: user.id,
+        status: 'READY',
+      },
+      include: {
+        _count: {
+          select: { answers: true },
+        },
+      },
+    });
+
+    const quizzesInProgress = readyQuizzes.filter((quiz: any) => {
+      const answered = quiz._count?.answers ?? 0;
+      return answered > 0 && answered < quiz.totalQuestions;
+    }).length;
+
+    const completedAllTime = await (this.prisma as any).quiz.findMany({
+      where: {
+        userId: user.id,
+        status: 'READY',
+        completedAt: { not: null },
+      },
+      select: {
+        weakTopics: true,
+        subjectName: true,
+        difficulty: true,
+      },
+    });
+
+    const distinctWeakTopics = new Set<string>();
+    for (const quiz of completedAllTime) {
+      if (!Array.isArray(quiz.weakTopics)) {
+        continue;
+      }
+      for (const topic of quiz.weakTopics) {
+        if (typeof topic === 'string' && topic.trim().length > 0) {
+          distinctWeakTopics.add(topic.trim().toLowerCase());
+        }
+      }
+    }
+    const growthAreasFlagged = distinctWeakTopics.size;
+
+    const subjectCounts = new Map<string, number>();
+    for (const quiz of completedAllTime) {
+      const name =
+        typeof quiz.subjectName === 'string' && quiz.subjectName.trim().length > 0
+          ? quiz.subjectName.trim()
+          : 'General';
+      subjectCounts.set(name, (subjectCounts.get(name) ?? 0) + 1);
+    }
+
+    const mostQuizzedSubject = Array.from(subjectCounts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([name, count]) => ({ name, count }))[0] ?? null;
+
+    const difficultyCounts = new Map<string, number>();
+    for (const quiz of completedAllTime) {
+      const difficulty = String(quiz.difficulty ?? 'STANDARD').toLowerCase();
+      difficultyCounts.set(difficulty, (difficultyCounts.get(difficulty) ?? 0) + 1);
+    }
+
+    const mostCommonDifficulty = Array.from(difficultyCounts.entries())
+      .sort(
+        (a, b) =>
+          b[1] - a[1]
+          || difficultyWeight(b[0]) - difficultyWeight(a[0]),
+      )
+      .map(([difficulty]) => toSharedDifficulty(difficulty))[0] ?? null;
+
+    return {
+      quizzesThisMonth,
+      monthlyLimit,
+      averageScoreThisMonth,
+      quizzesInProgress,
+      growthAreasFlagged,
+      mostQuizzedSubject,
+      mostCommonDifficulty,
+    };
+  }
+
+  async getHistory(
+    user: User,
+    query: QuizHistoryQueryDto,
+  ): Promise<QuizHistoryResponse> {
+    const limit = Math.min(query.limit ?? 10, 50);
+    const cursor = parseHistoryCursor(query.cursor);
+
+    const where = buildHistoryWhereClause(user.id, query);
+    const allMatching = await (this.prisma as any).quiz.findMany({
+      where,
+      include: {
+        answers: true,
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+
+    const statusFiltered = allMatching.filter((quiz: any) => {
+      const status = deriveQuizHistoryStatus(quiz);
+      if (query.status && status !== query.status) {
+        return false;
+      }
+
+      return true;
+    });
+
+    const paged = statusFiltered.filter((quiz: any) => {
+      if (!cursor) {
+        return true;
+      }
+
+      const createdAt = new Date(quiz.createdAt).getTime();
+      if (createdAt < cursor.createdAtMs) {
+        return true;
+      }
+      if (createdAt > cursor.createdAtMs) {
+        return false;
+      }
+
+      return quiz.id < cursor.id;
+    });
+
+    const pageItems = paged.slice(0, limit);
+    const hasMore = paged.length > limit;
+    const nextCursor = hasMore
+      ? buildHistoryCursor(pageItems[pageItems.length - 1])
+      : null;
+
+    const quizzes = await Promise.all(
+      pageItems.map(async (quiz: any) => {
+        const status = deriveQuizHistoryStatus(quiz);
+        const paperType = toSharedPaperType(quiz.paperType);
+        const difficulty = toSharedDifficulty(quiz.difficulty);
+
+        let score: number | null = null;
+        let totalMarks: number | null = null;
+
+        if (status === 'completed') {
+          if (paperType === 'paper2') {
+            const quizWithQuestions = await (this.prisma as any).quiz.findUnique({
+              where: { id: quiz.id },
+              include: {
+                questions: {
+                  select: { options: true },
+                },
+                answers: {
+                  select: { answer: true, isCorrect: true },
+                },
+              },
+            });
+
+            const marks = computePaper2Marks(quizWithQuestions);
+            score = marks.marksEarned;
+            totalMarks = marks.totalMarks;
+          } else {
+            score = typeof quiz.score === 'number' ? quiz.score : null;
+            totalMarks = null;
+          }
+        }
+
+        return {
+          quizId: quiz.id,
+          topic: quiz.topic,
+          subjectName: quiz.subjectName ?? 'General',
+          paperType,
+          difficulty,
+          status,
+          score,
+          totalMarks,
+          questionsAnswered: quiz.answers.length,
+          totalQuestions: quiz.totalQuestions,
+          completedAt: quiz.completedAt ? new Date(quiz.completedAt).toISOString() : null,
+          createdAt: new Date(quiz.createdAt).toISOString(),
+          estimatedSecondsRemaining: estimateSecondsRemaining(quiz),
+        };
+      }),
+    );
+
+    return {
+      quizzes,
+      nextCursor,
+      hasMore,
+      totalCount: statusFiltered.length,
+    };
+  }
+
+  async getQuizStatus(user: User, quizId: string): Promise<QuizStatusResponse> {
+    const quiz = await (this.prisma as any).quiz.findFirst({
+      where: { id: quizId, userId: user.id },
+      include: {
+        answers: {
+          select: { id: true },
+        },
+      },
+    });
+
+    if (!quiz) {
+      throw new NotFoundException('Quiz not found');
+    }
+
+    const status = deriveQuizHistoryStatus(quiz);
+    return {
+      status,
+      estimatedSecondsRemaining: estimateSecondsRemaining(quiz),
+    };
+  }
+
   async getQuiz(
     user: User,
     quizId: string,
-  ): Promise<
-    | QuizContent
-    | { status: 'generating' }
-    | { status: 'failed'; failureReason: string | null }
-  > {
+  ): Promise<QuizDetailResponse> {
     const quiz = await (this.prisma as any).quiz.findFirst({
       where: { id: quizId, userId: user.id },
       include: {
         questions: {
           where: { questionIndex: { gte: 0 } },
+          orderBy: { questionIndex: 'asc' },
+        },
+        answers: {
           orderBy: { questionIndex: 'asc' },
         },
       },
@@ -293,11 +550,21 @@ export class QuizzesService {
     }
 
     if (quiz.status === 'FAILED') {
-      return { status: 'failed', failureReason: quiz.failureReason ?? null };
+      return {
+        mode: 'failed',
+        status: 'failed',
+        quizId: quiz.id,
+        failureReason: quiz.failureReason ?? null,
+      };
     }
 
     if (quiz.status !== 'READY') {
-      return { status: 'generating' };
+      return {
+        mode: 'queued',
+        status: 'queued',
+        quizId: quiz.id,
+        estimatedSecondsRemaining: estimateSecondsRemaining(quiz),
+      };
     }
 
     const index = Math.min(
@@ -306,13 +573,13 @@ export class QuizzesService {
     );
     const currentQuestion = quiz.questions[index];
 
-    return {
+    const quizContent: QuizContent = {
       quizId: quiz.id,
       topic: quiz.topic,
       subjectName: quiz.subjectName ?? 'General',
       mode: normalizeMode(quiz.mode),
-      paperType: (quiz.paperType ?? 'PAPER1').toLowerCase(),
-      difficulty: (quiz.difficulty ?? 'STANDARD').toLowerCase(),
+      paperType: toSharedPaperType(quiz.paperType),
+      difficulty: toSharedDifficulty(quiz.difficulty),
       totalQuestions: quiz.totalQuestions,
       currentQuestionIndex: index,
       question: {
@@ -331,6 +598,105 @@ export class QuizzesService {
                 ? currentQuestion.options
                 : undefined,
             }),
+      },
+    };
+
+    const questionsAnswered = quiz.answers.length;
+    const answeredQuestionIndexes = Array.from(
+      new Set<number>(quiz.answers.map((answer: any) => answer.questionIndex)),
+    ).sort((a, b) => a - b);
+
+    if (quiz.completedAt) {
+      const answersByIndex = new Map<number, any>(
+        quiz.answers.map((answer: any) => [answer.questionIndex, answer]),
+      );
+
+      const storedQuestions = normalizeStoredReviewQuestions(quiz.reviewQuestions);
+      const questions =
+        storedQuestions.length > 0
+          ? storedQuestions
+          : quiz.questions.map((question: any) => {
+              const student = answersByIndex.get(question.questionIndex);
+              return {
+                text: question.text,
+                studentAnswer: formatStoredAnswerForReview(student?.answer),
+                correctAnswer: question.correctAnswer,
+                isCorrect: student?.isCorrect ?? false,
+                explanation: question.explanation,
+                subtopic: question.subtopic ?? undefined,
+                evaluationResult:
+                  (student?.evaluationResult as
+                    | 'correct'
+                    | 'partial'
+                    | 'incorrect'
+                    | undefined) ?? undefined,
+                feedback: student?.feedback ?? undefined,
+              };
+            });
+
+      const weakTopics = Array.isArray(quiz.weakTopics)
+        ? quiz.weakTopics.filter((topic: unknown): topic is string => typeof topic === 'string')
+        : [];
+      const strongTopics = Array.isArray(quiz.strongTopics)
+        ? quiz.strongTopics.filter((topic: unknown): topic is string => typeof topic === 'string')
+        : [];
+      const revisitSoonTopics = Array.isArray(quiz.revisitSoonTopics)
+        ? quiz.revisitSoonTopics.filter((topic: unknown): topic is string => typeof topic === 'string')
+        : [];
+
+      const debriefText =
+        typeof quiz.debriefText === 'string' && quiz.debriefText.trim().length > 0
+          ? quiz.debriefText
+          : 'Review your responses and focus on your growth areas.';
+
+      const score =
+        typeof quiz.score === 'number'
+          ? quiz.score
+          : questions.filter((entry) => entry.isCorrect).length;
+
+      return {
+        mode: 'review',
+        status: 'completed',
+        quiz: {
+          quizId: quiz.id,
+          topic: quiz.topic,
+          subjectName: quiz.subjectName ?? 'General',
+          paperType: toSharedPaperType(quiz.paperType),
+          difficulty: toSharedDifficulty(quiz.difficulty),
+          completedAt: new Date(quiz.completedAt).toISOString(),
+          score,
+          totalQuestions: quiz.totalQuestions,
+          xpEarned: 10 + score,
+          shouldRevealAnswers: true,
+          debriefText,
+          topicBreakdown: {
+            strong: strongTopics,
+            needsWork: weakTopics,
+            revisitSoon: revisitSoonTopics,
+          },
+          questions,
+        },
+      };
+    }
+
+    if (questionsAnswered === 0) {
+      return {
+        mode: 'start',
+        status: 'not_started',
+        quiz: {
+          ...quizContent,
+          estimatedMinutes: estimateQuizMinutes(quiz),
+        },
+      };
+    }
+
+    return {
+      mode: 'continue',
+      status: 'in_progress',
+      quiz: {
+        ...quizContent,
+        questionsAnswered,
+        answeredQuestionIndexes,
       },
     };
   }
@@ -686,6 +1052,16 @@ export class QuizzesService {
       else revisitSoon.push(sub); 
     }
 
+    const studentContext = await this.studentContextBuilder.buildForUser(user.id);
+    const debriefText = await this.mastraService.generateQuizDebrief({
+      topic: quiz.topic,
+      studentName: studentContext.name,
+      studentLevel: studentContext.grade ?? studentContext.ageGroup ?? 'student',
+      score,
+      total: quiz.totalQuestions,
+      questions: reviews.map((r) => ({ text: r.text, isCorrect: r.isCorrect })),
+    });
+
     await (this.prisma as any).quiz.update({
       where: { id: quizId },
       data: {
@@ -693,6 +1069,10 @@ export class QuizzesService {
         score,
         completedAt: new Date(),
         weakTopics,
+        strongTopics: strong,
+        revisitSoonTopics: revisitSoon,
+        debriefText,
+        reviewQuestions: reviews,
       },
     });
 
@@ -721,16 +1101,6 @@ export class QuizzesService {
         subjectName: quiz.subjectName ?? null,
         durationMinutes: Math.max(5, quiz.totalQuestions),
       },
-    });
-
-    const studentContext = await this.studentContextBuilder.buildForUser(user.id);
-    const debriefText = await this.mastraService.generateQuizDebrief({
-      topic: quiz.topic,
-      studentName: studentContext.name,
-      studentLevel: studentContext.grade ?? studentContext.ageGroup ?? 'student',
-      score,
-      total: quiz.totalQuestions,
-      questions: reviews.map((r) => ({ text: r.text, isCorrect: r.isCorrect })),
     });
 
     return {
@@ -1328,4 +1698,319 @@ function normalizeFreeTextAnswer(value: string): string {
     .toLowerCase()
     .replace(/[\s_-]+/g, ' ')
     .replace(/[^a-z0-9 ]/g, '');
+}
+
+function deriveQuizHistoryStatus(quiz: {
+  status: string;
+  completedAt: Date | string | null;
+  totalQuestions: number;
+  answers?: Array<unknown>;
+}): QuizHistoryStatus {
+  if (quiz.status === 'FAILED') {
+    return 'failed';
+  }
+
+  if (quiz.status !== 'READY') {
+    return 'queued';
+  }
+
+  const answersCount = quiz.answers?.length ?? 0;
+  if (quiz.completedAt) {
+    return 'completed';
+  }
+  if (answersCount === 0) {
+    return 'not_started';
+  }
+  if (answersCount < quiz.totalQuestions) {
+    return 'in_progress';
+  }
+  return 'completed';
+}
+
+function estimateSecondsRemaining(quiz: {
+  status: string;
+  paperType?: string | null;
+  totalQuestions: number;
+  createdAt: Date | string;
+}): number | null {
+  if (quiz.status === 'READY' || quiz.status === 'FAILED') {
+    return null;
+  }
+
+  const isPaper2 = String(quiz.paperType ?? '').toUpperCase() === 'PAPER2';
+  const estimateTotalSeconds = isPaper2
+    ? Math.max(45, quiz.totalQuestions * 35)
+    : Math.max(20, quiz.totalQuestions * 12);
+  const elapsed = Math.floor(
+    (Date.now() - new Date(quiz.createdAt).getTime()) / 1000,
+  );
+  return Math.max(5, estimateTotalSeconds - Math.max(0, elapsed));
+}
+
+function estimateQuizMinutes(quiz: {
+  paperType?: string | null;
+  totalQuestions: number;
+}): number {
+  const paperType = toSharedPaperType(quiz.paperType);
+  if (paperType === 'paper2') {
+    return Math.max(15, quiz.totalQuestions * 20);
+  }
+  return Math.max(5, quiz.totalQuestions * 2);
+}
+
+function formatStoredAnswerForReview(value: string | null | undefined): string {
+  if (!value || value.trim().length === 0) {
+    return 'No answer';
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, { text?: unknown }>;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return value;
+    }
+
+    const formatted = Object.entries(parsed)
+      .map(([partLabel, partValue]) => {
+        const text =
+          partValue && typeof partValue === 'object' && 'text' in partValue
+            ? String(partValue.text ?? '').trim()
+            : '';
+        if (!text) {
+          return null;
+        }
+        return `${partLabel}: ${text}`;
+      })
+      .filter((entry): entry is string => Boolean(entry));
+
+    return formatted.length > 0 ? formatted.join(' | ') : value;
+  } catch {
+    return value;
+  }
+}
+
+function normalizeStoredReviewQuestions(value: unknown): QuizQuestionReview[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const normalized: QuizQuestionReview[] = value
+    .map((raw) => {
+      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return null;
+      }
+
+      const item = raw as Record<string, unknown>;
+      const text = typeof item.text === 'string' ? item.text.trim() : '';
+      if (!text) {
+        return null;
+      }
+
+      const evaluationResult =
+        item.evaluationResult === 'correct'
+        || item.evaluationResult === 'partial'
+        || item.evaluationResult === 'incorrect'
+          ? (item.evaluationResult as 'correct' | 'partial' | 'incorrect')
+          : undefined;
+
+      return {
+        text,
+        studentAnswer:
+          typeof item.studentAnswer === 'string' && item.studentAnswer.trim().length > 0
+            ? item.studentAnswer
+            : 'No answer',
+        correctAnswer:
+          typeof item.correctAnswer === 'string' && item.correctAnswer.trim().length > 0
+            ? item.correctAnswer
+            : null,
+        isCorrect: item.isCorrect === true,
+        explanation:
+          typeof item.explanation === 'string' && item.explanation.trim().length > 0
+            ? item.explanation
+            : 'No explanation available.',
+        subtopic:
+          typeof item.subtopic === 'string' && item.subtopic.trim().length > 0
+            ? item.subtopic
+            : undefined,
+        evaluationResult,
+        feedback:
+          typeof item.feedback === 'string' && item.feedback.trim().length > 0
+            ? item.feedback
+            : undefined,
+      };
+    })
+    .filter((item): item is QuizQuestionReview => item !== null);
+
+  return normalized;
+}
+
+function parseHistoryCursor(
+  rawCursor: string | undefined,
+): { createdAtMs: number; id: string } | null {
+  if (!rawCursor) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      Buffer.from(rawCursor, 'base64').toString('utf8'),
+    ) as { createdAt: string; id: string };
+    const createdAtMs = new Date(parsed.createdAt).getTime();
+    if (!Number.isFinite(createdAtMs) || typeof parsed.id !== 'string') {
+      return null;
+    }
+
+    return { createdAtMs, id: parsed.id };
+  } catch {
+    return null;
+  }
+}
+
+function buildHistoryCursor(quiz: { createdAt: Date | string; id: string }): string {
+  const payload = {
+    createdAt: new Date(quiz.createdAt).toISOString(),
+    id: quiz.id,
+  };
+  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64');
+}
+
+function buildHistoryWhereClause(userId: string, query: QuizHistoryQueryDto): Record<string, unknown> {
+  const where: Record<string, unknown> = { userId };
+
+  if (query.subject) {
+    where.subjectName = query.subject;
+  }
+
+  if (query.difficulty) {
+    where.difficulty = query.difficulty.toUpperCase();
+  }
+
+  if (query.paper) {
+    where.paperType = query.paper.toUpperCase();
+  }
+
+  return where;
+}
+
+function toSharedPaperType(value: string | null | undefined): 'paper1' | 'paper2' {
+  return String(value ?? '').toUpperCase() === 'PAPER2' ? 'paper2' : 'paper1';
+}
+
+function toSharedDifficulty(
+  value: string | null | undefined,
+): 'foundation' | 'standard' | 'challenging' | 'extension' {
+  const normalized = String(value ?? '').toLowerCase();
+  if (normalized === 'foundation') return 'foundation';
+  if (normalized === 'challenging') return 'challenging';
+  if (normalized === 'extension') return 'extension';
+  return 'standard';
+}
+
+function computePaper2Marks(quiz: any): { marksEarned: number; totalMarks: number } {
+  if (!quiz) {
+    return { marksEarned: 0, totalMarks: 0 };
+  }
+
+  let totalMarks = 0;
+  for (const question of quiz.questions ?? []) {
+    if (!Array.isArray(question.options)) {
+      continue;
+    }
+    for (const part of question.options) {
+      const marks =
+        part && typeof part === 'object' && 'marks' in part
+          ? (part as { marks?: unknown }).marks
+          : null;
+      if (typeof marks === 'number' && Number.isFinite(marks)) {
+        totalMarks += marks;
+      }
+    }
+  }
+
+  let marksEarned = 0;
+  for (const answer of quiz.answers ?? []) {
+    try {
+      const parsed = JSON.parse(answer.answer) as Record<string, { marksEarned?: unknown }>;
+      for (const value of Object.values(parsed)) {
+        if (typeof value?.marksEarned === 'number' && Number.isFinite(value.marksEarned)) {
+          marksEarned += value.marksEarned;
+        }
+      }
+    } catch {
+      if (answer.isCorrect) {
+        marksEarned += 1;
+      }
+    }
+  }
+
+  return { marksEarned, totalMarks };
+}
+
+function computeNormalizedScoreOutOfTen(quiz: any): number | null {
+  const paperType = toSharedPaperType(quiz.paperType);
+
+  if (paperType === 'paper1') {
+    if (typeof quiz.score !== 'number' || !quiz.totalQuestions) {
+      return null;
+    }
+    return (quiz.score / Math.max(quiz.totalQuestions, 1)) * 10;
+  }
+
+  const marks = computePaper2Marks(quiz);
+  if (marks.totalMarks <= 0) {
+    return null;
+  }
+
+  return (marks.marksEarned / marks.totalMarks) * 10;
+}
+
+function getMonthlyQuizLimit(plan: string): number | null {
+  const normalized = plan.toUpperCase();
+  if (normalized === 'SCHOLAR') return 80;
+  if (normalized === 'HOUSEHOLD') return 100;
+  if (normalized === 'CAMPUS') return 200;
+  return null;
+}
+
+function difficultyWeight(value: string): number {
+  switch (value.toLowerCase()) {
+    case 'extension':
+      return 4;
+    case 'challenging':
+      return 3;
+    case 'standard':
+      return 2;
+    case 'foundation':
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function getBillingWindowBounds(anchorDay: number): { periodStart: Date; periodEnd: Date } {
+  const now = new Date();
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth();
+  const day = now.getUTCDate();
+
+  let startYear = year;
+  let startMonth = month;
+
+  if (day < anchorDay) {
+    startMonth -= 1;
+    if (startMonth < 0) {
+      startMonth = 11;
+      startYear -= 1;
+    }
+  }
+
+  const periodStart = new Date(Date.UTC(startYear, startMonth, anchorDay, 0, 0, 0, 0));
+  let endYear = startYear;
+  let endMonth = startMonth + 1;
+  if (endMonth > 11) {
+    endMonth = 0;
+    endYear += 1;
+  }
+
+  const periodEnd = new Date(Date.UTC(endYear, endMonth, anchorDay, 0, 0, 0, 0));
+  return { periodStart, periodEnd };
 }

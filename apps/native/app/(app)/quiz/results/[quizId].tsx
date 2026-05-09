@@ -4,7 +4,7 @@ import { ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
-import type { QuizCompletionResult } from '@lernard/shared-types';
+import type { QuizCompletionResult, QuizDetailResponse } from '@lernard/shared-types';
 
 import { Text } from '@rnr/text';
 
@@ -21,10 +21,35 @@ export default function QuizResultsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void nativeApiFetch<QuizCompletionResult>(ROUTES.QUIZZES.COMPLETE(quizId), { method: 'POST' })
-      .then(setResult)
-      .catch(() => setError('Could not load results.'))
-      .finally(() => setLoading(false));
+    async function loadResults() {
+      try {
+        const detail = await nativeApiFetch<QuizDetailResponse>(ROUTES.QUIZZES.GET(quizId));
+
+        if (detail.mode === 'review') {
+          setResult(detail.quiz);
+          return;
+        }
+
+        if (detail.mode === 'failed') {
+          throw new Error(detail.failureReason ?? 'Quiz generation failed.');
+        }
+
+        if (detail.mode === 'queued') {
+          throw new Error('Quiz is still being prepared. Please try again in a moment.');
+        }
+
+        const completed = await nativeApiFetch<QuizCompletionResult>(ROUTES.QUIZZES.COMPLETE(quizId), {
+          method: 'POST',
+        });
+        setResult(completed);
+      } catch (loadErr) {
+        setError(loadErr instanceof Error ? loadErr.message : 'Could not load results.');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void loadResults();
   }, [quizId]);
 
   if (loading) {
@@ -35,6 +60,13 @@ export default function QuizResultsScreen() {
     return (
       <SafeAreaView className="flex-1 bg-white px-4 pt-6">
         <Text className="text-base text-red-600">{error ?? 'Results unavailable.'}</Text>
+        <View className="mt-4">
+          <Button
+            onPress={() => router.replace({ pathname: '/quiz/[quizId]', params: { quizId } })}
+            title="Back to quiz"
+            variant="secondary"
+          />
+        </View>
       </SafeAreaView>
     );
   }
