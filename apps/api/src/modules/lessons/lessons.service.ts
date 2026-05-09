@@ -1,17 +1,32 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { LessonContent, PostLessonResult } from '@lernard/shared-types';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import type {
+  LessonContent,
+  LessonRemediationContextInput,
+  LessonRetryContextInput,
+  PostLessonResult,
+} from '@lernard/shared-types';
 import type { User } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MastraService } from '../../mastra/mastra.service';
 import { StudentContextBuilder } from '../../mastra/student-context.builder';
 import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
+import { R2Service } from '../../r2/r2.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import {
   CompleteLessonDto,
   GenerateLessonDto,
   SectionCheckDto,
 } from './dto/generate-lesson.dto';
+import {
+  deleteLessonUpload,
+  readLessonUpload,
+} from './lesson-uploads';
 
 @Injectable()
 export class LessonsService {
@@ -21,6 +36,7 @@ export class LessonsService {
     private readonly prisma: PrismaService,
     private readonly mastraService: MastraService,
     private readonly studentContextBuilder: StudentContextBuilder,
+    private readonly r2: R2Service,
     private readonly notificationsService: NotificationsService,
   ) {}
 
@@ -28,11 +44,35 @@ export class LessonsService {
     user: User,
     dto: GenerateLessonDto,
   ): Promise<{ lessonId: string; status: string }> {
+    const requestedSources = [
+      dto.fromUploadId ? 'upload' : null,
+      dto.fromQuizId ? 'quiz' : null,
+      dto.topic?.trim() ? 'text' : null,
+    ].filter(Boolean);
+
+    if (requestedSources.length === 0) {
+      throw new BadRequestException(
+        'Provide a topic, an uploaded file, or a past quiz to generate a lesson.',
+      );
+    }
+
+    if (requestedSources.length > 1) {
+      throw new BadRequestException(
+        'Choose one lesson source at a time: topic, upload, or past quiz.',
+      );
+    }
+
+    if (dto.fromUploadId && !dto.fromUploadKind) {
+      throw new BadRequestException(
+        'fromUploadKind is required when fromUploadId is provided.',
+      );
+    }
+
     const jobId = uuidv4();
     const queued = await (this.prisma as any).lesson.create({
       data: {
         userId: user.id,
-        topic: dto.topic,
+        topic: dto.topic?.trim() || (dto.fromQuizId ? 'Past quiz remediation' : 'Uploaded content'),
         subjectName: dto.subject ?? 'General',
         depth: dto.depth,
         status: 'QUEUED',
@@ -54,7 +94,7 @@ export class LessonsService {
     const startedAt = Date.now();
     const idempotencyKeyShort = dto.idempotencyKey.slice(0, 8);
     const subject = dto.subject ?? 'General';
-    const topicPreview = dto.topic.trim().slice(0, 80);
+    const topicPreview = (dto.topic?.trim() || 'source-driven').slice(0, 80);
     let stage = 'build_student_context';
 
     this.logger.log(
@@ -77,14 +117,62 @@ export class LessonsService {
 
       stage = 'generate_lesson';
       const generateStartedAt = Date.now();
-      const generated = await this.mastraService.generateLesson({
-        topic: dto.topic,
-        depth: dto.depth,
-        subjectName: dto.subject,
-        studentContext,
-        remediationContext: dto.remediationContext,
-        retryContext: dto.retryContext,
-      });
+      let generated: LessonContent;
+      if (dto.fromUploadId) {
+        const upload = await readLessonUpload(this.r2, userId, dto.fromUploadId);
+        if (!upload) {
+          throw new BadRequestException(
+            'Uploaded file not found or has expired. Please upload again.',
+          );
+        }
+        if (dto.fromUploadKind && upload.kind !== dto.fromUploadKind) {
+          throw new BadRequestException(
+            'Uploaded file kind did not match the selected source.',
+          );
+        }
+
+        generated = await this.mastraService.generateLessonFromFile({
+          buffer: upload.buffer,
+          kind: upload.kind,
+          mimeType: upload.mimeType,
+          depth: dto.depth,
+          studentContext,
+          subjectName: dto.subject,
+        });
+
+        deleteLessonUpload(this.r2, userId, dto.fromUploadId).catch(() => {});
+      } else {
+        let topic = dto.topic?.trim() ?? 'Focused revision lesson';
+        let subjectName = dto.subject;
+        let remediationContext = dto.remediationContext;
+        let retryContext = dto.retryContext;
+
+        if (dto.fromQuizId) {
+          const quizSeed = await this.buildLessonRemediationFromQuiz(
+            userId,
+            dto.fromQuizId,
+          );
+          topic = topic || quizSeed.topicHint;
+          subjectName = subjectName ?? quizSeed.subjectName;
+          remediationContext = quizSeed.remediationContext;
+          retryContext = {
+            source: 'quiz_remediation',
+            quizId: dto.fromQuizId,
+            previousScore: quizSeed.remediationContext.percentageScore,
+            trigger:
+              'Practice exam follow-up focused on missed and near-miss concepts.',
+          };
+        }
+
+        generated = await this.mastraService.generateLesson({
+          topic,
+          depth: dto.depth,
+          subjectName,
+          studentContext,
+          remediationContext,
+          retryContext,
+        });
+      }
       this.logger.log(
         `[lesson.generate] generated userId=${userId} lessonId=${lessonId} sections=${generated.sections.length} estimatedMinutes=${generated.estimatedMinutes} durationMs=${Date.now() - generateStartedAt}`,
       );
@@ -368,6 +456,116 @@ export class LessonsService {
       ],
     };
   }
+
+  private async buildLessonRemediationFromQuiz(
+    userId: string,
+    quizId: string,
+  ): Promise<{
+    topicHint: string;
+    subjectName: string;
+    remediationContext: LessonRemediationContextInput;
+    retryContext: LessonRetryContextInput;
+  }> {
+    const quiz = await (this.prisma as any).quiz.findFirst({
+      where: { id: quizId, userId },
+      include: {
+        questions: { orderBy: { questionIndex: 'asc' } },
+        answers: { orderBy: { questionIndex: 'asc' } },
+      },
+    });
+
+    if (!quiz) {
+      throw new NotFoundException('Quiz not found');
+    }
+
+    const answersByIndex = new Map<number, { answer: string; isCorrect: boolean }>(
+      quiz.answers.map((entry: { questionIndex: number; answer: string; isCorrect: boolean }) => [
+        entry.questionIndex,
+        entry,
+      ]),
+    );
+
+    const weak = new Map<string, number>();
+    const strong = new Set<string>();
+    const misconceptions: LessonRemediationContextInput['misconceptions'] = [];
+    const failedQuestionPrompts: string[] = [];
+
+    for (const question of quiz.questions as Array<{
+      questionIndex: number;
+      text: string;
+      subtopic: string | null;
+      correctAnswer: string;
+    }>) {
+      const subtopic =
+        question.subtopic?.trim() ||
+        summariseQuestionAsSubtopic(question.text) ||
+        quiz.topic;
+      const answer = answersByIndex.get(question.questionIndex);
+
+      if (answer?.isCorrect) {
+        strong.add(subtopic);
+        continue;
+      }
+
+      weak.set(subtopic, (weak.get(subtopic) ?? 0) + 1);
+
+      const prompt = question.text.trim();
+      if (prompt) {
+        failedQuestionPrompts.push(prompt.slice(0, 240));
+      }
+
+      const studentAnswer = normalizeStudentAnswer(answer?.answer);
+      const correctAnswer = normalizeStudentAnswer(question.correctAnswer);
+      misconceptions.push({
+        subtopic: subtopic.slice(0, 120),
+        studentBelievedX: studentAnswer.slice(0, 300),
+        correctAnswerIsY: correctAnswer.slice(0, 300),
+        implication: `They need a clearer mental model of ${subtopic.toLowerCase()} and when to apply it.`.slice(
+          0,
+          400,
+        ),
+      });
+    }
+
+    const weakSubtopics = Array.from(weak.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name]) => name)
+      .slice(0, 6);
+
+    const strongSubtopics = Array.from(strong)
+      .filter((name) => !weakSubtopics.includes(name))
+      .slice(0, 6);
+
+    const totalQuestions =
+      typeof quiz.totalQuestions === 'number' && quiz.totalQuestions > 0
+        ? quiz.totalQuestions
+        : quiz.questions.length;
+    const score = typeof quiz.score === 'number' ? quiz.score : 0;
+    const percentageScore =
+      totalQuestions > 0
+        ? Math.max(0, Math.min(100, Math.round((score / totalQuestions) * 100)))
+        : 0;
+
+    const topicHint = weakSubtopics[0] ?? quiz.topic;
+
+    return {
+      topicHint,
+      subjectName: quiz.subjectName ?? 'General',
+      remediationContext: {
+        quizId: quiz.id,
+        percentageScore,
+        weakSubtopics,
+        strongSubtopics,
+        misconceptions: misconceptions.slice(0, 6),
+        failedQuestionPrompts: failedQuestionPrompts.slice(0, 8),
+      },
+      retryContext: {
+        source: 'quiz_remediation',
+        quizId: quiz.id,
+        previousScore: percentageScore,
+      },
+    };
+  }
 }
 
 function normalizeDepth(depth: string): 'quick' | 'standard' | 'deep' {
@@ -375,4 +573,51 @@ function normalizeDepth(depth: string): 'quick' | 'standard' | 'deep' {
     return depth;
   }
   return 'standard';
+}
+
+function summariseQuestionAsSubtopic(text: string): string {
+  const trimmed = text.trim().replace(/\s+/g, ' ');
+  if (!trimmed) return '';
+
+  const firstSentence = trimmed.split(/[.?!]/)[0] ?? trimmed;
+  const words = firstSentence.split(' ').slice(0, 8).join(' ');
+  return words.length > 80 ? `${words.slice(0, 77)}...` : words;
+}
+
+function normalizeStudentAnswer(value: string | undefined): string {
+  if (!value || !value.trim()) {
+    return 'No answer submitted';
+  }
+
+  const trimmed = value.trim();
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+
+    if (typeof parsed === 'string') {
+      return parsed.trim() || 'No answer submitted';
+    }
+
+    if (Array.isArray(parsed)) {
+      const flat = parsed
+        .map((item) => String(item).trim())
+        .filter(Boolean)
+        .join(', ');
+      return flat || 'No answer submitted';
+    }
+
+    if (parsed && typeof parsed === 'object') {
+      const values = Object.values(parsed as Record<string, unknown>)
+        .map((item) =>
+          typeof item === 'string' ? item.trim() : JSON.stringify(item),
+        )
+        .filter(Boolean)
+        .join(' | ');
+      return values || trimmed;
+    }
+  } catch {
+    return trimmed;
+  }
+
+  return trimmed;
 }

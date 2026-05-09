@@ -556,7 +556,7 @@ export function ChatPageClient() {
 
                                         {filteredLessons.length === 0 ? (
                                             <div className="rounded-[20px] border border-dashed border-border bg-surface p-4 text-xs text-text-secondary">
-                                                No matching lessons yet. Generate one in Learn and it will appear here.
+                                                No matching lessons yet. Generate one in Lessons and it will appear here.
                                             </div>
                                         ) : null}
                                     </div>

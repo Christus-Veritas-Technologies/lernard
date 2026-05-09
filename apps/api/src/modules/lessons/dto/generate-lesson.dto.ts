@@ -84,10 +84,11 @@ class LessonRetryContextDto {
 }
 
 export class GenerateLessonDto {
+  @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(300)
-  topic!: string;
+  topic?: string;
 
   @IsOptional()
   @IsString()
@@ -107,6 +108,20 @@ export class GenerateLessonDto {
   @ValidateNested()
   @Type(() => LessonRetryContextDto)
   retryContext?: LessonRetryContextDto;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  fromUploadId?: string;
+
+  @IsOptional()
+  @IsIn(['image', 'pdf'])
+  fromUploadKind?: 'image' | 'pdf';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  fromQuizId?: string;
 
   @IsUUID()
   idempotencyKey!: string;

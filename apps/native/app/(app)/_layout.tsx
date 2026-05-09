@@ -94,7 +94,7 @@ export default function AppLayout() {
                 tabBar={(props) => <TabBar {...props} />}
             >
                 <Tabs.Screen name="(home)" options={{ title: 'Home', href: role === Role.GUARDIAN ? null : undefined }} />
-                <Tabs.Screen name="learn/index" options={{ title: 'Learn', href: role === Role.GUARDIAN ? null : undefined }} />
+                <Tabs.Screen name="learn/index" options={{ title: 'Lessons', href: role === Role.GUARDIAN ? null : undefined }} />
                 <Tabs.Screen name="quiz/index" options={{ title: 'Practice Exams', href: role === Role.GUARDIAN ? null : undefined }} />
                 <Tabs.Screen name="(chat)/index" options={{ title: 'Chat', href: role === Role.GUARDIAN ? null : undefined }} />
                 <Tabs.Screen name="(progress)" options={{ title: 'Progress', href: null }} />

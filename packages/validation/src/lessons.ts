@@ -1,9 +1,12 @@
 import { z } from 'zod'
 
 export const generateLessonSchema = z.object({
-  topic: z.string().min(1).max(300),
+  topic: z.string().min(1).max(300).optional(),
   subject: z.string().max(100).optional(),
   depth: z.enum(['quick', 'standard', 'deep']).default('standard'),
+  fromUploadId: z.string().max(100).optional(),
+  fromUploadKind: z.enum(['image', 'pdf']).optional(),
+  fromQuizId: z.string().max(100).optional(),
   idempotencyKey: z.string().uuid(),
 })
 

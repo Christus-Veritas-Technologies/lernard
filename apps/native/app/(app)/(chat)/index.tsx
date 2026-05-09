@@ -132,7 +132,7 @@ export default function ChatListScreen() {
                         Reopen any thread, continue learning, then turn the conversation into a lesson or quiz.
                     </Text>
                     <View className="mt-6 flex-row flex-wrap gap-3">
-                        <Button onPress={() => router.push('/learn')} title="Start learning" />
+                        <Button onPress={() => router.push('/learn')} title="Start lessons" />
                         <Button onPress={() => router.push('/(app)/(home)')} title="Back to home" variant="secondary" />
                     </View>
                 </View>

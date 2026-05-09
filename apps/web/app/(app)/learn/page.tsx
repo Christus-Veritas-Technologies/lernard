@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { LearnPageClient } from "./LearnPageClient";
 
 export const metadata: Metadata = {
-    title: "Learn — Lernard",
+    title: "Lessons — Lernard",
     description: "Create a personalized lesson on any topic.",
 };
 

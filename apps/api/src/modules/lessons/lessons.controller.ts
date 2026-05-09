@@ -6,8 +6,11 @@ import {
   ParseIntPipe,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
@@ -15,16 +18,37 @@ import {
   CheckPlanLimit,
   PlanLimitsGuard,
 } from '../../common/guards/plan-limits.guard';
+import { R2Service } from '../../r2/r2.service';
 import {
   CompleteLessonDto,
   GenerateLessonDto,
   SectionCheckDto,
 } from './dto/generate-lesson.dto';
+import {
+  LessonUploadFile,
+  MAX_LESSON_UPLOAD_SIZE,
+  storeLessonUpload,
+} from './lesson-uploads';
 import { LessonsService } from './lessons.service';
 
 @Controller('lessons')
 export class LessonsController {
-  constructor(private readonly lessonsService: LessonsService) {}
+  constructor(
+    private readonly lessonsService: LessonsService,
+    private readonly r2: R2Service,
+  ) {}
+
+  @ProtectedRoute()
+  @Post('attachments/upload')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: MAX_LESSON_UPLOAD_SIZE } }),
+  )
+  async uploadAttachment(
+    @CurrentUser() user: User,
+    @UploadedFile() file: LessonUploadFile | undefined,
+  ) {
+    return storeLessonUpload(this.r2, user.id, file);
+  }
 
   @ProtectedRoute()
   @Get()

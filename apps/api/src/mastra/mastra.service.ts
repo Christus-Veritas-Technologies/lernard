@@ -256,6 +256,123 @@ export class MastraService {
     );
   }
 
+  async generateLessonFromFile(input: {
+    buffer: Buffer;
+    kind: 'image' | 'pdf';
+    mimeType: string;
+    depth: 'quick' | 'standard' | 'deep';
+    studentContext: StudentContext;
+    subjectName?: string;
+  }): Promise<LessonContent> {
+    if (this.devMode) {
+      return buildFallbackLesson('Uploaded content', input.subjectName, input.depth);
+    }
+
+    const systemPrompt = buildSystemPrompt(input.studentContext, {
+      kind: 'lesson',
+      topic: 'the attached file content',
+      subjectName: input.subjectName,
+      depth: input.depth,
+    });
+
+    const fileBlock: ClaudeContentBlock =
+      input.kind === 'pdf'
+        ? {
+            type: 'document',
+            source: {
+              type: 'base64',
+              media_type: input.mimeType,
+              data: input.buffer.toString('base64'),
+            },
+          }
+        : {
+            type: 'image',
+            source: {
+              type: 'base64',
+              media_type: input.mimeType,
+              data: input.buffer.toString('base64'),
+            },
+          };
+
+    const styleAwareLessonPrompt = buildLessonUserPrompt(input.studentContext, {
+      topic: 'the attached file content',
+      subjectName: input.subjectName,
+      depth: input.depth,
+    });
+
+    const textBlock: ClaudeContentBlock = {
+      type: 'text',
+      text: [
+        `Generate a ${input.depth} lesson based on the attached ${input.kind === 'pdf' ? 'document' : 'image'}.`,
+        `Use the attached ${input.kind === 'pdf' ? 'document' : 'image'} as the source of truth for lesson content.`,
+        'Infer a concise topic name and subject from the file content.',
+        'Return only valid JSON in this exact shape:',
+        '{"topic":"<short topic>","subjectName":"<subject>","depth":"quick|standard|deep","estimatedMinutes":number,"sections":[{"type":"hook|concept|examples|recap","heading":string|null,"body":string,"terms":[{"term":string,"explanation":string}]}]}',
+        'Do not include markdown fences or extra prose.',
+        '',
+        'Apply these lesson-quality and format rules exactly:',
+        styleAwareLessonPrompt,
+      ].join('\n'),
+    };
+
+    const fallbackEstimatedMinutes = lessonMinutesForDepth(input.depth);
+
+    return this.runWithRetry(
+      async () => {
+        const text = await this.completeText({
+          model: SONNET_MODEL,
+          maxTokens: lessonMaxTokens(input.depth),
+          systemPrompt,
+          messages: [{ role: 'user', content: [fileBlock, textBlock] }],
+        });
+
+        const parsed = parseLessonContentFromModelText(text);
+        if (!parsed || !Array.isArray(parsed.sections)) {
+          this.logger.warn(
+            `[mastra.generateLessonFromFile] malformed_json_fallback depth=${input.depth} rawPreview="${truncateForLog(text.replace(/\s+/g, ' '), 600)}"`,
+          );
+          return buildFallbackLesson('Uploaded content', input.subjectName, input.depth);
+        }
+
+        try {
+          assertLessonContentValid(parsed);
+        } catch (validationError) {
+          const hook = parsed.sections?.find((s) => s?.type === 'hook') ?? parsed.sections?.[0];
+          const hookBody = typeof hook?.body === 'string' ? hook.body : '(no body)';
+          this.logger.error(
+            `[mastra.generateLessonFromFile] validation_failed depth=${input.depth} error="${validationError instanceof Error ? validationError.message : String(validationError)}" hookBodyPreview="${truncateForLog(hookBody, 400)}"`,
+          );
+          throw validationError;
+        }
+
+        return {
+          lessonId: 'generated',
+          topic: parsed.topic ?? 'Uploaded content',
+          subjectName: parsed.subjectName ?? input.subjectName ?? 'General',
+          depth: parsed.depth ?? input.depth,
+          estimatedMinutes: parsed.estimatedMinutes ?? fallbackEstimatedMinutes,
+          sections: parsed.sections.map((section, index) => ({
+            type: normalizeSectionType(section?.type, index),
+            heading: section?.heading ?? null,
+            body: section?.body ?? '',
+            terms: Array.isArray(section?.terms)
+              ? section.terms
+                  .filter((term) => term && typeof term.term === 'string')
+                  .map((term) => ({
+                    term: term.term,
+                    explanation:
+                      typeof term.explanation === 'string'
+                        ? term.explanation
+                        : 'Definition unavailable.',
+                  }))
+              : [],
+          })),
+        };
+      },
+      () => buildFallbackLesson('Uploaded content', input.subjectName, input.depth),
+    );
+  }
+
   async generateQuiz(input: {
     topic: string;
     questionCount: number;

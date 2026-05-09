@@ -347,6 +347,7 @@ function buildLessonRemediationBlock(
     '- Prioritise the weak subtopics before introducing new material.',
     '- Include at least one worked example that directly corrects a listed misconception.',
     '- In recap bullets, include one bullet per weak subtopic with the corrected principle.',
+    '- Keep remediation implicit: never mention that this lesson came from a past quiz or that the learner got questions wrong.',
   ].join('\n');
 }
 
