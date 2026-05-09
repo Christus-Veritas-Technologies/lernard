@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type {
   QuizCompletionResult,
   QuizContent,
@@ -8,6 +8,7 @@ import type {
   StructuredPartEvaluation,
 } from '@lernard/shared-types';
 import type { User } from '@prisma/client';
+import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MastraService } from '../../mastra/mastra.service';
 import { StudentContextBuilder } from '../../mastra/student-context.builder';
@@ -25,6 +26,8 @@ type LessonSectionForQuiz = {
 
 @Injectable()
 export class QuizzesService {
+  private readonly logger = new Logger(QuizzesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly mastraService: MastraService,
@@ -53,128 +56,210 @@ export class QuizzesService {
       }
     }
 
-    const studentContext = await this.studentContextBuilder.buildForUser(
-      user.id,
-    );
     const mode = normalizeMode(user.learningMode);
     const difficulty = dto.difficulty ?? 'standard';
 
-    let generated: {
-      topic: string;
-      subjectName: string;
-      mode: 'guide' | 'companion';
-      questions: Array<{
-        type: string;
-        text: string;
-        options?: string[];
-        correctAnswer?: string;
-        correctAnswers?: string[];
-        explanation?: string;
-      }>;
-    };
-
-    if (dto.fromUploadId) {
-      if (!dto.fromUploadKind) {
-        throw new BadRequestException('fromUploadKind is required when fromUploadId is provided');
-      }
-      const upload = await readQuizUpload(this.r2, user.id, dto.fromUploadId);
-      if (!upload) {
-        throw new BadRequestException('Uploaded file not found or has expired. Please upload again.');
-      }
-      generated = await this.mastraService.generateQuizFromFile({
-        buffer: upload.buffer,
-        kind: upload.kind,
-        mimeType: upload.mimeType,
-        questionCount: dto.questionCount,
-        paperType: dto.paperType,
-        difficulty,
-        mode,
-        studentContext,
-      });
-      // Fire-and-forget: delete the temp upload after generation
-      deleteQuizUpload(this.r2, user.id, dto.fromUploadId).catch(() => {});
-    } else {
-      let lessonSections: LessonSectionForQuiz[] | undefined;
-      let confidenceRating: number | null = null;
-
-      if (dto.fromLessonId) {
-        const lesson = await (this.prisma as any).lesson.findFirst({
-          where: { id: dto.fromLessonId, userId: user.id },
-          select: { sections: true, confidenceRating: true },
-        });
-        if (lesson) {
-          lessonSections = normalizeLessonSectionsForQuiz(
-            lesson.sections as unknown,
-          );
-          confidenceRating = lesson.confidenceRating ?? null;
-        }
-      }
-
-      generated = await this.mastraService.generateQuiz({
-        topic: dto.topic!,
-        paperType: dto.paperType,
-        questionCount: dto.questionCount,
-        difficulty,
-        subjectName: dto.subject,
-        mode,
-        studentContext,
-        lessonSections,
-        confidenceRating,
-      });
-      await validateGeneratedContent(generated, this.mastraService);
-    }
-
-    if (generated.questions.length !== dto.questionCount) {
-      throw new Error(
-        `Quiz generation returned ${generated.questions.length} questions instead of ${dto.questionCount}.`,
-      );
-    }
-
-    const quiz = await (this.prisma as any).quiz.create({
+    const jobId = uuidv4();
+    const queuedQuiz = await (this.prisma as any).quiz.create({
       data: {
         userId: user.id,
-        topic: generated.topic,
-        subjectName: generated.subjectName,
+        topic: dto.topic ?? 'Uploaded content',
+        subjectName: dto.subject ?? 'General',
         totalQuestions: dto.questionCount,
         mode: user.learningMode,
         paperType: dto.paperType.toUpperCase(),
         difficulty: difficulty.toUpperCase(),
-        status: 'READY',
+        status: 'QUEUED',
         fromLessonId: dto.fromLessonId ?? null,
         fromConversationId: dto.fromConversationId ?? null,
+        jobId,
       },
+      select: { id: true },
     });
 
-    // Ensure we create exactly the requested number of questions, no more
-    const questionsToCreate = generated.questions.slice(0, dto.questionCount);
-    for (let i = 0; i < questionsToCreate.length; i++) {
-      const question = questionsToCreate[i];
+    void this.runQuizGenerationJob({
+      quizId: queuedQuiz.id,
+      userId: user.id,
+      mode,
+      dto,
+      difficulty,
+      jobId,
+    });
 
-      const correctAnswer = serializeCorrectAnswer(question);
+    return { quizId: queuedQuiz.id, status: 'queued' };
+  }
 
-      await (this.prisma as any).quizQuestion.create({
+  private async runQuizGenerationJob(input: {
+    quizId: string;
+    userId: string;
+    mode: 'guide' | 'companion';
+    dto: GenerateQuizDto;
+    difficulty: 'foundation' | 'standard' | 'challenging' | 'extension';
+    jobId: string;
+  }): Promise<void> {
+    try {
+      await (this.prisma as any).quiz.update({
+        where: { id: input.quizId },
+        data: { status: 'PROCESSING' },
+      });
+
+      const studentContext = await this.studentContextBuilder.buildForUser(
+        input.userId,
+      );
+
+      let generated: {
+        topic: string;
+        subjectName: string;
+        mode: 'guide' | 'companion';
+        questions: Array<{
+          type: string;
+          text: string;
+          options?: string[];
+          correctAnswer?: string;
+          correctAnswers?: string[];
+          explanation?: string;
+        }>;
+      };
+
+      const dto = input.dto;
+
+      if (dto.fromUploadId) {
+        if (!dto.fromUploadKind) {
+          throw new BadRequestException(
+            'fromUploadKind is required when fromUploadId is provided',
+          );
+        }
+
+        const upload = await readQuizUpload(this.r2, input.userId, dto.fromUploadId);
+        if (!upload) {
+          throw new BadRequestException(
+            'Uploaded file not found or has expired. Please upload again.',
+          );
+        }
+
+        generated = await this.mastraService.generateQuizFromFile({
+          buffer: upload.buffer,
+          kind: upload.kind,
+          mimeType: upload.mimeType,
+          questionCount: dto.questionCount,
+          paperType: dto.paperType,
+          difficulty: input.difficulty,
+          mode: input.mode,
+          studentContext,
+        });
+
+        deleteQuizUpload(this.r2, input.userId, dto.fromUploadId).catch(() => {});
+      } else {
+        let lessonSections: LessonSectionForQuiz[] | undefined;
+        let confidenceRating: number | null = null;
+
+        if (dto.fromLessonId) {
+          const lesson = await (this.prisma as any).lesson.findFirst({
+            where: { id: dto.fromLessonId, userId: input.userId },
+            select: { sections: true, confidenceRating: true },
+          });
+          if (lesson) {
+            lessonSections = normalizeLessonSectionsForQuiz(
+              lesson.sections as unknown,
+            );
+            confidenceRating = lesson.confidenceRating ?? null;
+          }
+        }
+
+        generated = await this.mastraService.generateQuiz({
+          topic: dto.topic!,
+          paperType: dto.paperType,
+          questionCount: dto.questionCount,
+          difficulty: input.difficulty,
+          subjectName: dto.subject,
+          mode: input.mode,
+          studentContext,
+          lessonSections,
+          confidenceRating,
+        });
+        await validateGeneratedContent(generated, this.mastraService);
+      }
+
+      if (generated.questions.length !== dto.questionCount) {
+        throw new Error(
+          `Quiz generation returned ${generated.questions.length} questions instead of ${dto.questionCount}.`,
+        );
+      }
+
+      await (this.prisma as any).quizQuestion.deleteMany({
+        where: { quizId: input.quizId },
+      });
+
+      const questionsToCreate = generated.questions.slice(0, dto.questionCount);
+      for (let i = 0; i < questionsToCreate.length; i++) {
+        const question = questionsToCreate[i];
+
+        await (this.prisma as any).quizQuestion.create({
+          data: {
+            quizId: input.quizId,
+            questionIndex: i,
+            type: toDbQuestionType(question.type),
+            text: question.text,
+            options:
+              question.type === 'structured'
+                ? Array.isArray((question as any).parts)
+                  ? (question as any).parts
+                  : null
+                : (question.options ?? null),
+            correctAnswer:
+              question.type === 'structured'
+                ? 'structured'
+                : serializeCorrectAnswer(question),
+            explanation:
+              question.explanation ??
+              'Review this concept and compare your answer with the expected pattern.',
+            subtopic: (question as any).subtopic ?? null,
+          },
+        });
+      }
+
+      await (this.prisma as any).quiz.update({
+        where: { id: input.quizId },
         data: {
-          quizId: quiz.id,
-          questionIndex: i,
-          type: toDbQuestionType(question.type),
-          text: question.text,
-          // For structured questions: store parts array as the options JSON; correctAnswer is sentinel 'structured'
-          options: question.type === 'structured'
-            ? (Array.isArray((question as any).parts) ? (question as any).parts : null)
-            : (question.options ?? null),
-          correctAnswer: question.type === 'structured' ? 'structured' : serializeCorrectAnswer(question),
-          explanation:
-            question.explanation ??
-            'Review this concept and compare your answer with the expected pattern.',
-          subtopic: (question as any).subtopic ?? null,
+          topic: generated.topic,
+          subjectName: generated.subjectName,
+          status: 'READY',
+          readyAt: new Date(),
+          failedAt: null,
+          failureReason: null,
+        },
+      });
+
+      this.logger.log(
+        `[quiz.generate] success quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? `${error.name}: ${error.message}` : 'Unknown error';
+      this.logger.error(
+        `[quiz.generate] failed quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId} error="${message}"`,
+        error instanceof Error ? error.stack : undefined,
+      );
+
+      await (this.prisma as any).quiz.update({
+        where: { id: input.quizId },
+        data: {
+          status: 'FAILED',
+          failedAt: new Date(),
+          failureReason: message.slice(0, 500),
         },
       });
     }
-
-    return { quizId: quiz.id, status: 'ready' };
   }
 
-  async getQuiz(user: User, quizId: string): Promise<QuizContent> {
+  async getQuiz(
+    user: User,
+    quizId: string,
+  ): Promise<
+    | QuizContent
+    | { status: 'generating' }
+    | { status: 'failed'; failureReason: string | null }
+  > {
     const quiz = await (this.prisma as any).quiz.findFirst({
       where: { id: quizId, userId: user.id },
       include: {
@@ -187,6 +272,14 @@ export class QuizzesService {
 
     if (!quiz) {
       throw new NotFoundException('Quiz not found');
+    }
+
+    if (quiz.status === 'FAILED') {
+      return { status: 'failed', failureReason: quiz.failureReason ?? null };
+    }
+
+    if (quiz.status !== 'READY') {
+      return { status: 'generating' };
     }
 
     const index = Math.min(
