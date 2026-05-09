@@ -9,6 +9,13 @@ export type QuizQuestionType =
 
 export type PaperType = 'paper1' | 'paper2'
 export type QuizDifficulty = 'foundation' | 'standard' | 'challenging' | 'extension'
+export type QuizHistoryStatus =
+  | 'completed'
+  | 'in_progress'
+  | 'not_started'
+  | 'queued'
+  | 'failed'
+export type QuizDetailMode = 'review' | 'continue' | 'start' | 'queued' | 'failed'
 
 export interface QuizQuestion {
   type: QuizQuestionType
@@ -133,3 +140,92 @@ export interface QuizRemediationContext {
   misconceptions: QuizRemediationMisconception[]
   strongSubtopics: string[]
 }
+
+export interface QuizDashboardStats {
+  quizzesThisMonth: number
+  monthlyLimit: number | null
+  averageScoreThisMonth: number | null
+  quizzesInProgress: number
+  growthAreasFlagged: number
+  mostQuizzedSubject: { name: string; count: number } | null
+  mostCommonDifficulty: QuizDifficulty | null
+}
+
+export interface QuizHistoryItem {
+  quizId: string
+  topic: string
+  subjectName: string
+  paperType: PaperType
+  difficulty: QuizDifficulty
+  status: QuizHistoryStatus
+  score: number | null
+  totalMarks: number | null
+  questionsAnswered: number
+  totalQuestions: number
+  completedAt: string | null
+  createdAt: string
+  estimatedSecondsRemaining: number | null
+}
+
+export interface QuizHistoryResponse {
+  quizzes: QuizHistoryItem[]
+  nextCursor: string | null
+  hasMore: boolean
+  totalCount: number
+}
+
+export interface QuizStatusResponse {
+  status: QuizHistoryStatus
+  estimatedSecondsRemaining: number | null
+}
+
+export interface QuizDetailReviewPayload {
+  mode: 'review'
+  status: 'completed'
+  quiz: QuizCompletionResult & {
+    quizId: string
+    topic: string
+    subjectName: string
+    paperType: PaperType
+    difficulty: QuizDifficulty
+    completedAt: string | null
+  }
+}
+
+export interface QuizDetailContinuePayload {
+  mode: 'continue'
+  status: 'in_progress'
+  quiz: QuizContent & {
+    questionsAnswered: number
+    answeredQuestionIndexes: number[]
+  }
+}
+
+export interface QuizDetailStartPayload {
+  mode: 'start'
+  status: 'not_started'
+  quiz: QuizContent & {
+    estimatedMinutes: number
+  }
+}
+
+export interface QuizDetailQueuedPayload {
+  mode: 'queued'
+  status: 'queued'
+  quizId: string
+  estimatedSecondsRemaining: number | null
+}
+
+export interface QuizDetailFailedPayload {
+  mode: 'failed'
+  status: 'failed'
+  quizId: string
+  failureReason: string | null
+}
+
+export type QuizDetailResponse =
+  | QuizDetailReviewPayload
+  | QuizDetailContinuePayload
+  | QuizDetailStartPayload
+  | QuizDetailQueuedPayload
+  | QuizDetailFailedPayload

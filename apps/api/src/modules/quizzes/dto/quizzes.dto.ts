@@ -9,6 +9,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 export class GenerateQuizDto {
   @IsOptional()
@@ -86,4 +87,35 @@ export class AnswerPartDto {
   @IsString()
   @MaxLength(2000)
   answer!: string;
+}
+
+export class QuizHistoryQueryDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  cursor?: string;
+
+  @IsOptional()
+  @Transform(({ value }) => Number(value))
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  subject?: string;
+
+  @IsOptional()
+  @IsIn(['foundation', 'standard', 'challenging', 'extension'])
+  difficulty?: 'foundation' | 'standard' | 'challenging' | 'extension';
+
+  @IsOptional()
+  @IsIn(['paper1', 'paper2'])
+  paper?: 'paper1' | 'paper2';
+
+  @IsOptional()
+  @IsIn(['completed', 'in_progress', 'not_started', 'queued', 'failed'])
+  status?: 'completed' | 'in_progress' | 'not_started' | 'queued' | 'failed';
 }

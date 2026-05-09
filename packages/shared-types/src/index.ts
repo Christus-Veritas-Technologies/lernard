@@ -65,6 +65,10 @@ export type {
 export { SECTION_COLORS, getSubjectIcon } from './payloads/lessons'
 export type {
   QuizQuestionType,
+  PaperType,
+  QuizDifficulty,
+  QuizHistoryStatus,
+  QuizDetailMode,
   QuizQuestion,
   QuizStructuredPart,
   StructuredQuestion,
@@ -78,6 +82,16 @@ export type {
   QuizRemediationWeakSubtopic,
   QuizRemediationMisconception,
   QuizRemediationContext,
+  QuizDashboardStats,
+  QuizHistoryItem,
+  QuizHistoryResponse,
+  QuizStatusResponse,
+  QuizDetailReviewPayload,
+  QuizDetailContinuePayload,
+  QuizDetailStartPayload,
+  QuizDetailQueuedPayload,
+  QuizDetailFailedPayload,
+  QuizDetailResponse,
 } from './payloads/quizzes'
 export type {
   ConversationListItem,
