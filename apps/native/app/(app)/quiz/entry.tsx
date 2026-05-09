@@ -3,12 +3,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   BookOpen01Icon,
+  Clock01Icon,
   Cancel01Icon,
   DocumentAttachmentIcon,
   ImageUploadIcon,
+  MoreHorizontalCircle01Icon,
   PencilEdit01Icon,
+  RefreshIcon,
+  Rocket01Icon,
+  SchoolReportCardIcon,
+  SignalMedium02Icon,
 } from 'hugeicons-react-native';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -21,6 +27,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
+import type {
+  QuizDashboardStats,
+  QuizHistoryItem,
+  QuizHistoryResponse,
+} from '@lernard/shared-types';
 
 import { Text } from '@rnr/text';
 
@@ -43,6 +54,16 @@ interface UploadResult {
   mimeType: string;
   size: number;
 }
+
+const EMPTY_STATS: QuizDashboardStats = {
+  quizzesThisMonth: 0,
+  monthlyLimit: null,
+  averageScoreThisMonth: null,
+  quizzesInProgress: 0,
+  growthAreasFlagged: 0,
+  mostQuizzedSubject: null,
+  mostCommonDifficulty: null,
+};
 
 const COUNTS = [5, 10, 15] as const;
 
@@ -71,6 +92,13 @@ export default function QuizEntryScreen() {
   const [questionCount, setQuestionCount] = useState<5 | 10 | 15>(5);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardError, setDashboardError] = useState<string | null>(null);
+  const [stats, setStats] = useState<QuizDashboardStats>(EMPTY_STATS);
+  const [history, setHistory] = useState<QuizHistoryItem[]>([]);
+  const [historyCursor, setHistoryCursor] = useState<string | null>(null);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
 
   // Lesson source state
   const [lessonSearch, setLessonSearch] = useState('');
@@ -87,6 +115,29 @@ export default function QuizEntryScreen() {
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const loadDashboard = useCallback(async () => {
+    setDashboardLoading(true);
+    setDashboardError(null);
+    try {
+      const [statsData, historyData] = await Promise.all([
+        nativeApiFetch<QuizDashboardStats>(ROUTES.QUIZZES.DASHBOARD_STATS),
+        nativeApiFetch<QuizHistoryResponse>(`${ROUTES.QUIZZES.HISTORY}?limit=8`),
+      ]);
+      setStats(statsData);
+      setHistory(historyData.quizzes);
+      setHistoryCursor(historyData.nextCursor);
+      setHistoryHasMore(historyData.hasMore);
+    } catch {
+      setDashboardError('Could not load your quiz dashboard yet.');
+    } finally {
+      setDashboardLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
 
   const loadLessons = useCallback(async () => {
     if (lessonsLoaded) return;
@@ -166,6 +217,22 @@ export default function QuizEntryScreen() {
     setUploadError(null);
   }
 
+  async function loadMoreHistory() {
+    if (!historyHasMore || !historyCursor || historyLoadingMore) return;
+
+    setHistoryLoadingMore(true);
+    try {
+      const nextPage = await nativeApiFetch<QuizHistoryResponse>(
+        `${ROUTES.QUIZZES.HISTORY}?limit=8&cursor=${encodeURIComponent(historyCursor)}`,
+      );
+      setHistory((prev) => [...prev, ...nextPage.quizzes]);
+      setHistoryCursor(nextPage.nextCursor);
+      setHistoryHasMore(nextPage.hasMore);
+    } finally {
+      setHistoryLoadingMore(false);
+    }
+  }
+
   const filteredLessons = lessons.filter(
     (l) =>
       l.topic.toLowerCase().includes(lessonSearch.toLowerCase()) ||
@@ -203,12 +270,39 @@ export default function QuizEntryScreen() {
         method: 'POST',
         body: JSON.stringify(body),
       });
+      void loadDashboard();
       router.replace({ pathname: '/quiz/[quizId]', params: { quizId: response.quizId } });
     } catch {
       setError('Failed to generate quiz. Please try again.');
     } finally {
       setLoading(false);
     }
+  }
+
+  const monthlyUsageLabel =
+    stats.monthlyLimit === null
+      ? `${stats.quizzesThisMonth} quizzes this month`
+      : `${stats.quizzesThisMonth} / ${stats.monthlyLimit} this month`;
+
+  const avgScoreLabel =
+    stats.averageScoreThisMonth === null
+      ? 'No completed quizzes'
+      : `${stats.averageScoreThisMonth.toFixed(1)} / 10 average`;
+
+  function statusTone(status: QuizHistoryItem['status']): string {
+    if (status === 'completed') return 'text-green-700 bg-green-50 border-green-200';
+    if (status === 'in_progress') return 'text-blue-700 bg-blue-50 border-blue-200';
+    if (status === 'queued') return 'text-amber-700 bg-amber-50 border-amber-200';
+    if (status === 'failed') return 'text-red-700 bg-red-50 border-red-200';
+    return 'text-slate-600 bg-slate-50 border-slate-200';
+  }
+
+  function statusLabel(status: QuizHistoryItem['status']): string {
+    if (status === 'in_progress') return 'In progress';
+    if (status === 'not_started') return 'Not started';
+    if (status === 'queued') return 'Queued';
+    if (status === 'failed') return 'Failed';
+    return 'Completed';
   }
 
   return (
@@ -226,6 +320,121 @@ export default function QuizEntryScreen() {
         contentContainerClassName="px-4 pt-5 pb-8 gap-5"
         keyboardShouldPersistTaps="handled"
       >
+        <View className="rounded-2xl border border-slate-200 bg-white p-4">
+          <View className="mb-3 flex-row items-start justify-between">
+            <View className="flex-1 pr-3">
+              <Text className="text-base font-semibold text-slate-900">Quiz Dashboard</Text>
+              <Text className="mt-0.5 text-xs text-slate-500">
+                Track your momentum and jump back into unfinished quizzes.
+              </Text>
+            </View>
+            <Pressable
+              className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5"
+              onPress={() => void loadDashboard()}
+            >
+              <View className="flex-row items-center gap-1.5">
+                <RefreshIcon color="#475569" size={14} />
+                <Text className="text-xs font-semibold text-slate-600">Refresh</Text>
+              </View>
+            </Pressable>
+          </View>
+
+          {dashboardError ? (
+            <Text className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+              {dashboardError}
+            </Text>
+          ) : null}
+
+          <View className="mb-4 flex-row flex-wrap gap-2">
+            <View className="min-w-[47%] flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <View className="mb-1 flex-row items-center gap-1.5">
+                <Rocket01Icon color="#64748b" size={13} />
+                <Text className="text-[11px] text-slate-500">Monthly activity</Text>
+              </View>
+              <Text className="text-xs font-semibold text-slate-800">
+                {dashboardLoading ? '...' : monthlyUsageLabel}
+              </Text>
+            </View>
+            <View className="min-w-[47%] flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <View className="mb-1 flex-row items-center gap-1.5">
+                <SchoolReportCardIcon color="#64748b" size={13} />
+                <Text className="text-[11px] text-slate-500">Score trend</Text>
+              </View>
+              <Text className="text-xs font-semibold text-slate-800">
+                {dashboardLoading ? '...' : avgScoreLabel}
+              </Text>
+            </View>
+            <View className="min-w-[47%] flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <View className="mb-1 flex-row items-center gap-1.5">
+                <Clock01Icon color="#64748b" size={13} />
+                <Text className="text-[11px] text-slate-500">In progress</Text>
+              </View>
+              <Text className="text-xs font-semibold text-slate-800">
+                {dashboardLoading
+                  ? '...'
+                  : `${stats.quizzesInProgress} quiz${stats.quizzesInProgress === 1 ? '' : 'zes'}`}
+              </Text>
+            </View>
+            <View className="min-w-[47%] flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+              <View className="mb-1 flex-row items-center gap-1.5">
+                <SignalMedium02Icon color="#64748b" size={13} />
+                <Text className="text-[11px] text-slate-500">Growth areas</Text>
+              </View>
+              <Text className="text-xs font-semibold text-slate-800">
+                {dashboardLoading ? '...' : stats.growthAreasFlagged}
+              </Text>
+            </View>
+          </View>
+
+          <Text className="mb-2 text-sm font-semibold text-slate-900">Recent quizzes</Text>
+          {history.length === 0 ? (
+            <Text className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-500">
+              No quizzes yet. Generate one below to get started.
+            </Text>
+          ) : (
+            <View className="gap-2">
+              {history.map((item) => (
+                <Pressable
+                  className="rounded-xl border border-slate-200 px-3 py-2.5 active:bg-slate-50"
+                  key={item.quizId}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/quiz/[quizId]',
+                      params: { quizId: item.quizId },
+                    })
+                  }
+                >
+                  <View className="flex-row items-start justify-between gap-2">
+                    <View className="flex-1">
+                      <Text className="text-sm font-semibold text-slate-900" numberOfLines={1}>
+                        {item.topic}
+                      </Text>
+                      <Text className="mt-0.5 text-xs text-slate-500">
+                        {item.subjectName} • {item.paperType.toUpperCase()} • {item.difficulty}
+                      </Text>
+                    </View>
+                    <View className={`rounded-full border px-2 py-0.5 ${statusTone(item.status)}`}>
+                      <Text className="text-[10px] font-semibold">{statusLabel(item.status)}</Text>
+                    </View>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
+
+          {historyHasMore ? (
+            <Pressable
+              className="mt-3 flex-row items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 py-2"
+              onPress={() => void loadMoreHistory()}
+            >
+              <MoreHorizontalCircle01Icon color="#475569" size={14} />
+              <Text className="text-xs font-semibold text-slate-600">
+                {historyLoadingMore ? 'Loading...' : 'Load more'}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+
         {/* Source selector */}
         <View>
           <Text className="mb-2 text-sm font-semibold text-slate-700">Generate quiz from</Text>
@@ -440,105 +649,6 @@ export default function QuizEntryScreen() {
           title={loading ? 'Generating…' : 'Generate Quiz'}
         />
       </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-
-import { ROUTES } from '@lernard/routes';
-
-import { Text } from '@rnr/text';
-
-import { Button } from '@/components/Button';
-import { nativeApiFetch } from '@/lib/native-api';
-
-const COUNTS = [5, 10, 15] as const;
-
-export default function QuizEntryScreen() {
-  const { lessonId, topic: initialTopic } = useLocalSearchParams<{ lessonId?: string; topic?: string }>();
-  const router = useRouter();
-
-  const [topic, setTopic] = useState(initialTopic ?? '');
-  const [questionCount, setQuestionCount] = useState<5 | 10 | 15>(5);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function generate() {
-    if (!topic.trim()) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await nativeApiFetch<{ quizId: string }>(ROUTES.QUIZZES.GENERATE, {
-        method: 'POST',
-        body: JSON.stringify({
-          topic: topic.trim(),
-          questionCount,
-          idempotencyKey: Math.random().toString(36).slice(2),
-          fromLessonId: lessonId || undefined,
-        }),
-      });
-      router.replace({ pathname: '/quiz/[quizId]', params: { quizId: response.quizId } });
-    } catch {
-      setError('Failed to generate quiz. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row items-center border-b border-slate-100 px-4 py-3">
-        <TouchableOpacity onPress={() => router.back()}>
-          <Text className="text-base font-medium text-indigo-600">← Back</Text>
-        </TouchableOpacity>
-        <Text className="ml-4 text-base font-semibold text-slate-900">New Quiz</Text>
-      </View>
-
-      <View className="flex-1 px-4 pt-6 space-y-5">
-        {lessonId && initialTopic ? (
-          <View className="rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-2">
-            <Text className="text-xs font-medium text-indigo-700">From lesson: {initialTopic}</Text>
-          </View>
-        ) : null}
-
-        <View>
-          <Text className="mb-2 text-sm font-semibold text-slate-700">Topic</Text>
-          <TextInput
-            className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900"
-            multiline
-            numberOfLines={3}
-            onChangeText={setTopic}
-            placeholder="e.g. CORS, photosynthesis, quadratic equations"
-            placeholderTextColor="#94a3b8"
-            value={topic}
-          />
-        </View>
-
-        <View>
-          <Text className="mb-2 text-sm font-semibold text-slate-700">Number of questions</Text>
-          <View className="flex-row gap-3">
-            {COUNTS.map((n) => (
-              <TouchableOpacity
-                key={n}
-                className={`flex-1 items-center rounded-xl border py-3 ${questionCount === n ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 bg-white'}`}
-                onPress={() => setQuestionCount(n)}
-              >
-                <Text className={`font-semibold ${questionCount === n ? 'text-indigo-700' : 'text-slate-700'}`}>
-                  {n}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {error ? <Text className="text-sm text-red-600">{error}</Text> : null}
-
-        <Button
-          disabled={loading || !topic.trim()}
-          onPress={generate}
-          title={loading ? 'Generating…' : 'Generate Quiz'}
-        />
-      </View>
     </SafeAreaView>
   );
 }
