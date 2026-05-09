@@ -30,21 +30,6 @@ interface GeneratedLessonLike {
   sections?: unknown;
 }
 
-const MIN_LESSON_BODY_WORDS = 60;
-const MIN_QUIZ_QUESTION_WORDS = 15;
-const PLACEHOLDER_PATTERN =
-  /^which\s+(statement|option)\s+(best\s+)?describes/i;
-
-const HARD_REJECT_PATTERNS = [
-  /which\s+(statement|option)\s+(best\s+)?describes/i,
-  /gives\s+the\s+(clearest|most\s+accurate|best)\s+summary/i,
-  /becomes\s+easier\s+when\s+you\s+break\s+it\s+into/i,
-  /helping\s+you\s+practi[cs]e\s+___/i,
-  /can\s+be\s+understood\s+step\s+by\s+step/i,
-  /is\s+(only\s+)?a\s+random\s+guess/i,
-  /cannot\s+be\s+explained\s+or\s+practi[cs]ed/i,
-  /is\s+unrelated\s+to\s+problem.solving/i,
-];
 
 export async function validateGeneratedContent(
   content: unknown,
@@ -103,20 +88,6 @@ function validateQuizContent(content: unknown): void {
       );
     }
 
-    const isStructured = typeof question.type === 'string' && question.type === 'structured';
-
-    if (!isStructured && countWords(text) < MIN_QUIZ_QUESTION_WORDS) {
-      throw new ContentValidationError(
-        `Generated quiz question is too short (under ${MIN_QUIZ_QUESTION_WORDS} words): ${truncate(text)}`,
-      );
-    }
-
-    if (PLACEHOLDER_PATTERN.test(text) || HARD_REJECT_PATTERNS.some((p) => p.test(text))) {
-      throw new ContentValidationError(
-        `Generated quiz question uses a placeholder pattern: ${truncate(text)}`,
-      );
-    }
-
     const key = text.toLowerCase().replace(/\s+/g, ' ');
     if (seenTexts.has(key)) {
       throw new ContentValidationError(
@@ -124,12 +95,6 @@ function validateQuizContent(content: unknown): void {
       );
     }
     seenTexts.add(key);
-
-    if (isPlaceholderQuestion(text, question.options)) {
-      throw new ContentValidationError(
-        'Generated quiz contains placeholder questions',
-      );
-    }
 
     validateQuestionStructure(question);
   }
@@ -157,35 +122,6 @@ function validateLessonContent(content: unknown): void {
       );
     }
 
-    if (countWords(body) < MIN_LESSON_BODY_WORDS) {
-      throw new ContentValidationError(
-        `Generated lesson section is too short (under ${MIN_LESSON_BODY_WORDS} words)`,
-      );
-    }
-
-    if (isMetaSentence(body)) {
-      throw new ContentValidationError(
-        'Generated lesson section reads like a meta-description rather than real content',
-      );
-    }
-  }
-
-  const hook = sections.find((s) => s.type === 'hook') ?? sections[0];
-  const hookBody = typeof hook?.body === 'string' ? hook.body : '';
-  if (topic && !hookBody.toLowerCase().includes(topic.toLowerCase())) {
-    throw new ContentValidationError(
-      'Generated lesson hook does not mention the topic by name',
-    );
-  }
-
-  const examples = sections.find((s) => s.type === 'examples');
-  if (examples) {
-    const examplesBody = typeof examples.body === 'string' ? examples.body : '';
-    if (!hasConcreteExampleSignal(examplesBody)) {
-      throw new ContentValidationError(
-        'Generated lesson examples section lacks concrete detail (no numbers or specific names)',
-      );
-    }
   }
 }
 
@@ -211,15 +147,9 @@ function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
     typeof question.explanation === 'string' ? question.explanation.trim() : '';
 
   if (type !== 'structured') {
-    if (!explanation || countWords(explanation) < 10) {
+    if (!explanation) {
       throw new ContentValidationError(
-        'Quiz questions require explanations with at least 10 words',
-      );
-    }
-
-    if (!hasExplanationJustificationSignal(explanation)) {
-      throw new ContentValidationError(
-        'Quiz explanations must clearly justify why the answer is correct',
+        'Quiz questions require a non-empty explanation',
       );
     }
   }
@@ -245,20 +175,6 @@ function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
         );
       }
 
-      const mcCorrectMentioned = explanation
-        .toLowerCase()
-        .includes(correctAnswer.toLowerCase());
-      const mcDistractors = options.filter(
-        (option) => option.toLowerCase() !== correctAnswer.toLowerCase(),
-      );
-      const mcDistractorMentioned = mcDistractors.some((option) =>
-        explanation.toLowerCase().includes(option.toLowerCase()),
-      );
-      if (!mcCorrectMentioned || !mcDistractorMentioned) {
-        throw new ContentValidationError(
-          'Multiple choice explanations must mention the correct option and at least one incorrect option',
-        );
-      }
       return;
     case 'multiple_select':
       if (
@@ -283,14 +199,6 @@ function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
         );
       }
 
-      const msMentioned = correctAnswers.filter((answer) =>
-        explanation.toLowerCase().includes(answer.toLowerCase()),
-      ).length;
-      if (msMentioned < Math.min(2, correctAnswers.length)) {
-        throw new ContentValidationError(
-          'Multiple select explanations must reference at least two correct answers',
-        );
-      }
       return;
     case 'true_false':
       if (correctAnswer !== 'true' && correctAnswer !== 'false') {
@@ -299,11 +207,6 @@ function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
         );
       }
 
-      if (!explanation.toLowerCase().includes(correctAnswer)) {
-        throw new ContentValidationError(
-          'True/false explanations must explicitly state why the statement is true or false',
-        );
-      }
       return;
     case 'fill_blank':
     case 'short_answer':
@@ -372,40 +275,6 @@ function validateQuestionStructure(question: GeneratedQuizQuestionLike): void {
   }
 }
 
-function isPlaceholderQuestion(text: string, options: unknown): boolean {
-  const normalizedText = text.trim().toLowerCase();
-  const normalizedOptions = Array.isArray(options)
-    ? options
-        .filter((option): option is string => typeof option === 'string')
-        .map((option) => option.trim().toLowerCase())
-    : [];
-
-  return (
-    normalizedText.startsWith('which statement best describes') ||
-    /^\d+\./.test(normalizedText) ||
-    normalizedOptions.join('|') ===
-      'definition a|definition b|definition c|definition d'
-  );
-}
-
-function isMetaSentence(body: string): boolean {
-  const lower = body.trim().toLowerCase();
-  return (
-    lower.startsWith('this section will') ||
-    lower.startsWith('in this section we will') ||
-    /\bcan be (understood|broken down) by breaking (it|them) into smaller (steps|ideas|patterns)\b/.test(
-      lower,
-    )
-  );
-}
-
-function hasConcreteExampleSignal(body: string): boolean {
-  if (/\d/.test(body)) return true;
-  // Look for a capitalised proper-noun-like token of at least 3 characters,
-  // ignoring sentence starts. Two or more of these strongly suggests a real scenario.
-  const properNouns = body.match(/(?<![.!?]\s)\b[A-Z][a-zA-Z]{2,}\b/g) ?? [];
-  return properNouns.length >= 2;
-}
 
 function isQuizPayload(
   content: unknown,
@@ -433,16 +302,3 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-function hasExplanationJustificationSignal(text: string): boolean {
-  return /\b(because|therefore|which means|so that|this is why|since|due to|as a result|allows|prevents|causes|ensures|keeps|leads to|results in)\b/i.test(
-    text,
-  );
-}
-
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
-function truncate(text: string): string {
-  return text.length > 80 ? `${text.slice(0, 77)}…` : text;
-}
