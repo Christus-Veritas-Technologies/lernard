@@ -30,6 +30,7 @@ import type {
     ChatMessageBlock,
     ChatQuizAttachmentOption,
     ConversationListItem,
+    QuizRemediationContext,
 } from "@lernard/shared-types";
 
 import { Badge } from "@/components/ui/Badge";
@@ -72,6 +73,8 @@ export function ChatPageClient() {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [desktopSidebarCollapsed, setDesktopSidebarCollapsed] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [quizRemediationContext, setQuizRemediationContext] = useState<QuizRemediationContext | null>(null);
+    const [loadingQuizContext, setLoadingQuizContext] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -125,6 +128,36 @@ export function ChatPageClient() {
     }, [messages]);
 
     useEffect(() => {
+        if (!attachQuizId) {
+            setQuizRemediationContext(null);
+            return;
+        }
+
+        let disposed = false;
+        setLoadingQuizContext(true);
+        void browserApiFetch<QuizRemediationContext>(ROUTES.QUIZZES.REMEDIATION_CONTEXT(attachQuizId))
+            .then((context) => {
+                if (!disposed) {
+                    setQuizRemediationContext(context);
+                }
+            })
+            .catch(() => {
+                if (!disposed) {
+                    setQuizRemediationContext(null);
+                }
+            })
+            .finally(() => {
+                if (!disposed) {
+                    setLoadingQuizContext(false);
+                }
+            });
+
+        return () => {
+            disposed = true;
+        };
+    }, [attachQuizId]);
+
+    useEffect(() => {
         if (deepLinkAppliedRef.current) {
             return;
         }
@@ -149,10 +182,15 @@ export function ChatPageClient() {
             applied = true;
         }
 
+        if (!prefillMessage && quizRemediationContext && !input.trim()) {
+            setInput(buildRemediationOpeningPrompt(quizRemediationContext));
+            applied = true;
+        }
+
         if (applied || (!attachQuizId && !prefillMessage)) {
             deepLinkAppliedRef.current = true;
         }
-    }, [attachQuizId, prefillMessage, quizzes, input]);
+    }, [attachQuizId, prefillMessage, quizzes, input, quizRemediationContext]);
 
     const filteredLessons = lessons.filter((lesson) => {
         const normalizedQuery = deferredLessonQuery.trim().toLowerCase();
@@ -627,6 +665,43 @@ export function ChatPageClient() {
 
                     <ScrollArea className="min-h-0 flex-1 rounded-[30px] border border-border/60 bg-white/80 p-4 shadow-inner shadow-accent-cool-100/40">
                         <div className="space-y-4">
+                            {attachQuizId && messages.length === 0 ? (
+                                <Card className="border-primary-200 bg-linear-to-br from-primary-50/70 via-white to-accent-warm-100/50 shadow-[0_18px_40px_-28px_rgba(36,52,88,0.35)]">
+                                    <CardHeader className="pb-3">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <CardTitle className="text-base">Quiz remediation context</CardTitle>
+                                            <Badge tone="cool">Attached quiz</Badge>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        {loadingQuizContext ? (
+                                            <p className="text-sm text-text-secondary">Loading quiz context...</p>
+                                        ) : quizRemediationContext ? (
+                                            <>
+                                                <p className="text-sm text-text-secondary">
+                                                    {quizRemediationContext.topic} · {quizRemediationContext.score}/{quizRemediationContext.total} ({quizRemediationContext.percentageScore}%)
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {quizRemediationContext.weakSubtopics.slice(0, 4).map((item) => (
+                                                        <Badge key={`weak-${item.name}`} tone="warning">Weak: {item.name}</Badge>
+                                                    ))}
+                                                    {quizRemediationContext.strongSubtopics.slice(0, 2).map((item) => (
+                                                        <Badge key={`strong-${item}`} tone="success">Strong: {item}</Badge>
+                                                    ))}
+                                                </div>
+                                                {quizRemediationContext.misconceptions[0] ? (
+                                                    <p className="text-xs leading-6 text-text-secondary">
+                                                        Misconception to fix first: {quizRemediationContext.misconceptions[0].studentBelievedX} → {quizRemediationContext.misconceptions[0].correctAnswerIsY}
+                                                    </p>
+                                                ) : null}
+                                            </>
+                                        ) : (
+                                            <p className="text-sm text-text-secondary">Could not load remediation details, but the quiz is still attached for context.</p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ) : null}
+
                             {messages.length === 0 && !loadingConversation ? (
                                 <div className="rounded-[28px] border border-dashed border-border bg-linear-to-br from-accent-cool-100/70 via-white to-accent-warm-100/70 p-6">
                                     <div className="flex items-start gap-3">
@@ -1088,4 +1163,15 @@ function getErrorMessage(error: unknown): string {
     }
 
     return "Lernard hit a snag. Try that again in a moment.";
+}
+
+function buildRemediationOpeningPrompt(context: QuizRemediationContext): string {
+    const weak = context.weakSubtopics.slice(0, 3).map((item) => item.name).join(", ");
+    const misconception = context.misconceptions[0];
+
+    if (misconception) {
+        return `Help me review ${context.topic}. Focus on ${weak || "my weak subtopics"}. I thought "${misconception.studentBelievedX}", but the correct idea is "${misconception.correctAnswerIsY}". Teach this clearly, then give me short practice checks.`;
+    }
+
+    return `Help me review ${context.topic}. Focus on ${weak || "my weak subtopics"}. Explain what I got wrong and then give me short practice checks.`;
 }
