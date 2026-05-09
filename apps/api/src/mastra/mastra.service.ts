@@ -1889,11 +1889,11 @@ function normalizeArrayAnswers(value: unknown): string[] | undefined {
 }
 
 function isUsableGeneratedQuestion(question: GeneratedQuizQuestion): boolean {
-  if (!question.text || isGenericQuestionText(question.text)) {
+  if (!question.text) {
     return false;
   }
 
-  if (!question.explanation || countWords(question.explanation) < 10) {
+  if (!question.explanation) {
     return false;
   }
 
@@ -1944,10 +1944,6 @@ function isUsableGeneratedQuestion(question: GeneratedQuizQuestion): boolean {
   }
 }
 
-function countWords(text: string): number {
-  return text.trim().split(/\s+/).filter(Boolean).length;
-}
-
 function allOptionsSharePrefix(options: string[] | undefined): boolean {
   if (!Array.isArray(options) || options.length < 2) return false;
   const firstThreeWords = (s: string) =>
@@ -1982,28 +1978,6 @@ function optionListIncludes(
   return options.some(
     (option) => option.trim().toLowerCase() === normalizedCandidate,
   );
-}
-
-const HARD_REJECT_PATTERNS = [
-  /which\s+(statement|option)\s+(best\s+)?describes/i,
-  /gives\s+the\s+(clearest|most\s+accurate|best)\s+summary/i,
-  /becomes\s+easier\s+when\s+you\s+break\s+it\s+into/i,
-  /helping\s+you\s+practi[cs]e\s+___/i,
-  /can\s+be\s+understood\s+step\s+by\s+step/i,
-  /is\s+(only\s+)?a\s+random\s+guess/i,
-  /cannot\s+be\s+explained\s+or\s+practi[cs]ed/i,
-  /is\s+unrelated\s+to\s+problem.solving/i,
-];
-
-function isGenericQuestionText(text: string): boolean {
-  const normalized = text.trim().toLowerCase();
-
-  if (normalized.length < 12) return true;
-  if (countWords(normalized) < 6) return true;
-  if (/^\d+\./.test(normalized)) return true;
-  if (normalized.includes('definition a') || normalized.includes('definition b')) return true;
-
-  return HARD_REJECT_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 function normalizeQuestionKey(text: string): string {
