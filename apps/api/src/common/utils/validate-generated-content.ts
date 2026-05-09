@@ -322,7 +322,7 @@ function isLessonPayload(
 function validateQuestionDistribution(
   questions: GeneratedQuizQuestionLike[],
   paperType: 'paper1' | 'paper2',
-  difficulty: 'foundation' | 'standard' | 'challenging' | 'extension',
+  _difficulty: 'foundation' | 'standard' | 'challenging' | 'extension',
 ): void {
   if (paperType === 'paper2') {
     if (!questions.every((question) => question.type === 'structured')) {
@@ -334,63 +334,63 @@ function validateQuestionDistribution(
   }
 
   const totalQuestions = questions.length;
-  const expectedByDifficulty: Record<
-    'foundation' | 'standard' | 'challenging' | 'extension',
-    Record<number, { multiple_choice: number; true_false: number; multiple_select: number }>
-  > = {
-    foundation: {
-      5: { multiple_choice: 3, true_false: 1, multiple_select: 1 },
-      10: { multiple_choice: 7, true_false: 2, multiple_select: 1 },
-      15: { multiple_choice: 10, true_false: 3, multiple_select: 2 },
-      20: { multiple_choice: 14, true_false: 4, multiple_select: 2 },
-    },
-    standard: {
-      5: { multiple_choice: 3, true_false: 1, multiple_select: 1 },
-      10: { multiple_choice: 6, true_false: 2, multiple_select: 2 },
-      15: { multiple_choice: 9, true_false: 3, multiple_select: 3 },
-      20: { multiple_choice: 12, true_false: 4, multiple_select: 4 },
-    },
-    challenging: {
-      5: { multiple_choice: 2, true_false: 1, multiple_select: 2 },
-      10: { multiple_choice: 5, true_false: 2, multiple_select: 3 },
-      15: { multiple_choice: 7, true_false: 3, multiple_select: 5 },
-      20: { multiple_choice: 10, true_false: 4, multiple_select: 6 },
-    },
-    extension: {
-      5: { multiple_choice: 2, true_false: 1, multiple_select: 2 },
-      10: { multiple_choice: 4, true_false: 2, multiple_select: 4 },
-      15: { multiple_choice: 6, true_false: 3, multiple_select: 6 },
-      20: { multiple_choice: 8, true_false: 4, multiple_select: 8 },
-    },
-  };
-
-  const expected = expectedByDifficulty[difficulty][totalQuestions];
-  if (!expected) {
-    return;
-  }
-
   const actual = {
     multiple_choice: 0,
-    true_false: 0,
     multiple_select: 0,
+    unsupported: 0,
   };
 
   for (const question of questions) {
     const type = typeof question.type === 'string' ? question.type : '';
     if (type === 'multiple_choice') actual.multiple_choice += 1;
-    if (type === 'true_false') actual.true_false += 1;
     if (type === 'multiple_select') actual.multiple_select += 1;
+    if (type !== 'multiple_choice' && type !== 'multiple_select') {
+      actual.unsupported += 1;
+    }
   }
 
-  const mismatches = Object.entries(expected).filter(
-    ([type, expectedCount]) => actual[type as keyof typeof actual] !== expectedCount,
+  if (actual.unsupported > 0) {
+    throw new ContentValidationError(
+      'Paper 1 quizzes can only contain multiple_choice and multiple_select questions',
+    );
+  }
+
+  const expectedMultipleChoice = Math.ceil(totalQuestions * 0.7);
+  const expectedMultipleSelect = totalQuestions - expectedMultipleChoice;
+  const lowerBoundMultipleChoice = Math.max(0, expectedMultipleChoice - 1);
+  const upperBoundMultipleChoice = Math.min(totalQuestions, expectedMultipleChoice + 1);
+
+  if (
+    actual.multiple_choice < lowerBoundMultipleChoice ||
+    actual.multiple_choice > upperBoundMultipleChoice
+  ) {
+    throw new ContentValidationError(
+      `Paper 1 objective mix mismatch. Expected multiple_choice around ${expectedMultipleChoice}/${totalQuestions} (acceptable ${lowerBoundMultipleChoice}-${upperBoundMultipleChoice}); got ${actual.multiple_choice}`,
+    );
+  }
+
+  if (totalQuestions >= 5 && actual.multiple_select < 1) {
+    throw new ContentValidationError(
+      'Paper 1 objective quizzes must include at least one multiple_select question',
+    );
+  }
+
+  const lowerBoundMultipleSelect = totalQuestions >= 5
+    ? Math.max(1, expectedMultipleSelect - 1)
+    : Math.max(0, expectedMultipleSelect - 1);
+  const upperBoundMultipleSelect = Math.min(
+    totalQuestions,
+    expectedMultipleSelect + 1,
   );
 
-  if (mismatches.length > 0) {
-    const expectedSummary = `multiple_choice=${expected.multiple_choice}, true_false=${expected.true_false}, multiple_select=${expected.multiple_select}`;
-    const actualSummary = `multiple_choice=${actual.multiple_choice}, true_false=${actual.true_false}, multiple_select=${actual.multiple_select}`;
+  if (
+    actual.multiple_select < lowerBoundMultipleSelect ||
+    actual.multiple_select > upperBoundMultipleSelect
+  ) {
+    const expectedSummary = `multiple_choice~${expectedMultipleChoice}, multiple_select~${expectedMultipleSelect} (acceptable ${lowerBoundMultipleSelect}-${upperBoundMultipleSelect})`;
+    const actualSummary = `multiple_choice=${actual.multiple_choice}, multiple_select=${actual.multiple_select}`;
     throw new ContentValidationError(
-      `Paper 1 ${difficulty} distribution mismatch. Expected ${expectedSummary}; got ${actualSummary}`,
+      `Paper 1 objective distribution mismatch. Expected ${expectedSummary}; got ${actualSummary}`,
     );
   }
 }

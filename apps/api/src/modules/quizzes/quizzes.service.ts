@@ -116,10 +116,21 @@ export class QuizzesService {
     jobId: string;
   }): Promise<void> {
     try {
-      await (this.prisma as any).quiz.update({
-        where: { id: input.quizId },
+      const claimed = await (this.prisma as any).quiz.updateMany({
+        where: {
+          id: input.quizId,
+          userId: input.userId,
+          jobId: input.jobId,
+          status: 'QUEUED',
+        },
         data: { status: 'PROCESSING' },
       });
+      if (claimed.count === 0) {
+        this.logger.warn(
+          `[quiz.generate] skipped stale job quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
+        );
+        return;
+      }
 
       const studentContext = await this.studentContextBuilder.buildForUser(
         input.userId,
@@ -208,12 +219,26 @@ export class QuizzesService {
         );
       }
 
+      if (!(await this.isActiveGenerationJob(input))) {
+        this.logger.warn(
+          `[quiz.generate] halted before persisting stale job quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
+        );
+        return;
+      }
+
       await (this.prisma as any).quizQuestion.deleteMany({
         where: { quizId: input.quizId },
       });
 
       const questionsToCreate = generated.questions.slice(0, dto.questionCount);
       for (let i = 0; i < questionsToCreate.length; i++) {
+        if (!(await this.isActiveGenerationJob(input))) {
+          this.logger.warn(
+            `[quiz.generate] halted during persist stale job quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
+          );
+          return;
+        }
+
         const question = questionsToCreate[i];
 
         await (this.prisma as any).quizQuestion.create({
@@ -240,8 +265,13 @@ export class QuizzesService {
         });
       }
 
-      await (this.prisma as any).quiz.update({
-        where: { id: input.quizId },
+      const markedReady = await (this.prisma as any).quiz.updateMany({
+        where: {
+          id: input.quizId,
+          userId: input.userId,
+          jobId: input.jobId,
+          status: 'PROCESSING',
+        },
         data: {
           topic: generated.topic,
           subjectName: generated.subjectName,
@@ -251,6 +281,12 @@ export class QuizzesService {
           failureReason: null,
         },
       });
+      if (markedReady.count === 0) {
+        this.logger.warn(
+          `[quiz.generate] skipped ready update for stale job quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
+        );
+        return;
+      }
 
       await this.notificationsService.sendToUser(input.userId, {
         type: 'quiz_ready',
@@ -271,14 +307,27 @@ export class QuizzesService {
         error instanceof Error ? error.stack : undefined,
       );
 
-      await (this.prisma as any).quiz.update({
-        where: { id: input.quizId },
+      const markedFailed = await (this.prisma as any).quiz.updateMany({
+        where: {
+          id: input.quizId,
+          userId: input.userId,
+          jobId: input.jobId,
+          status: {
+            in: ['QUEUED', 'PROCESSING'],
+          },
+        },
         data: { 
           status: 'FAILED',
           failedAt: new Date(),
           failureReason: message.slice(0, 500),
         },
       });
+      if (markedFailed.count === 0) {
+        this.logger.warn(
+          `[quiz.generate] skipped failed update for stale job quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
+        );
+        return;
+      }
 
       await this.notificationsService.sendToUser(input.userId, {
         type: 'quiz_failed',
@@ -288,6 +337,25 @@ export class QuizzesService {
         quizId: input.quizId,
       });
     }
+  }
+
+  private async isActiveGenerationJob(input: {
+    quizId: string;
+    userId: string;
+    jobId: string;
+  }): Promise<boolean> {
+    const quiz = await (this.prisma as any).quiz.findFirst({
+      where: {
+        id: input.quizId,
+        userId: input.userId,
+      },
+      select: {
+        jobId: true,
+        status: true,
+      },
+    });
+
+    return quiz?.jobId === input.jobId && quiz?.status === 'PROCESSING';
   }
 
   async getDashboardStats(user: User): Promise<QuizDashboardStats> {

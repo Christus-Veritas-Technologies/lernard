@@ -1,6 +1,7 @@
 type RetryOptions = {
   maxAttempts?: number;
   baseDelayMs?: number;
+  shouldRetry?: (error: unknown, attempt: number) => boolean;
 };
 
 export async function completeWithRetry<T>(
@@ -9,6 +10,7 @@ export async function completeWithRetry<T>(
 ): Promise<T> {
   const maxAttempts = options.maxAttempts ?? 3;
   const baseDelayMs = options.baseDelayMs ?? 300;
+  const shouldRetry = options.shouldRetry ?? (() => true);
 
   let lastError: unknown;
 
@@ -17,6 +19,10 @@ export async function completeWithRetry<T>(
       return await operation();
     } catch (error) {
       lastError = error;
+
+      if (!shouldRetry(error, attempt)) {
+        throw error;
+      }
 
       if (attempt === maxAttempts) {
         throw error;

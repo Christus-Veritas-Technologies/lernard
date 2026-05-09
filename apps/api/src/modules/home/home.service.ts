@@ -29,7 +29,14 @@ export class HomeService {
   ) {}
 
   async getPayload(userId: string): Promise<PagePayload<HomeContent>> {
-    const [user, userSubjects, subjectProgress, recentSessions, sessionsToday] =
+    const [
+      user,
+      userSubjects,
+      subjectProgress,
+      recentSessions,
+      sessionsToday,
+      recentSessionCompletions,
+    ] =
       await Promise.all([
         this.prisma.user.findUniqueOrThrow({
           where: { id: userId },
@@ -70,6 +77,17 @@ export class HomeService {
             completedAt: {
               gte: startOfTodayUtc(),
             },
+          },
+        }),
+        (this.prisma as any).session.findMany({
+          where: {
+            userId,
+            completedAt: {
+              gte: startOfRecentWindowUtc(),
+            },
+          },
+          select: {
+            completedAt: true,
           },
         }),
       ]);
@@ -153,8 +171,7 @@ export class HomeService {
         : 0;
 
     const recentActivity: DayActivity[] = buildRecentActivity(
-      user.lastActiveAt,
-      user.streakDays,
+      recentSessionCompletions,
     );
 
     const topTopics: TopicSummary[] = [...allTopicScores]
@@ -352,6 +369,16 @@ function startOfTodayUtc(): Date {
   );
 }
 
+function startOfRecentWindowUtc(): Date {
+  const start = startOfTodayUtc();
+  start.setUTCDate(start.getUTCDate() - 6);
+  return start;
+}
+
+function toUtcDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
 function buildHomePermissions(): ScopedPermission[] {
   return [{ action: 'can_edit_mode' }];
 }
@@ -376,21 +403,22 @@ function buildHomeSlots(firstLookComplete: boolean): SlotAssignments {
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
 function buildRecentActivity(
-  lastActiveAt: Date | null,
-  streakDays: number,
+  sessionCompletions: Array<{ completedAt: Date }>,
 ): DayActivity[] {
-  const anchor = lastActiveAt ?? new Date();
-  const anchorDay = new Date(anchor);
-  anchorDay.setHours(0, 0, 0, 0);
+  const activeDateKeys = new Set(
+    sessionCompletions.map((session) => toUtcDateKey(session.completedAt)),
+  );
+  const start = startOfRecentWindowUtc();
 
   const result: DayActivity[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(anchorDay);
-    d.setDate(anchorDay.getDate() - i);
-    const diffDays = i; // days before anchor
+  for (let i = 0; i < 7; i++) {
+    const dayDate = new Date(start);
+    dayDate.setUTCDate(start.getUTCDate() + i);
+    const dayKey = toUtcDateKey(dayDate);
+
     result.push({
-      day: DAY_LABELS[d.getDay()],
-      active: diffDays < streakDays,
+      day: DAY_LABELS[dayDate.getUTCDay()],
+      active: activeDateKeys.has(dayKey),
     });
   }
   return result;

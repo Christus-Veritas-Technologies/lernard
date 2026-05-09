@@ -25,8 +25,6 @@ import type { StudentContext } from './student-context.builder';
 
 const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
-const LERNARD_OUTAGE_MESSAGE =
-  "I'm having a moment — try again in a few seconds.";
 
 type ClaudeContentBlock =
   | { type: 'text'; text: string }
@@ -1265,6 +1263,7 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
       return await completeWithRetry(operation, {
         maxAttempts: 3,
         baseDelayMs: 400,
+        shouldRetry: (error) => !(error instanceof ContentValidationError),
       });
     } catch (error) {
       const message =
@@ -1277,7 +1276,7 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
         return fallback();
       }
       if (error instanceof ContentValidationError) {
-        throw new InternalServerErrorException(LERNARD_OUTAGE_MESSAGE);
+        throw error;
       }
       throw error;
     }
