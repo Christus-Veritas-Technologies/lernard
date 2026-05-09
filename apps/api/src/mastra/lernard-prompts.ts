@@ -428,6 +428,24 @@ function buildPaperTypeBlock(paperType: PaperTypeKey): string {
   ].join('\n');
 }
 
+function buildMultipleChoiceDistributionBlock(
+  _difficulty: QuizDifficultyKey,
+  questionCount: number,
+): string {
+  // For multiple choice mode, calculate the split: ~70% multiple_choice, ~30% multiple_select
+  const multipleChoiceCount = Math.ceil(questionCount * 0.7);
+  const multipleSelectCount = questionCount - multipleChoiceCount;
+
+  return [
+    `RULE 6 — MULTIPLE CHOICE DISTRIBUTION.`,
+    `For ${questionCount} questions, generate approximately:`,
+    `  ~${multipleChoiceCount} questions of type "multiple_choice" (4 options, 1 correct)`,
+    `  ~${multipleSelectCount} questions of type "multiple_select" (4-5 options, 2-3 correct)`,
+    `This mix (${Math.round((multipleChoiceCount/questionCount)*100)}% multiple_choice, ${Math.round((multipleSelectCount/questionCount)*100)}% multiple_select) tests both single-answer recall and multi-concept application.`,
+    `Do NOT generate any other question types.`,
+  ].join('\n');
+}
+
 function buildQuestionDistributionBlock(
   paperType: PaperTypeKey,
   difficulty: QuizDifficultyKey,
@@ -493,6 +511,7 @@ export function buildQuizUserPrompt(
     mode: LearningModeKey;
     paperType: PaperTypeKey;
     difficulty: QuizDifficultyKey;
+    questionType: 'multiple_choice' | 'structured';
     lessonSections?: Array<{
       type: string;
       heading: string | null;
@@ -502,7 +521,8 @@ export function buildQuizUserPrompt(
     confidenceRating?: number | null;
   },
 ): string {
-  if (input.paperType === 'paper2') {
+  // Route based on questionType instead of paperType
+  if (input.questionType === 'structured') {
     return buildZimsecQuizUserPrompt(ctx, {
       topic: input.topic,
       subjectName: input.subjectName,
@@ -512,6 +532,36 @@ export function buildQuizUserPrompt(
       confidenceRating: input.confidenceRating,
     });
   }
+  
+  // Multiple choice mode: mix of multiple_choice and multiple_select
+  return buildMultipleChoiceQuizUserPrompt(ctx, {
+    topic: input.topic,
+    subjectName: input.subjectName,
+    questionCount: input.questionCount,
+    mode: input.mode,
+    difficulty: input.difficulty,
+    lessonSections: input.lessonSections,
+    confidenceRating: input.confidenceRating,
+  });
+}
+
+function buildMultipleChoiceQuizUserPrompt(
+  ctx: StudentContext,
+  input: {
+    topic: string;
+    subjectName?: string;
+    questionCount: number;
+    mode: LearningModeKey;
+    difficulty: QuizDifficultyKey;
+    lessonSections?: Array<{
+      type: string;
+      heading: string | null;
+      body: string;
+      terms: Array<{ term: string; explanation: string }>;
+    }>;
+    confidenceRating?: number | null;
+  },
+): string {
   const subject = input.subjectName ?? 'General';
   const studentLevel = ctx.grade ?? ctx.ageGroup ?? 'student';
   const topicStrength =
@@ -595,30 +645,30 @@ export function buildQuizUserPrompt(
     ].join('\n');
   }
 
-  const paperTypeBlock = buildPaperTypeBlock(input.paperType);
   const difficultyBlock = buildDifficultyBlock(input.difficulty);
-  const distributionBlock = buildQuestionDistributionBlock(
-    input.paperType,
-    input.difficulty,
-    input.questionCount,
-  );
+  const distributionBlock = buildMultipleChoiceDistributionBlock(input.difficulty, input.questionCount);
 
   const lessonRuleNote = input.lessonSections && input.lessonSections.length > 0
     ? `\nRULE 7 — IF A LESSON WAS PROVIDED, USE IT.\nAt least ${Math.max(4, Math.floor(input.questionCount * 0.8))} of ${input.questionCount} questions must test concepts, terms, or examples that appeared in the lesson above. The lesson is the source material — the quiz tests whether the student retained it.`
     : '';
 
   return [
-    `Generate ${input.questionCount} quiz questions for ${ctx.name}, a ${studentLevel} student.`,
+    `Generate ${input.questionCount} multiple choice quiz questions for ${ctx.name}, a ${studentLevel} student.`,
     '',
     studentContextBlock,
     '',
     sourceContextBlock,
     '',
     '═══════════════════════════════════════════════════════',
-    'QUESTION GENERATION RULES',
+    'MULTIPLE CHOICE QUESTION RULES',
     '═══════════════════════════════════════════════════════',
     '',
-    paperTypeBlock,
+    'QUESTION TYPE REQUIREMENT:',
+    `You MUST generate a mix of question types:`,
+    `- Approximately 65-75% type "multiple_choice" (exactly 4 options, 1 correct answer)`,
+    `- Approximately 25-35% type "multiple_select" (4-5 options, 2-3 correct answers)`,
+    'Do NOT generate any other question types (no true_false, fill_blank, structured, or short_answer).',
+    'Each question must have an "options" array with string elements.',
     '',
     'RULE 1 — EVERY QUESTION MUST TEST SPECIFIC KNOWLEDGE.',
     '',
@@ -635,7 +685,7 @@ export function buildQuizUserPrompt(
     '',
     'RULE 2 — WRONG OPTIONS MUST BE PLAUSIBLE MISCONCEPTIONS.',
     '',
-    'For multiple_choice questions, all four options must be things a student might genuinely believe if they misunderstood the topic.',
+    'All wrong options must be things a student might genuinely believe if they misunderstood the topic.',
     'BAD wrong options: absurd statements, obviously grammatically wrong, repetitions of the correct answer.',
     '',
     '───────────────────────────────────────────────────────',
@@ -648,17 +698,16 @@ export function buildQuizUserPrompt(
     '',
     '───────────────────────────────────────────────────────',
     '',
-    'RULE 5 — QUESTION TYPE SPECIFICATIONS.',
+    'RULE 3 — MULTIPLE CHOICE SPECIFICATIONS.',
+    'Type "multiple_choice": Exactly 4 options. correctAnswer must be the exact text of one option. All 4 options should be roughly similar in length.',
     '',
-    'multiple_choice: Exactly 4 options. correctAnswer must be the exact text of one option. All 4 options roughly similar in length.',
-    'multiple_select: 4 to 5 options. correctAnswers is an array of 2 or 3 correct option texts.',
-    'true_false: No options array. correctAnswer must be exactly "true" or "false" (lowercase). Target common misconceptions.',
-    'fill_blank: The blank appears as _____ in the question text. correctAnswer is 1–5 words.',
-    'short_answer: No options array. correctAnswer is a model answer (1–2 sentences). Question asks for explanation, not recall.',
+    'RULE 4 — MULTIPLE SELECT SPECIFICATIONS.',
+    'Type "multiple_select": 4 to 5 options. correctAnswers is an array of 2 or 3 correct option texts.',
+    'When using multiple_select, make it clear in the question that multiple answers are correct (e.g., "Which of the following are true?" or "Select all that apply").',
     '',
     '───────────────────────────────────────────────────────',
     '',
-    'RULE 6 — EVERY QUESTION NEEDS AN EXPLANATION.',
+    'RULE 5 — EVERY QUESTION NEEDS AN EXPLANATION.',
     '',
     'The explanation must:',
     '  - Be one sentence (at least 10 words)',
@@ -666,7 +715,6 @@ export function buildQuizUserPrompt(
     '  - Name the specific concept, rule, or mechanism being tested',
     '  - For multiple_choice, mention the correct option and at least one incorrect option',
     '  - For multiple_select, mention at least two correct options',
-    '  - For true_false, explicitly say why the statement is true or false',
     '',
     '───────────────────────────────────────────────────────',
     lessonRuleNote,
@@ -676,9 +724,22 @@ export function buildQuizUserPrompt(
     '',
     'Return ONLY valid JSON. No markdown fences. No preamble. No explanation.',
     '',
-    'Each question must include a "subtopic" field: a 2–5 word label for the specific sub-concept being tested (e.g. "const vs let", "scope rules", "hoisting").',
+    'Each question must include a "subtopic" field: a 2–5 word label for the specific sub-concept being tested.',
     '',
-    '{"questions":[{"type":"multiple_choice","text":"...","options":["...","...","...","..."],"correctAnswer":"...","explanation":"...","subtopic":"..."},{"type":"multiple_select","text":"...","options":["...","...","...","..."],"correctAnswers":["...","..."],"explanation":"...","subtopic":"..."},{"type":"true_false","text":"...","correctAnswer":"true","explanation":"...","subtopic":"..."},{"type":"fill_blank","text":"A variable declared with _____ cannot be reassigned.","correctAnswer":"const","explanation":"...","subtopic":"..."},{"type":"short_answer","text":"...","correctAnswer":"...","explanation":"...","subtopic":"..."}]}',
+    'Multiple choice example: {"type":"multiple_choice","text":"...","options":["...","...","...","..."],"correctAnswer":"...","explanation":"...","subtopic":"..."}',
+    'Multiple select example: {"type":"multiple_select","text":"...","options":["...","...","...","..."],"correctAnswers":["...","..."],"explanation":"...","subtopic":"..."}',
+    '',
+    `Full response shape: {"questions":[<${input.questionCount} question objects>]}`,
+    '',
+    'QUALITY CHECK — before returning, verify:',
+    '- Approximately 65-75% are type "multiple_choice"?',
+    '- Approximately 25-35% are type "multiple_select"?',
+    '- Each multiple_choice has exactly 4 options?',
+    '- Each multiple_select has 4-5 options with 2-3 in correctAnswers?',
+    '- All options are plausible and roughly similar length?',
+    '- Every question has a specific, concrete subtopic?',
+    '',
+    'Return JSON only. No markdown fences. No prose before or after the JSON.',
   ]
     .filter((line) => line !== undefined)
     .join('\n');

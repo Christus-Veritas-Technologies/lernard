@@ -264,6 +264,7 @@ export class MastraService {
     subjectName?: string;
     mode: 'guide' | 'companion';
     paperType: 'paper1' | 'paper2';
+    questionType: 'multiple_choice' | 'structured';
     difficulty: 'foundation' | 'standard' | 'challenging' | 'extension';
     studentContext: StudentContext;
     lessonSections?: LessonSectionInput[];
@@ -292,6 +293,7 @@ export class MastraService {
       mode: input.mode,
       paperType: input.paperType,
       difficulty: input.difficulty,
+      questionType: input.questionType,
       lessonSections: input.lessonSections,
       confidenceRating: input.confidenceRating,
     });
@@ -629,6 +631,7 @@ export class MastraService {
     questionCount: number;
     mode: 'guide' | 'companion';
     paperType: 'paper1' | 'paper2';
+    questionType: 'multiple_choice' | 'structured';
     difficulty: 'foundation' | 'standard' | 'challenging' | 'extension';
     studentContext: StudentContext;
   }): Promise<{
@@ -674,6 +677,7 @@ export class MastraService {
       mode: input.mode,
       paperType: input.paperType,
       difficulty: input.difficulty,
+      questionType: input.questionType,
     });
 
     const textBlock: ClaudeContentBlock = {
