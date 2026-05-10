@@ -1871,52 +1871,52 @@ function normalizeStoredReviewQuestions(value: unknown): QuizQuestionReview[] {
     return [];
   }
 
-  const normalized: QuizQuestionReview[] = value
-    .map((raw) => {
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
-        return null;
-      }
+  const normalized: QuizQuestionReview[] = [];
 
-      const item = raw as Record<string, unknown>;
-      const text = typeof item.text === 'string' ? item.text.trim() : '';
-      if (!text) {
-        return null;
-      }
+  for (const raw of value) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      continue;
+    }
 
-      const evaluationResult =
-        item.evaluationResult === 'correct'
-        || item.evaluationResult === 'partial'
-        || item.evaluationResult === 'incorrect'
-          ? (item.evaluationResult as 'correct' | 'partial' | 'incorrect')
-          : undefined;
+    const item = raw as Record<string, unknown>;
+    const text = typeof item.text === 'string' ? item.text.trim() : '';
+    if (!text) {
+      continue;
+    }
 
-      return {
-        text,
-        studentAnswer:
-          typeof item.studentAnswer === 'string' && item.studentAnswer.trim().length > 0
-            ? item.studentAnswer
-            : 'No answer',
-        correctAnswer:
-          typeof item.correctAnswer === 'string' && item.correctAnswer.trim().length > 0
-            ? item.correctAnswer
-            : null,
-        isCorrect: item.isCorrect === true,
-        explanation:
-          typeof item.explanation === 'string' && item.explanation.trim().length > 0
-            ? item.explanation
-            : 'No explanation available.',
-        subtopic:
-          typeof item.subtopic === 'string' && item.subtopic.trim().length > 0
-            ? item.subtopic
-            : undefined,
-        evaluationResult,
-        feedback:
-          typeof item.feedback === 'string' && item.feedback.trim().length > 0
-            ? item.feedback
-            : undefined,
-      };
-    })
-    .filter((item): item is QuizQuestionReview => item !== null);
+    const evaluationResult =
+      item.evaluationResult === 'correct'
+      || item.evaluationResult === 'partial'
+      || item.evaluationResult === 'incorrect'
+        ? (item.evaluationResult as 'correct' | 'partial' | 'incorrect')
+        : undefined;
+
+    normalized.push({
+      text,
+      studentAnswer:
+        typeof item.studentAnswer === 'string' && item.studentAnswer.trim().length > 0
+          ? item.studentAnswer
+          : 'No answer',
+      correctAnswer:
+        typeof item.correctAnswer === 'string' && item.correctAnswer.trim().length > 0
+          ? item.correctAnswer
+          : null,
+      isCorrect: item.isCorrect === true,
+      explanation:
+        typeof item.explanation === 'string' && item.explanation.trim().length > 0
+          ? item.explanation
+          : 'No explanation available.',
+      subtopic:
+        typeof item.subtopic === 'string' && item.subtopic.trim().length > 0
+          ? item.subtopic
+          : undefined,
+      evaluationResult,
+      feedback:
+        typeof item.feedback === 'string' && item.feedback.trim().length > 0
+          ? item.feedback
+          : undefined,
+    });
+  }
 
   return normalized;
 }

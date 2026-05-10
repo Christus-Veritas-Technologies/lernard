@@ -482,6 +482,7 @@ export class ChatService {
         const { quizId } = await this.quizzesService.generate(user, {
           topic,
           questionCount,
+          questionType: 'multiple_choice',
           subject,
           idempotencyKey: randomUUID(),
           fromConversationId: conversationId,
