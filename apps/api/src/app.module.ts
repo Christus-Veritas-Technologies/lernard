@@ -16,6 +16,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { JobsModule } from './jobs/jobs.module';
 import { RedisModule } from './redis/redis.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ProjectsModule } from './modules/projects/projects.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
     LessonsModule,
     QuizzesModule,
     ChatModule,
+    ProjectsModule,
     NotificationsModule,
     JobsModule,
   ],

@@ -76,6 +76,19 @@ export const ROUTES = {
     ANSWER_PART: (quizId: string) => `/v1/quizzes/${quizId}/answer-part` as const,
   },
 
+  PROJECTS: {
+    PAYLOAD: '/v1/projects/payload',
+    TEMPLATES: '/v1/projects/templates',
+    CREATE_DRAFT: '/v1/projects/drafts',
+    UPDATE_DRAFT: (draftId: string) => `/v1/projects/drafts/${draftId}` as const,
+    GET_DRAFT: (draftId: string) => `/v1/projects/drafts/${draftId}` as const,
+    GENERATE: '/v1/projects/generate',
+    GET: (projectId: string) => `/v1/projects/${projectId}` as const,
+    STATUS: (projectId: string) => `/v1/projects/${projectId}/status` as const,
+    DOWNLOAD_PDF: (projectId: string) => `/v1/projects/${projectId}/download` as const,
+    EDIT_PDF: (projectId: string) => `/v1/projects/${projectId}/edit-pdf` as const,
+  },
+
   CHAT: {
     CONVERSATIONS: '/v1/chat/conversations',
     CONVERSATION: (conversationId: string) => `/v1/chat/conversations/${conversationId}` as const,

@@ -76,6 +76,12 @@ enum SessionType {
   QUIZ
 }
 
+enum ProjectAcademicLevel {
+  GRADE7
+  OLEVEL
+  ALEVEL
+}
+
 enum QuizQuestionType {
   MULTIPLE_CHOICE
   MULTIPLE_SELECT
@@ -163,6 +169,8 @@ model User {
   subjectProgress   SubjectProgress[]
   lessons           Lesson[]
   quizzes           Quiz[]
+  projects          Project[]
+  projectDrafts     ProjectDraft[]
   quizAnswers       QuizAnswer[]
   sessions          Session[]
   conversations     Conversation[]
@@ -445,6 +453,55 @@ model Session {
 
   @@index([userId, completedAt])
   @@index([type])
+}
+
+model ProjectDraft {
+  id               String              @id @default(cuid())
+  userId           String
+  templateId       String
+  subjectName      String
+  level            ProjectAcademicLevel
+  topicHint        String?
+  studentInfo      Json
+  context          Json
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  projects         Project[]
+
+  @@index([userId, updatedAt])
+}
+
+model Project {
+  id               String              @id @default(cuid())
+  userId           String
+  draftId          String?
+  templateId       String
+  templateName     String
+  title            String
+  subjectName      String
+  level            ProjectAcademicLevel
+  totalMarks       Int                 @default(0)
+  status           GenerationStatus    @default(QUEUED)
+  sections         Json                @default("[]")
+  jobId            String?
+  idempotencyKey   String?
+  readyAt          DateTime?
+  failedAt         DateTime?
+  failureReason    String?
+  pdfReadyAt       DateTime?
+  pdfObjectKey     String?
+  pdfFileName      String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  user             User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  draft            ProjectDraft?       @relation(fields: [draftId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@unique([userId, idempotencyKey])
 }
 
 // ─── Chat ───────────────────────────────────────────────────────────────────

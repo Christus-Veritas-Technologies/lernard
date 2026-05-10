@@ -33,6 +33,7 @@ export type { GenerateQuizInput, SubmitAnswerInput } from './quizzes'
 // Chat
 export { sendMessageSchema } from './chat'
 export type { SendMessageInput } from './chat'
+export * from './projects'
 
 // Settings
 export {

@@ -110,6 +110,20 @@ export type {
   QuizRefCardProps,
 } from './payloads/chat'
 export type {
+  ProjectLevel,
+  ProjectGenerationStatus,
+  ProjectTemplateStep,
+  ProjectTemplateDefinition,
+  ProjectDraftStudentInfo,
+  ProjectDraftContext,
+  ProjectDraft,
+  ProjectSection,
+  ProjectContent,
+  ProjectSummaryItem,
+  ProjectsContent,
+  ProjectStatusResponse,
+} from './payloads/projects'
+export type {
   GuardianDashboardContent,
   GuardianSummary,
   PendingInvite,
