@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   ArrowRight01Icon,
+  Bookmark01Icon,
   ChartBarLineIcon,
   Settings02Icon,
   UserCircleIcon,
@@ -16,7 +17,7 @@ import { useRouter } from 'expo-router';
 
 interface DrawerLink {
   label: string;
-  path: '/(app)/(progress)' | '/(app)/settings' | '/(app)/settings/profile' | '/(app)/settings/preferences';
+  path: '/(app)/(progress)' | '/(app)/projects' | '/(app)/settings' | '/(app)/settings/profile' | '/(app)/settings/preferences';
   description: string;
   Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 }
@@ -27,6 +28,12 @@ const DRAWER_LINKS: DrawerLink[] = [
     path: '/(app)/(progress)',
     description: 'Track momentum, strengths, and growth areas.',
     Icon: ChartBarLineIcon,
+  },
+  {
+    label: 'Projects',
+    path: '/(app)/projects',
+    description: 'Open generated project PDFs and edit sections.',
+    Icon: Bookmark01Icon,
   },
   {
     label: 'Settings',
