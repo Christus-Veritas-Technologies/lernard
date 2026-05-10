@@ -4,6 +4,7 @@ import type { ComponentType } from "react";
 import {
     BookOpen01Icon,
     ChartBarLineIcon,
+    FolderLibraryIcon,
     Home01Icon,
     Message01Icon,
     SchoolBell01Icon,
@@ -30,6 +31,7 @@ const studentNavItems: NavItem[] = [
     { href: "/home", label: "Home", description: "Today", icon: Home01Icon },
     { href: "/learn", label: "Lessons", description: "Set Work", icon: BookOpen01Icon },
     { href: "/quiz", label: "Practice Exams", description: "Test yourself", icon: SchoolBell01Icon },
+    { href: "/projects", label: "Projects", description: "Coursework", icon: FolderLibraryIcon },
     { href: "/progress", label: "Progress", description: "Read on You", icon: ChartBarLineIcon },
     { href: "/chat", label: "Chat", description: "Ask Lernard", icon: Message01Icon },
     { href: "/settings", label: "Settings", description: "Your setup", icon: Settings02Icon },
