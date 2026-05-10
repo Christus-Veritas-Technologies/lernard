@@ -108,9 +108,9 @@ export function ProjectsPageClient() {
                     <div className="flex items-start justify-between gap-3">
                         <div>
                             <Badge tone="primary">Project templates</Badge>
-                            <CardTitle className="mt-2">Choose from 10 structured templates</CardTitle>
+                            <CardTitle className="mt-2">Start a new project document</CardTitle>
                             <CardDescription>
-                                Each template includes guided sections, clear mark targets, and level-appropriate structure.
+                                Pick a template and continue with level-appropriate structure, marks, and section flow.
                             </CardDescription>
                         </div>
                         <Button onClick={() => void loadTemplates()} variant="secondary">Refresh templates</Button>
@@ -118,10 +118,10 @@ export function ProjectsPageClient() {
                 </CardHeader>
                 <CardContent>
                     {templatesLoading ? (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                             {Array.from({ length: 6 }).map((_, index) => (
                                 <div
-                                    className="h-52 animate-pulse rounded-2xl border border-border bg-background-subtle"
+                                    className="h-72 animate-pulse rounded-2xl border border-border bg-background-subtle"
                                     key={`template-loading-${index}`}
                                 />
                             ))}
@@ -142,38 +142,48 @@ export function ProjectsPageClient() {
                     ) : null}
 
                     {!templatesLoading && !templatesError && templates.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        <div className="overflow-x-auto pb-2">
+                            <div className="flex min-w-max gap-4 pr-2">
                             {templates.map((template) => {
                                 const stepPreview = template.steps.slice(0, 4);
                                 const remainingCount = Math.max(template.steps.length - stepPreview.length, 0);
 
                                 return (
                                     <article
-                                        className="rounded-2xl border border-border bg-white p-4 shadow-[0_18px_40px_-34px_rgba(36,52,88,0.45)]"
+                                        className="w-[240px] shrink-0 rounded-2xl border border-border bg-white p-3 shadow-[0_18px_40px_-34px_rgba(36,52,88,0.45)]"
                                         key={template.id}
                                     >
-                                        <div className="flex flex-wrap items-center gap-2">
+                                        <div className="rounded-xl border border-border bg-background-subtle p-3">
+                                            <div className="h-28 rounded-lg border border-border bg-white p-3">
+                                                <div className={`h-1.5 w-16 rounded-full ${levelAccent(template.level)}`} />
+                                                <div className="mt-3 h-1.5 w-24 rounded-full bg-slate-200" />
+                                                <div className="mt-2 h-1.5 w-20 rounded-full bg-slate-200" />
+                                                <div className="mt-4 h-1.5 w-28 rounded-full bg-slate-200" />
+                                                <div className="mt-2 h-1.5 w-16 rounded-full bg-slate-200" />
+                                            </div>
+                                        </div>
+                                        <h3 className="mt-3 line-clamp-2 text-[15px] font-semibold text-text-primary">{template.name}</h3>
+                                        <p className="mt-1 text-sm text-text-secondary">{template.subject}</p>
+                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
                                             <Badge tone={levelTone(template.level)}>{formatLevel(template.level)}</Badge>
-                                            <Badge tone="cool">{template.subject}</Badge>
                                             <Badge tone="warm">{template.totalMarks} marks</Badge>
                                         </div>
-                                        <h3 className="mt-3 text-base font-semibold text-text-primary">{template.name}</h3>
-                                        <p className="mt-2 line-clamp-3 text-sm leading-6 text-text-secondary">{template.description}</p>
 
-                                        <div className="mt-4 rounded-xl border border-border bg-background-subtle p-3">
-                                            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-text-tertiary">Section flow</p>
-                                            <ul className="mt-2 space-y-1.5">
+                                        <div className="mt-3 rounded-xl border border-border bg-background-subtle p-2.5">
+                                            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-tertiary">Section flow</p>
+                                            <ul className="mt-2 space-y-1">
                                                 {stepPreview.map((step) => (
-                                                    <li className="text-sm text-text-primary" key={step.key}>• {step.title}</li>
+                                                    <li className="line-clamp-1 text-xs text-text-primary" key={step.key}>• {step.title}</li>
                                                 ))}
                                             </ul>
                                             {remainingCount > 0 ? (
-                                                <p className="mt-2 text-xs font-medium text-text-secondary">+{remainingCount} more sections</p>
+                                                <p className="mt-2 text-[11px] font-medium text-text-secondary">+{remainingCount} more sections</p>
                                             ) : null}
                                         </div>
                                     </article>
                                 );
                             })}
+                            </div>
                         </div>
                     ) : null}
                 </CardContent>
@@ -248,4 +258,10 @@ function levelTone(level: ProjectLevel): "cool" | "warm" | "primary" {
     if (level === "grade7") return "cool";
     if (level === "olevel") return "warm";
     return "primary";
+}
+
+function levelAccent(level: ProjectLevel): string {
+    if (level === "grade7") return "bg-sky-500";
+    if (level === "olevel") return "bg-amber-500";
+    return "bg-indigo-500";
 }
