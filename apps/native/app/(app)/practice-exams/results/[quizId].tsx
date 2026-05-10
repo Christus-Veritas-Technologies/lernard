@@ -135,7 +135,7 @@ export default function QuizResultsScreen() {
       {/* Actions */}
       <View className="border-t border-slate-100 px-4 py-4 space-y-3">
         <Button
-          onPress={() => router.push('/quiz/entry')}
+          onPress={() => router.push('/practice-exams/entry')}
           title="Practice more"
         />
         <Button

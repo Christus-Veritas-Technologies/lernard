@@ -68,7 +68,7 @@ export default function QuizScreen() {
       }
 
       if (data.mode === 'review') {
-        router.replace({ pathname: '/quiz/results/[quizId]', params: { quizId } });
+        router.replace({ pathname: '/practice-exams/results/[quizId]', params: { quizId } });
         return;
       }
 
@@ -199,7 +199,7 @@ export default function QuizScreen() {
             {failureReason ?? 'Something went wrong while generating this practice exam.'}
           </Text>
           <View className="gap-3">
-            <Button onPress={() => router.replace('/quiz')} title="Back to Practice Exams" variant="secondary" />
+            <Button onPress={() => router.replace('/practice-exams')} title="Back to Practice Exams" variant="secondary" />
             <Button onPress={loadQuiz} title="Try again" />
           </View>
         </SafeAreaView>
@@ -226,7 +226,7 @@ export default function QuizScreen() {
               {quiz.currentQuestionIndex + 1} of {quiz.totalQuestions}
             </Text>
           </View>
-          <TouchableOpacity onPress={() => router.replace('/quiz')}>
+          <TouchableOpacity onPress={() => router.replace('/practice-exams')}>
             <Text className="text-sm text-slate-600">Exit</Text>
           </TouchableOpacity>
         </View>

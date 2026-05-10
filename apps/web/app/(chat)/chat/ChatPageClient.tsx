@@ -1078,14 +1078,14 @@ function MessageBlock({ block, role }: { block: ChatMessageBlock; role: "user" |
                 <div className="mt-3 flex flex-wrap gap-2">
                     <Link
                         className="inline-flex items-center gap-1.5 rounded-2xl bg-primary-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-primary-600"
-                        href={`/quiz/${quizId}`}
+                        href={`/practice-exams/${quizId}`}
                     >
                         <PlayCircleIcon size={14} strokeWidth={1.8} />
                         Start quiz
                     </Link>
                     <Link
                         className="inline-flex items-center gap-1.5 rounded-2xl border border-border bg-surface px-3 py-2 text-xs font-semibold text-text-primary transition hover:bg-background-subtle"
-                        href={`/quiz/${quizId}`}
+                        href={`/practice-exams/${quizId}`}
                         target="_blank"
                     >
                         View quiz

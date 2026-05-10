@@ -128,7 +128,7 @@ export default function QuizDashboardScreen() {
               </CardHeader>
               <CardContent className="mt-3 gap-2">
                 <Button onPress={() => setShowCreateModal(true)} title="Create new practice exam" />
-                <Button onPress={() => router.push('/quiz/create')} title="Open full create page" variant="secondary" />
+                <Button onPress={() => router.push('/practice-exams/create')} title="Open full create page" variant="secondary" />
                 <Button
                   iconLeft={<RefreshIcon color="#334155" size={16} strokeWidth={1.8} />}
                   onPress={() => void loadDashboard()}
@@ -205,7 +205,7 @@ export default function QuizDashboardScreen() {
                 <Pressable
                   className="rounded-xl border border-slate-200 bg-white px-3 py-3 active:bg-slate-50"
                   key={item.quizId}
-                  onPress={() => router.push({ pathname: '/quiz/[quizId]', params: { quizId: item.quizId } })}
+                  onPress={() => router.push({ pathname: '/practice-exams/[quizId]', params: { quizId: item.quizId } })}
                 >
                   <View className="flex-row items-center">
                     <Text className="w-[35%] text-sm font-semibold text-slate-900" numberOfLines={1}>{item.topic}</Text>

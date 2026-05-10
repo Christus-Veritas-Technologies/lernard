@@ -97,7 +97,7 @@ export default function SubjectDetailScreen() {
                         <Button
                             onPress={() =>
                                 router.push({
-                                    pathname: '/quiz/entry',
+                                    pathname: '/practice-exams/entry',
                                     params: { topic: subject.subjectName },
                                 })
                             }

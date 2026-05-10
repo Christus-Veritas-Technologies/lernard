@@ -198,7 +198,7 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
             });
 
             onGenerated?.();
-            router.push(`/quiz/${response.quizId}`);
+            router.push(`/practice-exams/${response.quizId}`);
         } finally {
             setLoading(false);
         }

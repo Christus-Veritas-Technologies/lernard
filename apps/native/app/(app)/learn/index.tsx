@@ -375,7 +375,7 @@ export default function LearnEntryScreen() {
                                                 <Button disabled={!canGenerate} onPress={onGenerate} title={loading ? 'Generating...' : 'Generate lesson'} />
                                                 <Button
                                                         iconLeft={<SchoolBell01Icon color="#FFFFFF" size={16} strokeWidth={1.8} />}
-                                                        onPress={() => router.push('/quiz/entry')}
+                                                        onPress={() => router.push('/practice-exams/entry')}
                                                         title="Start practice exam"
                                                 />
                                                 <Button

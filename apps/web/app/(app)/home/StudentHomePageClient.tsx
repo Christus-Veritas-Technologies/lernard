@@ -161,7 +161,7 @@ export function StudentHomePageClient() {
                         Start a new lesson
                     </Button>
                 </Link>
-                <Link href="/quiz/create">
+                <Link href="/practice-exams/create">
                     <Button className="w-full" variant="secondary">
                         <SchoolBell01Icon size={16} strokeWidth={1.8} />
                         New practice exam

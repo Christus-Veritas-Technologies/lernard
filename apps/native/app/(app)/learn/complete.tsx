@@ -131,7 +131,7 @@ export default function PostLessonScreen() {
             <Button
               onPress={() =>
                 router.push({
-                  pathname: '/quiz/entry',
+                  pathname: '/practice-exams/entry',
                   params: { lessonId, topic: topic ?? '' },
                 })
               }
