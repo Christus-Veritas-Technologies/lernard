@@ -229,7 +229,7 @@ export class HomeService {
 
     const content: HomeContent = {
       greeting: buildGreeting(user.name),
-      streak: user.streakDays,
+      streak: Math.max(user.streakDays, calculateRecentActivityStreak(recentActivity)),
       xpLevel: calculateXpLevel(user.sessionCount),
       dailyGoalProgress: sessionsToday,
       dailyGoalTarget: user.dailyGoal,
@@ -422,4 +422,13 @@ function buildRecentActivity(
     });
   }
   return result;
+}
+
+function calculateRecentActivityStreak(recentActivity: DayActivity[]): number {
+  let streak = 0;
+  for (let i = recentActivity.length - 1; i >= 0; i--) {
+    if (!recentActivity[i]?.active) break;
+    streak += 1;
+  }
+  return streak;
 }
