@@ -42,7 +42,7 @@ export class ProjectsService {
   ) {}
 
   async getPayload(user: User): Promise<PagePayload<ProjectsContent>> {
-    const [recentProjects, recentDrafts] = await Promise.all([
+    const [recentProjectsResult, recentDraftsResult] = await Promise.allSettled([
       (this.prisma as any).project.findMany({
         where: { userId: user.id },
         orderBy: { createdAt: 'desc' },
@@ -54,6 +54,22 @@ export class ProjectsService {
         take: 10,
       }),
     ]);
+
+    const recentProjects =
+      recentProjectsResult.status === 'fulfilled' ? recentProjectsResult.value : [];
+    const recentDrafts =
+      recentDraftsResult.status === 'fulfilled' ? recentDraftsResult.value : [];
+
+    if (recentProjectsResult.status === 'rejected') {
+      this.logger.warn(
+        `Projects list unavailable for user ${user.id}: ${String(recentProjectsResult.reason)}`,
+      );
+    }
+    if (recentDraftsResult.status === 'rejected') {
+      this.logger.warn(
+        `Project drafts unavailable for user ${user.id}: ${String(recentDraftsResult.reason)}`,
+      );
+    }
 
     const content: ProjectsContent = {
       totalProjects: recentProjects.length,
