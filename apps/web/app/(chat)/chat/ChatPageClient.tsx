@@ -39,6 +39,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Textarea } from "@/components/ui/textarea";
 import { BrowserApiError, BrowserAuthError, browserApiFetch } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
@@ -484,142 +486,6 @@ export function ChatPageClient() {
 
             {/* Main chat panel */}
             <Card className="relative flex h-full flex-1 flex-col overflow-hidden border-none bg-linear-to-b from-white via-background to-accent-cool-100/60 shadow-[0_30px_90px_-40px_rgba(36,52,88,0.42)]">
-                {attachmentMenuOpen ? (
-                    <div className="absolute bottom-44 left-4 right-4 z-20 rounded-[28px] border border-border/70 bg-white/95 p-4 shadow-[0_24px_64px_-32px_rgba(36,52,88,0.45)] backdrop-blur xl:left-auto xl:right-6 xl:w-104">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <p className="text-sm font-semibold text-text-primary">Attach context</p>
-                                <p className="text-xs text-text-secondary">
-                                    Upload a PDF or image, or pull in a recent lesson from Lernard.
-                                </p>
-                            </div>
-                            <Badge tone="muted">{attachmentCount}/6</Badge>
-                        </div>
-
-                        <div className="mt-4 space-y-4">
-                            <button
-                                className="flex w-full items-center justify-between rounded-[22px] border border-border bg-background px-4 py-3 text-left transition hover:border-primary-300 hover:bg-accent-cool-100/60"
-                                onClick={() => fileInputRef.current?.click()}
-                                type="button"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-500 text-white">
-                                        <Add01Icon size={18} strokeWidth={1.8} />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-semibold text-text-primary">Upload a PDF or image</p>
-                                        <p className="text-xs text-text-secondary">Claude receives the file on this turn.</p>
-                                    </div>
-                                </div>
-                                <Badge tone={uploading ? "warning" : "cool"}>{uploading ? "Uploading" : "Ready"}</Badge>
-                            </button>
-
-                            <div className="space-y-3 rounded-3xl border border-border bg-background p-4">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-                                    <BookOpen01Icon size={18} strokeWidth={1.8} />
-                                    Attach a lesson
-                                </div>
-                                <Input
-                                    onChange={(event) => setLessonQuery(event.target.value)}
-                                    placeholder="Search your recent lessons"
-                                    value={lessonQuery}
-                                />
-                                <ScrollArea className="h-52 pr-2">
-                                    <div className="space-y-2">
-                                        {filteredLessons.map((lesson) => {
-                                            const isSelected = selectedLessons.some((item) => item.lessonId === lesson.lessonId);
-
-                                            return (
-                                                <button
-                                                    className={cn(
-                                                        "w-full rounded-[20px] border px-3 py-3 text-left transition",
-                                                        isSelected
-                                                            ? "border-primary-300 bg-primary-100/70"
-                                                            : "border-border bg-white hover:border-primary-200 hover:bg-accent-cool-100/50",
-                                                    )}
-                                                    key={lesson.lessonId}
-                                                    onClick={() => onSelectLesson(lesson)}
-                                                    type="button"
-                                                >
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <div>
-                                                            <p className="text-sm font-medium text-text-primary">{lesson.title}</p>
-                                                            <p className="text-xs text-text-secondary">{lesson.subjectName}</p>
-                                                        </div>
-                                                        <Badge tone={isSelected ? "primary" : "muted"}>
-                                                            {isSelected ? "Attached" : "Attach"}
-                                                        </Badge>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-
-                                        {filteredLessons.length === 0 ? (
-                                            <div className="rounded-[20px] border border-dashed border-border bg-surface p-4 text-xs text-text-secondary">
-                                                No matching lessons yet. Generate one in Lessons and it will appear here.
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </ScrollArea>
-                            </div>
-
-                            <div className="space-y-3 rounded-3xl border border-border bg-background p-4">
-                                <div className="flex items-center gap-2 text-sm font-semibold text-text-primary">
-                                    <SchoolBell01Icon size={18} strokeWidth={1.8} />
-                                    Attach a quiz
-                                </div>
-                                <Input
-                                    onChange={(event) => setQuizQuery(event.target.value)}
-                                    placeholder="Search your recent quizzes"
-                                    value={quizQuery}
-                                />
-                                <ScrollArea className="h-52 pr-2">
-                                    <div className="space-y-2">
-                                        {filteredQuizzes.map((quiz) => {
-                                            const isSelected = selectedQuizzes.some((item) => item.quizId === quiz.quizId);
-
-                                            return (
-                                                <button
-                                                    className={cn(
-                                                        "w-full rounded-[20px] border px-3 py-3 text-left transition",
-                                                        isSelected
-                                                            ? "border-primary-300 bg-primary-100/70"
-                                                            : "border-border bg-white hover:border-primary-200 hover:bg-accent-cool-100/50",
-                                                    )}
-                                                    key={quiz.quizId}
-                                                    onClick={() => onSelectQuiz(quiz)}
-                                                    type="button"
-                                                >
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <div>
-                                                            <p className="text-sm font-medium text-text-primary">{quiz.title}</p>
-                                                            <p className="text-xs text-text-secondary">
-                                                                {quiz.subjectName} · {quiz.totalQuestions} questions
-                                                                {typeof quiz.score === "number"
-                                                                    ? ` · score ${quiz.score}/${quiz.totalQuestions}`
-                                                                    : " · not completed"}
-                                                            </p>
-                                                        </div>
-                                                        <Badge tone={isSelected ? "primary" : "muted"}>
-                                                            {isSelected ? "Attached" : "Attach"}
-                                                        </Badge>
-                                                    </div>
-                                                </button>
-                                            );
-                                        })}
-
-                                        {filteredQuizzes.length === 0 ? (
-                                            <div className="rounded-[20px] border border-dashed border-border bg-surface p-4 text-xs text-text-secondary">
-                                                No matching quizzes yet. Complete a quiz and it will appear here.
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                </ScrollArea>
-                            </div>
-                        </div>
-                    </div>
-                ) : null}
-
                 <CardHeader className="shrink-0 border-b border-border/60 pb-4">
                     <div className="flex items-center gap-3">
                         {/* Mobile hamburger — opens sidebar Sheet */}
@@ -851,14 +717,171 @@ export function ChatPageClient() {
 
                         <div className="mt-3 flex flex-col gap-3 border-t border-border/70 pt-3 md:flex-row md:items-end md:justify-between">
                             <div className="flex flex-wrap gap-2">
-                                <Button
-                                    className="gap-2"
-                                    onClick={() => setAttachmentMenuOpen((current) => !current)}
-                                    variant="secondary"
-                                >
-                                    <Add01Icon size={16} strokeWidth={1.8} />
-                                    Attach context
-                                </Button>
+                                <Popover open={attachmentMenuOpen} onOpenChange={setAttachmentMenuOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button className="gap-2" variant="secondary">
+                                            <Add01Icon size={16} strokeWidth={1.8} />
+                                            Attach context
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                        align="start"
+                                        className="w-[min(92vw,34rem)] p-0"
+                                        side="top"
+                                    >
+                                        <div className="flex items-start justify-between gap-3 border-b border-border/70 px-4 pb-3 pt-4">
+                                            <div>
+                                                <p className="text-sm font-semibold text-text-primary">Attach context</p>
+                                                <p className="text-xs text-text-secondary">
+                                                    Upload a PDF or image, or pull in a recent lesson from Lernard.
+                                                </p>
+                                            </div>
+                                            <Badge tone="muted">{attachmentCount}/6</Badge>
+                                        </div>
+
+                                        <ScrollArea className="max-h-[70vh] px-4 pb-4 pt-4">
+                                            <div className="space-y-4">
+                                                <button
+                                                    className="flex w-full items-center justify-between rounded-[22px] border border-border bg-background px-4 py-3 text-left transition hover:border-primary-300 hover:bg-accent-cool-100/60"
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    type="button"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary-500 text-white">
+                                                            <Add01Icon size={18} strokeWidth={1.8} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-semibold text-text-primary">Upload a PDF or image</p>
+                                                            <p className="text-xs text-text-secondary">Claude receives the file on this turn.</p>
+                                                        </div>
+                                                    </div>
+                                                    <Badge tone={uploading ? "warning" : "cool"}>{uploading ? "Uploading" : "Ready"}</Badge>
+                                                </button>
+
+                                                <Accordion className="space-y-3" defaultValue={["lessons-controls", "lessons-results", "quizzes-controls", "quizzes-results"]} type="multiple">
+                                                    <AccordionItem value="lessons-controls">
+                                                        <AccordionTrigger>
+                                                            <span className="flex items-center gap-2">
+                                                                <BookOpen01Icon size={18} strokeWidth={1.8} />
+                                                                Attach a lesson
+                                                            </span>
+                                                        </AccordionTrigger>
+                                                        <AccordionContent>
+                                                            <Input
+                                                                onChange={(event) => setLessonQuery(event.target.value)}
+                                                                placeholder="Search your recent lessons"
+                                                                value={lessonQuery}
+                                                            />
+                                                        </AccordionContent>
+                                                    </AccordionItem>
+
+                                                    <AccordionItem value="lessons-results">
+                                                        <AccordionTrigger>Recent lessons</AccordionTrigger>
+                                                        <AccordionContent>
+                                                            <div className="space-y-2">
+                                                                {filteredLessons.map((lesson) => {
+                                                                    const isSelected = selectedLessons.some((item) => item.lessonId === lesson.lessonId);
+
+                                                                    return (
+                                                                        <button
+                                                                            className={cn(
+                                                                                "w-full rounded-[20px] border px-3 py-3 text-left transition",
+                                                                                isSelected
+                                                                                    ? "border-primary-300 bg-primary-100/70"
+                                                                                    : "border-border bg-white hover:border-primary-200 hover:bg-accent-cool-100/50",
+                                                                            )}
+                                                                            key={lesson.lessonId}
+                                                                            onClick={() => onSelectLesson(lesson)}
+                                                                            type="button"
+                                                                        >
+                                                                            <div className="flex items-center justify-between gap-3">
+                                                                                <div>
+                                                                                    <p className="text-sm font-medium text-text-primary">{lesson.title}</p>
+                                                                                    <p className="text-xs text-text-secondary">{lesson.subjectName}</p>
+                                                                                </div>
+                                                                                <Badge tone={isSelected ? "primary" : "muted"}>
+                                                                                    {isSelected ? "Attached" : "Attach"}
+                                                                                </Badge>
+                                                                            </div>
+                                                                        </button>
+                                                                    );
+                                                                })}
+
+                                                                {filteredLessons.length === 0 ? (
+                                                                    <div className="rounded-[20px] border border-dashed border-border bg-surface p-4 text-xs text-text-secondary">
+                                                                        No matching lessons yet. Generate one in Lessons and it will appear here.
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        </AccordionContent>
+                                                    </AccordionItem>
+
+                                                    <AccordionItem value="quizzes-controls">
+                                                        <AccordionTrigger>
+                                                            <span className="flex items-center gap-2">
+                                                                <SchoolBell01Icon size={18} strokeWidth={1.8} />
+                                                                Attach a quiz
+                                                            </span>
+                                                        </AccordionTrigger>
+                                                        <AccordionContent>
+                                                            <Input
+                                                                onChange={(event) => setQuizQuery(event.target.value)}
+                                                                placeholder="Search your recent quizzes"
+                                                                value={quizQuery}
+                                                            />
+                                                        </AccordionContent>
+                                                    </AccordionItem>
+
+                                                    <AccordionItem value="quizzes-results">
+                                                        <AccordionTrigger>Recent quizzes</AccordionTrigger>
+                                                        <AccordionContent>
+                                                            <div className="space-y-2">
+                                                                {filteredQuizzes.map((quiz) => {
+                                                                    const isSelected = selectedQuizzes.some((item) => item.quizId === quiz.quizId);
+
+                                                                    return (
+                                                                        <button
+                                                                            className={cn(
+                                                                                "w-full rounded-[20px] border px-3 py-3 text-left transition",
+                                                                                isSelected
+                                                                                    ? "border-primary-300 bg-primary-100/70"
+                                                                                    : "border-border bg-white hover:border-primary-200 hover:bg-accent-cool-100/50",
+                                                                            )}
+                                                                            key={quiz.quizId}
+                                                                            onClick={() => onSelectQuiz(quiz)}
+                                                                            type="button"
+                                                                        >
+                                                                            <div className="flex items-center justify-between gap-3">
+                                                                                <div>
+                                                                                    <p className="text-sm font-medium text-text-primary">{quiz.title}</p>
+                                                                                    <p className="text-xs text-text-secondary">
+                                                                                        {quiz.subjectName} · {quiz.totalQuestions} questions
+                                                                                        {typeof quiz.score === "number"
+                                                                                            ? ` · score ${quiz.score}/${quiz.totalQuestions}`
+                                                                                            : " · not completed"}
+                                                                                    </p>
+                                                                                </div>
+                                                                                <Badge tone={isSelected ? "primary" : "muted"}>
+                                                                                    {isSelected ? "Attached" : "Attach"}
+                                                                                </Badge>
+                                                                            </div>
+                                                                        </button>
+                                                                    );
+                                                                })}
+
+                                                                {filteredQuizzes.length === 0 ? (
+                                                                    <div className="rounded-[20px] border border-dashed border-border bg-surface p-4 text-xs text-text-secondary">
+                                                                        No matching quizzes yet. Complete a quiz and it will appear here.
+                                                                    </div>
+                                                                ) : null}
+                                                            </div>
+                                                        </AccordionContent>
+                                                    </AccordionItem>
+                                                </Accordion>
+                                            </div>
+                                        </ScrollArea>
+                                    </PopoverContent>
+                                </Popover>
                                 <Badge tone="cool">Ctrl + Enter to send</Badge>
                                 <Badge tone={uploading ? "warning" : "muted"}>
                                     {uploading ? "Uploading files..." : `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`}
