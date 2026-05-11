@@ -89,7 +89,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
             }
 
             if (data.mode === "review") {
-                router.replace(`/quiz/${quizId}/results`);
+                router.replace(`/practice-exams/${quizId}/results`);
                 return;
             }
 
@@ -250,7 +250,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
             }
 
             if (res.done) {
-                router.push(`/quiz/${quizId}/results`);
+                router.push(`/practice-exams/${quizId}/results`);
             }
         } finally {
             setSubmitting(false);
@@ -280,7 +280,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
             );
             setPartResults((prev) => ({ ...prev, [partLabel]: res }));
             if (res.done) {
-                router.push(`/quiz/${quizId}/results`);
+                router.push(`/practice-exams/${quizId}/results`);
             }
         } finally {
             setPartSubmitting((prev) => ({ ...prev, [partLabel]: false }));

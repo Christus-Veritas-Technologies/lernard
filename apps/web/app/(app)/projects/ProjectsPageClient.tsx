@@ -1,7 +1,8 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import { FolderLibraryIcon, RefreshIcon } from "hugeicons-react";
+import { ArrowRight01Icon, BookOpen01Icon, CheckmarkCircle02Icon, Clock01Icon, FireIcon, FolderLibraryIcon, RefreshIcon, SparklesIcon } from "hugeicons-react";
 import Link from "next/link";
 
 import { ROUTES } from "@lernard/routes";
@@ -80,26 +81,44 @@ export function ProjectsPageClient() {
 
     return (
         <div className="space-y-6">
-            <Card className="border-0 bg-[linear-gradient(145deg,#ecfeff_0%,#f8fafc_45%,#ffffff_100%)]">
-                <CardHeader>
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <Badge tone="cool">Projects</Badge>
-                            <CardTitle className="mt-3 text-2xl">Generated project workspace</CardTitle>
-                            <CardDescription>
-                                Track project generation, edit finished PDFs, and export clean submissions.
-                            </CardDescription>
+            <Card className="overflow-hidden border-0 bg-[linear-gradient(145deg,#ecfeff_0%,#f8fafc_45%,#ffffff_100%)]">
+                <CardHeader className="pb-4">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="max-w-2xl">
+                            <Badge tone="cool" className="gap-1.5">
+                                <SparklesIcon size={12} />
+                                Projects
+                            </Badge>
+                            <div className="mt-4 flex items-start gap-4">
+                                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-500 text-white shadow-sm shadow-primary-500/20">
+                                    <FolderLibraryIcon size={22} />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-2xl">Generated project workspace</CardTitle>
+                                    <CardDescription className="mt-2 max-w-xl">
+                                        Track project generation, inspect the section flow, and export polished PDFs without leaving the page.
+                                    </CardDescription>
+                                </div>
+                            </div>
                         </div>
+
                         <Button variant="ghost" onClick={refetch}>
                             <RefreshIcon size={14} />
+                            <span className="ml-2">Refresh</span>
                         </Button>
+                    </div>
+
+                    <div className="mt-5 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-text-secondary">
+                        <MetaPill icon={<CheckmarkCircle02Icon size={12} className="text-success" />} label={`${content.readyProjects} ready`} />
+                        <MetaPill icon={<Clock01Icon size={12} className="text-primary-500" />} label={`${content.generatingProjects} generating`} />
+                        <MetaPill icon={<FireIcon size={12} className="text-warning" />} label={`${content.draftsInProgress} drafts in progress`} />
                     </div>
                 </CardHeader>
                 <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <Stat label="Total" value={content.totalProjects} />
-                    <Stat label="Ready" value={content.readyProjects} />
-                    <Stat label="Generating" value={content.generatingProjects} />
-                    <Stat label="Drafts" value={content.draftsInProgress} />
+                    <Stat icon={<FolderLibraryIcon size={16} />} label="Total" value={content.totalProjects} tone="cool" />
+                    <Stat icon={<CheckmarkCircle02Icon size={16} />} label="Ready" value={content.readyProjects} tone="success" />
+                    <Stat icon={<Clock01Icon size={16} />} label="Generating" value={content.generatingProjects} tone="primary" />
+                    <Stat icon={<FireIcon size={16} />} label="Drafts" value={content.draftsInProgress} tone="warm" />
                 </CardContent>
             </Card>
 
@@ -142,47 +161,70 @@ export function ProjectsPageClient() {
                     ) : null}
 
                     {!templatesLoading && !templatesError && templates.length > 0 ? (
-                        <div className="overflow-x-auto pb-2">
-                            <div className="flex min-w-max gap-4 pr-2">
-                            {templates.map((template) => {
-                                const stepPreview = template.steps.slice(0, 4);
-                                const remainingCount = Math.max(template.steps.length - stepPreview.length, 0);
+                        <div className="space-y-4">
+                            <Link href="/projects/create" className="block">
+                                <Button className="w-full" size="lg">
+                                    <SparklesIcon size={18} />
+                                    <span className="ml-2">Create new project</span>
+                                </Button>
+                            </Link>
 
-                                return (
-                                    <article
-                                        className="w-[240px] shrink-0 rounded-2xl border border-border bg-white p-3 shadow-[0_18px_40px_-34px_rgba(36,52,88,0.45)]"
-                                        key={template.id}
-                                    >
-                                        <div className="rounded-xl border border-border bg-background-subtle p-3">
-                                            <div className="h-28 rounded-lg border border-border bg-white p-3">
-                                                <div className={`h-1.5 w-16 rounded-full ${levelAccent(template.level)}`} />
-                                                <div className="mt-3 h-1.5 w-24 rounded-full bg-slate-200" />
-                                                <div className="mt-2 h-1.5 w-20 rounded-full bg-slate-200" />
-                                                <div className="mt-4 h-1.5 w-28 rounded-full bg-slate-200" />
-                                                <div className="mt-2 h-1.5 w-16 rounded-full bg-slate-200" />
-                                            </div>
-                                        </div>
-                                        <h3 className="mt-3 line-clamp-2 text-[15px] font-semibold text-text-primary">{template.name}</h3>
-                                        <p className="mt-1 text-sm text-text-secondary">{template.subject}</p>
-                                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                            <Badge tone={levelTone(template.level)}>{formatLevel(template.level)}</Badge>
-                                            <Badge tone="warm">{template.totalMarks} marks</Badge>
-                                        </div>
+                            <div className="overflow-x-auto pb-2">
+                                <div className="flex min-w-max gap-4 pr-2">
+                                {templates.map((template) => {
+                                    const stepPreview = template.steps.slice(0, 4);
+                                    const remainingCount = Math.max(template.steps.length - stepPreview.length, 0);
 
-                                        <div className="mt-3 rounded-xl border border-border bg-background-subtle p-2.5">
-                                            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-tertiary">Section flow</p>
-                                            <ul className="mt-2 space-y-1">
-                                                {stepPreview.map((step) => (
-                                                    <li className="line-clamp-1 text-xs text-text-primary" key={step.key}>• {step.title}</li>
-                                                ))}
-                                            </ul>
-                                            {remainingCount > 0 ? (
-                                                <p className="mt-2 text-[11px] font-medium text-text-secondary">+{remainingCount} more sections</p>
-                                            ) : null}
-                                        </div>
-                                    </article>
-                                );
-                            })}
+                                    return (
+                                        <Link
+                                            href={`/projects/create?template=${template.id}`}
+                                            key={template.id}
+                                        >
+                                            <article
+                                                className="group h-full w-[252px] shrink-0 cursor-pointer rounded-3xl border-2 border-border bg-white p-3 shadow-[0_18px_40px_-34px_rgba(36,52,88,0.45)] transition duration-200 hover:border-primary-300 hover:shadow-[0_24px_48px_-36px_rgba(59,130,246,0.3)]"
+                                            >
+                                                <div className="rounded-2xl border border-border bg-background-subtle p-3">
+                                                    <div className="rounded-xl border border-border bg-white p-3">
+                                                        <div className="flex items-center justify-between gap-3">
+                                                            <div className={`h-8 w-8 rounded-xl ${levelAccent(template.level)} shadow-sm transition group-hover:scale-110`} />
+                                                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${levelBgTone(template.level)} text-white shadow-sm`}>
+                                                                {formatLevel(template.level)}
+                                                            </span>
+                                                        </div>
+                                                        <div className="mt-3 h-1.5 w-20 rounded-full bg-slate-200" />
+                                                        <div className="mt-2 h-1.5 w-24 rounded-full bg-slate-200" />
+                                                        <div className="mt-4 h-1.5 w-28 rounded-full bg-slate-200" />
+                                                        <div className="mt-2 h-1.5 w-16 rounded-full bg-slate-200" />
+                                                    </div>
+                                                </div>
+                                                <div className="mt-3 flex items-start justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <h3 className="line-clamp-2 text-[15px] font-semibold text-text-primary">{template.name}</h3>
+                                                        <p className="mt-1 text-sm text-text-secondary">{template.subject}</p>
+                                                    </div>
+                                                    <ArrowRight01Icon size={16} className="mt-0.5 shrink-0 text-text-tertiary transition group-hover:translate-x-1" />
+                                                </div>
+                                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                                    <Badge tone={levelTone(template.level)}>{formatLevel(template.level)}</Badge>
+                                                    <Badge tone="warm">{template.totalMarks} marks</Badge>
+                                                </div>
+
+                                                <div className="mt-3 rounded-xl border border-border bg-background-subtle p-2.5">
+                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-tertiary">Section flow</p>
+                                                    <ul className="mt-2 space-y-1">
+                                                        {stepPreview.map((step) => (
+                                                            <li className="line-clamp-1 text-xs text-text-primary" key={step.key}>• {step.title}</li>
+                                                        ))}
+                                                    </ul>
+                                                    {remainingCount > 0 ? (
+                                                        <p className="mt-2 text-[11px] font-medium text-text-secondary">+{remainingCount} more sections</p>
+                                                    ) : null}
+                                                </div>
+                                            </article>
+                                        </Link>
+                                    );
+                                })}
+                                </div>
                             </div>
                         </div>
                     ) : null}
@@ -204,17 +246,23 @@ export function ProjectsPageClient() {
                             <Link
                                 href={`/projects/${project.projectId}`}
                                 key={project.projectId}
-                                className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-background-subtle px-4 py-3 hover:bg-white"
+                                className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-background-subtle px-4 py-3 transition hover:border-primary-200 hover:bg-white"
                             >
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-semibold text-text-primary">{project.title}</p>
-                                    <p className="text-xs text-text-secondary">
-                                        {project.templateName} • {project.subject} • {project.level.toUpperCase()}
-                                    </p>
+                                <div className="flex min-w-0 items-start gap-3">
+                                    <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-border">
+                                        <BookOpen01Icon size={16} className="text-primary-500" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-semibold text-text-primary">{project.title}</p>
+                                        <p className="text-xs text-text-secondary">
+                                            {project.templateName} • {project.subject} • {project.level.toUpperCase()}
+                                        </p>
+                                    </div>
                                 </div>
-                                <span className="rounded-full bg-surface px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-text-secondary">
-                                    {project.status}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className={projectStatusTone(project.status)}>{project.status}</span>
+                                    <ArrowRight01Icon size={14} className="text-text-tertiary" />
+                                </div>
                             </Link>
                         ))
                     )}
@@ -223,15 +271,20 @@ export function ProjectsPageClient() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Drafts in progress</CardTitle>
+                    <div className="flex items-center justify-between gap-3">
+                        <CardTitle>Drafts in progress</CardTitle>
+                        <Badge tone="muted">Live draft data</Badge>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="flex items-center justify-between rounded-2xl border border-border bg-background-subtle px-4 py-3">
-                        <div>
+                        <div className="min-w-0">
                             <p className="text-sm font-semibold text-text-primary">Active drafts</p>
                             <p className="text-xs text-text-secondary">{content.drafts.length} draft(s) currently saved.</p>
                         </div>
-                        <FolderLibraryIcon size={20} className="text-primary-500" />
+                        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-border">
+                            <FolderLibraryIcon size={20} className="text-primary-500" />
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -239,11 +292,14 @@ export function ProjectsPageClient() {
     );
 }
 
-function Stat({ label, value }: { label: string; value: number }) {
+function Stat({ label, value, icon, tone }: { label: string; value: number; icon: ReactNode; tone: "cool" | "warm" | "success" | "primary" }) {
     return (
-        <div className="rounded-2xl border border-border bg-white px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-tertiary">{label}</p>
-            <p className="mt-1 text-xl font-semibold text-text-primary">{value}</p>
+        <div className="rounded-2xl border border-border bg-white px-4 py-3 shadow-[0_18px_40px_-34px_rgba(36,52,88,0.45)]">
+            <div className="flex items-center gap-2.5">
+                <span className={statIconTone[tone]}>{icon}</span>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-text-tertiary">{label}</p>
+            </div>
+            <p className="mt-2 text-xl font-semibold text-text-primary">{value}</p>
         </div>
     );
 }
@@ -265,3 +321,37 @@ function levelAccent(level: ProjectLevel): string {
     if (level === "olevel") return "bg-amber-500";
     return "bg-indigo-500";
 }
+
+function levelBgTone(level: ProjectLevel): string {
+    if (level === "grade7") return "bg-sky-500";
+    if (level === "olevel") return "bg-amber-500";
+    return "bg-indigo-500";
+}
+
+function projectStatusTone(status: string): string {
+    if (status === "ready") {
+        return "inline-flex items-center rounded-full bg-success-bg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-success";
+    }
+
+    if (status === "processing" || status === "queued") {
+        return "inline-flex items-center rounded-full bg-primary-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary-700";
+    }
+
+    return "inline-flex items-center rounded-full bg-warning-bg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-warning";
+}
+
+function MetaPill({ icon, label }: { icon: ReactNode; label: string }) {
+    return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] text-text-primary shadow-sm ring-1 ring-border">
+            {icon}
+            {label}
+        </span>
+    );
+}
+
+const statIconTone = {
+    cool: "flex h-8 w-8 items-center justify-center rounded-xl bg-accent-cool-100 text-text-primary",
+    warm: "flex h-8 w-8 items-center justify-center rounded-xl bg-accent-warm-100 text-text-primary",
+    success: "flex h-8 w-8 items-center justify-center rounded-xl bg-success-bg text-success",
+    primary: "flex h-8 w-8 items-center justify-center rounded-xl bg-primary-50 text-primary-700",
+} as const;

@@ -271,7 +271,7 @@ export function QuizDashboardClient() {
                                             </TableCell>
                                             <TableCell>{formatDate(item.updatedAt)}</TableCell>
                                             <TableCell className="text-right">
-                                                <Link href={`/quiz/${item.quizId}`}>
+                                                <Link href={`/practice-exams/${item.quizId}`}>
                                                     <Button variant="secondary">Open</Button>
                                                 </Link>
                                             </TableCell>

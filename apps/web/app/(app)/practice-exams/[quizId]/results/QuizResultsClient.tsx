@@ -120,7 +120,7 @@ export function QuizResultsClient({ quizId }: QuizResultsClientProps) {
                 </CardHeader>
                 <CardContent className="space-y-3">
                     <p className="text-sm text-text-secondary">{loadError ?? "Please try again."}</p>
-                    <Button onClick={() => router.push(`/quiz/${quizId}`)} variant="secondary">
+                    <Button onClick={() => router.push(`/practice-exams/${quizId}`)} variant="secondary">
                         Back to practice exam
                     </Button>
                 </CardContent>
