@@ -89,8 +89,7 @@ export default function SubjectDetailScreen() {
                         Live topic-level confidence mapped to native bars so you can see where to push next.
                     </Text>
                     <View className="mt-5 flex-row flex-wrap gap-2">
-                        <Pill label={`${subject.totalLessons} lessons`} tone="indigo" />
-                        <Pill label={`${subject.totalQuizzes} quizzes`} tone="sky" />
+                        <Pill label={`${subject.topics.length} topics`} tone="indigo" />
                         <Pill label={formatPercent(subject.averageScore)} tone="amber" />
                     </View>
                     <View className="mt-6 flex-row flex-wrap gap-3">
