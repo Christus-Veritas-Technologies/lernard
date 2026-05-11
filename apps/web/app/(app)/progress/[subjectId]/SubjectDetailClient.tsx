@@ -2,6 +2,7 @@
 
 import { ArrowLeft01Icon } from "hugeicons-react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
 import type { SubjectDetailContent, TopicStrength } from "@lernard/shared-types";
@@ -10,15 +11,52 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/progress";
-import { usePagePayload } from "@/hooks/usePagePayload";
+import { browserApiFetch } from "@/lib/browser-api";
 
 interface SubjectDetailClientProps {
     subjectId: string;
 }
 
 export function SubjectDetailClient({ subjectId }: SubjectDetailClientProps) {
-    const { data, loading, error, refetch } =
-        usePagePayload<SubjectDetailContent>(ROUTES.PROGRESS.SUBJECT(subjectId));
+    const [data, setData] = useState<SubjectDetailContent | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<Error | null>(null);
+
+    useEffect(() => {
+        async function loadData() {
+            setLoading(true);
+            setError(null);
+            try {
+                const response = await browserApiFetch<SubjectDetailContent>(
+                    ROUTES.PROGRESS.SUBJECT(subjectId),
+                );
+                setData(response);
+            } catch (err) {
+                setError(err instanceof Error ? err : new Error("Failed to load subject"));
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        void loadData();
+    }, [subjectId]);
+
+    function refetch() {
+        void (async () => {
+            setLoading(true);
+            setError(null);
+            try {
+                const response = await browserApiFetch<SubjectDetailContent>(
+                    ROUTES.PROGRESS.SUBJECT(subjectId),
+                );
+                setData(response);
+            } catch (err) {
+                setError(err instanceof Error ? err : new Error("Failed to load subject"));
+            } finally {
+                setLoading(false);
+            }
+        })();
+    }
 
     if (loading) {
         return <div className="h-64 rounded-3xl bg-background-subtle" />;
@@ -38,7 +76,7 @@ export function SubjectDetailClient({ subjectId }: SubjectDetailClientProps) {
         );
     }
 
-    const subject = data.content.subject;
+    const subject = data.subject;
     const average =
         subject.topics.length > 0
             ? Math.round(subject.topics.reduce((sum, topic) => sum + topic.score, 0) / subject.topics.length)
