@@ -7,7 +7,6 @@
       "@rnr/*": ["rnr/*"]
     },
     "skipLibCheck": true,
-    "skipTypeCheck": true,
     "noImplicitAny": false,
     "noImplicitThis": false,
     "strictNullChecks": false,

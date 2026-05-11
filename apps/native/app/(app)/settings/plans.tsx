@@ -41,7 +41,7 @@ const plans: PlanConfig[] = [
         price: 'Free',
         priceDetail: 'No card needed',
         featured: false,
-        icon: Student01Icon,
+        icon: StudentIcon,
         features: [
             'Unlimited subject tracking',
             'First Look baseline assessment',
@@ -57,7 +57,7 @@ const plans: PlanConfig[] = [
         price: 'Coming soon',
         priceDetail: 'Billed monthly',
         featured: true,
-        icon: Crown02Icon,
+        icon: CrownIcon,
         features: [
             'Everything in Explorer',
             'Unlimited conversation history',
@@ -74,7 +74,7 @@ const plans: PlanConfig[] = [
         price: 'Coming soon',
         priceDetail: 'Covers up to 4 learners',
         featured: false,
-        icon: HomeSmileIcon,
+        icon: SmileIcon,
         features: [
             'Everything in Scholar',
             'Up to 4 student accounts',

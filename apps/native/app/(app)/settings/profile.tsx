@@ -5,7 +5,8 @@ import { Pressable, ScrollView, TextInput, TouchableOpacity, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
-import type { AgeGroup, LearningGoal, SettingsContent, StudentSettingsContent } from '@lernard/shared-types';
+import { AgeGroup, LearningGoal } from '@lernard/shared-types';
+import type { SettingsContent, StudentSettingsContent } from '@lernard/shared-types';
 
 import { Text } from '@rnr/text';
 
