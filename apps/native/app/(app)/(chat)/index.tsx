@@ -108,7 +108,7 @@ export default function ChatListScreen() {
 
         return (
             <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-                <View className="flex-1 px-4 pb-24 pt-6">
+                <View className="flex-1 px-3 pb-16 pt-4">
                     <StateNotice
                         actionTitle={isAuthError ? 'Back to home' : 'Try again'}
                         badge={isAuthError ? 'Sign in required' : 'Chat failed to load'}
@@ -124,8 +124,8 @@ export default function ChatListScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
-                <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
+            <ScrollView className="flex-1" contentContainerClassName="px-3 pb-16 pt-4 gap-4">
+                <View className="rounded-[32px] bg-[rgb(248,251,255)] p-4 shadow-sm">
                     <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Guide + Companion</Text>
                     <Text className="mt-3 text-3xl font-semibold text-slate-900">Live conversation history</Text>
                     <Text className="mt-3 text-base leading-7 text-slate-600">
@@ -137,7 +137,7 @@ export default function ChatListScreen() {
                     </View>
                 </View>
 
-                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                <View className="rounded-[32px] border border-slate-200 bg-white p-4 shadow-sm">
                     <Text className="text-2xl font-semibold text-slate-900">Conversations</Text>
                     <Text className="mt-2 text-base leading-7 text-slate-600">
                         Ordered by most recently active, backed by cursor pagination.

@@ -473,7 +473,7 @@ export function ChatPageClient() {
     );
 
     return (
-        <div className="flex h-dvh flex-col gap-4 overflow-hidden p-4 xl:flex-row">
+        <div className="flex h-dvh flex-col gap-3 overflow-hidden p-3 xl:flex-row">
             {/* Desktop sidebar */}
             <Card
                 className={cn(
@@ -521,7 +521,7 @@ export function ChatPageClient() {
                     </div>
                 </CardHeader>
 
-                <CardContent className="flex min-h-0 flex-1 flex-col gap-4 p-4 md:p-6">
+                <CardContent className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:p-3">
                     {errorMessage ? (
                         <div className="flex items-start gap-3 rounded-3xl border border-warning/30 bg-warning-bg px-4 py-3 text-sm text-text-primary">
                             <AlertCircleIcon className="mt-0.5 shrink-0" size={18} strokeWidth={1.8} />
@@ -529,7 +529,7 @@ export function ChatPageClient() {
                         </div>
                     ) : null}
 
-                    <ScrollArea className="min-h-0 flex-1 rounded-[30px] border border-border/60 bg-white/80 p-4 shadow-inner shadow-accent-cool-100/40">
+                    <ScrollArea className="min-h-0 flex-1 rounded-[30px] border border-border/60 bg-white/80 p-2 shadow-inner shadow-accent-cool-100/40">
                         <div className="space-y-4">
                             {attachQuizId && messages.length === 0 ? (
                                 <Card className="border-primary-200 bg-linear-to-br from-primary-50/70 via-white to-accent-warm-100/50 shadow-[0_18px_40px_-28px_rgba(36,52,88,0.35)]">
@@ -650,7 +650,7 @@ export function ChatPageClient() {
                         </div>
                     </ScrollArea>
 
-                    <div className="shrink-0 rounded-4xl border border-border/70 bg-white/90 p-3 shadow-[0_24px_64px_-40px_rgba(36,52,88,0.48)] backdrop-blur">
+                    <div className="shrink-0 rounded-4xl border border-border/70 bg-white/90 p-2 shadow-[0_24px_64px_-40px_rgba(36,52,88,0.48)] backdrop-blur">
                         {attachmentCount > 0 ? (
                             <div className="mb-3 flex flex-wrap gap-2">
                                 {uploadedFiles.map((file) => (
