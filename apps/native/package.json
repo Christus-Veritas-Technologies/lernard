@@ -37,7 +37,7 @@
     "expo-system-ui": "~6.0.7",
     "expo-web-browser": "~15.0.7",
     "hugeicons-react-native": "^0.0.2",
-    "nativewind": "latest",
+    "nativewind": "^2.0.11",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
@@ -64,6 +64,11 @@
     "prettier-plugin-tailwindcss": "^0.5.11",
     "tailwindcss": "^3.4.0",
     "typescript": "~5.9.2"
+  },
+  "pnpm": {
+    "overrides": {
+      "tailwindcss": "^3.4.0"
+    }
   },
   "private": true
 }
