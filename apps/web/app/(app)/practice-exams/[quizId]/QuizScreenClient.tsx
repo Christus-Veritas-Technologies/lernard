@@ -188,7 +188,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="flex gap-3">
-                        <Button onClick={() => router.push("/quiz")} variant="secondary">
+                        <Button onClick={() => router.push("/practice-exams")} variant="secondary">
                             Back to Practice Exams dashboard
                         </Button>
                         <Button onClick={loadQuiz}>Try loading again</Button>
@@ -294,7 +294,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                     {quiz.currentQuestionIndex + 1} of {quiz.totalQuestions}
                 </Badge>
                 <Progress className="max-w-72" value={progressValue} />
-                <Button onClick={() => router.push("/quiz")} variant="ghost">
+                <Button onClick={() => router.push("/practice-exams")} variant="ghost">
                     Exit
                 </Button>
             </div>

@@ -292,7 +292,7 @@ export class QuizzesService {
         type: 'quiz_ready',
         title: 'Quiz ready',
         body: `Your quiz on ${generated.topic} is ready.`,
-        url: `/quiz/${input.quizId}`,
+        url: `/practice-exams/${input.quizId}`,
         quizId: input.quizId,
       });
 
@@ -333,7 +333,7 @@ export class QuizzesService {
         type: 'quiz_failed',
         title: 'Quiz generation failed',
         body: 'Please retry generating your quiz.',
-        url: '/quiz',
+        url: '/practice-exams',
         quizId: input.quizId,
       });
     }

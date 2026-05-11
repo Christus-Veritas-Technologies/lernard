@@ -111,7 +111,7 @@ export function PostLessonClient({ lessonId }: PostLessonClientProps) {
                     <Button
                         className="w-full"
                         onClick={() => {
-                            const quizUrl = `/quiz?lessonId=${lessonId}${topic ? `&topic=${encodeURIComponent(topic)}` : ""}`;
+                            const quizUrl = `/practice-exams?lessonId=${lessonId}${topic ? `&topic=${encodeURIComponent(topic)}` : ""}`;
                             router.push(quizUrl);
                         }}
                     >
