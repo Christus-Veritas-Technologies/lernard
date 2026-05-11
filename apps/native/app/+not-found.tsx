@@ -33,7 +33,7 @@ export default function NotFoundScreen() {
             >
                 {/* Icon */}
                 <View className="h-20 w-20 items-center justify-center rounded-2xl bg-slate-100">
-                    <SearchNotFoundIcon color="#64748b" size={40} />
+                    <Text className="text-4xl">🔍</Text>
                 </View>
 
                 {/* Text */}

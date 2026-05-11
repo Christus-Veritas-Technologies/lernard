@@ -19,7 +19,7 @@ import { usePagePayload } from '@/hooks/usePagePayload';
 import { nativeApiFetch } from '@/lib/native-api';
 
 const THEME_OPTIONS = [
-    { value: Appearance.LIGHT, label: 'Light', icon: SunIcon },
+    { value: Appearance.LIGHT, label: 'Light' },
     { value: Appearance.DARK, label: 'Dark', icon: Moon02Icon },
     { value: Appearance.SYSTEM, label: 'System', icon: Settings02Icon },
 ];

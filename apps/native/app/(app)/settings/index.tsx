@@ -271,7 +271,6 @@ function StudentSettingsView({
                 <SectionHeader title="Notifications" />
                 <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
                     <NavRow
-                        icon={<Bell01Icon color="#6366f1" size={20} />}
                         label="Notifications"
                         onPress={() => router.push('/settings/notifications')}
                     />

@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
     ArrowLeft01Icon,
-    CheckIcon,
     CrownIcon,
     SmileIcon,
     StudentIcon,
