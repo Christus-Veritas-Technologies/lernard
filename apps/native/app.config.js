@@ -3,7 +3,7 @@
 
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = {
-    name: 'lernard',
+    name: 'Lernard AI',
     slug: 'lernard',
     newArchEnabled: true,
     version: '1.0.0',
