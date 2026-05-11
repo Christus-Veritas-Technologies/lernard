@@ -485,8 +485,8 @@ export function ChatPageClient() {
             </Card>
 
             {/* Main chat panel */}
-            <Card className="relative flex h-full flex-1 flex-col overflow-hidden border-none bg-linear-to-b from-white via-background to-accent-cool-100/60 shadow-[0_30px_90px_-40px_rgba(36,52,88,0.42)]">
-                <CardHeader className="shrink-0 border-b border-border/60 pb-4">
+            <div className="relative flex h-full flex-1 flex-col overflow-hidden bg-linear-to-b from-white via-background to-accent-cool-100/60 shadow-[0_30px_90px_-40px_rgba(36,52,88,0.42)]">
+                <div className="shrink-0 border-b border-border/60 pb-4 px-3 pt-3">
                     <div className="flex items-center gap-3">
                         {/* Mobile hamburger — opens sidebar Sheet */}
                         <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
@@ -519,9 +519,9 @@ export function ChatPageClient() {
                             {conversationTitle}
                         </Badge>
                     </div>
-                </CardHeader>
+                </div>
 
-                <CardContent className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:p-3">
+                <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:p-3">
                     {errorMessage ? (
                         <div className="flex items-start gap-3 rounded-3xl border border-warning/30 bg-warning-bg px-4 py-3 text-sm text-text-primary">
                             <AlertCircleIcon className="mt-0.5 shrink-0" size={18} strokeWidth={1.8} />
@@ -893,8 +893,8 @@ export function ChatPageClient() {
                             </Button>
                         </div>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
 
             <input
                 accept="application/pdf,image/gif,image/jpeg,image/png,image/webp"
