@@ -71,7 +71,7 @@ export default function AppLayout() {
         return <Redirect href="/(auth)/account-type" />;
     }
 
-    const appSection = segments[1] ?? '';
+    const appSection = (segments && segments.length > 1 ? segments[1] : '') ?? '';
 
     if (role === Role.GUARDIAN) {
         if (appSection !== 'guardian' && appSection !== 'settings') {

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Moon02Icon, Settings02Icon, SunIcon } from 'hugeicons-react-native';
+import { Moon02Icon, Settings02Icon } from 'hugeicons-react-native';
 
 import { ROUTES } from '@lernard/routes';
 import { Appearance, type SettingsContent, type UserSettings } from '@lernard/shared-types';

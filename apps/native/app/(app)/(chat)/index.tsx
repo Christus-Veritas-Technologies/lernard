@@ -148,7 +148,7 @@ export default function ChatListScreen() {
                             <View className="rounded-[28px] bg-slate-50 p-4" key={conversation.id}>
                                 <Text className="text-base font-semibold text-slate-900">{conversation.title ?? 'Untitled conversation'}</Text>
                                 <Text className="mt-1 text-sm leading-6 text-slate-600">
-                                    Opened {formatRelativeDate(conversation.createdAt ?? new Date().toISOString())}
+                                    Opened {formatRelativeDate(conversation.updatedAt ?? new Date().toISOString())}
                                 </Text>
                                 <View className="mt-4 flex-row flex-wrap gap-3">
                                     <Button

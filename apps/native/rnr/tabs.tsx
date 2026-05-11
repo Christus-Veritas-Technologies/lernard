@@ -67,7 +67,6 @@ export function TabsTrigger({ value, className, children, ...props }: TabsTrigge
                 isActive && 'bg-white shadow-sm',
                 className
             )}
-            activeOpacity={0.7}
             {...props}
         >
             {typeof children === 'string' ? (

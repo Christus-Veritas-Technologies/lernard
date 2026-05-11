@@ -4,7 +4,8 @@ import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ROUTES } from '@lernard/routes';
-import type { SessionDepth, SettingsContent, StudentSettingsContent, UserSettings } from '@lernard/shared-types';
+import { SessionDepth } from '@lernard/shared-types';
+import type { SettingsContent, StudentSettingsContent, UserSettings } from '@lernard/shared-types';
 
 import { Text } from '@rnr/text';
 
@@ -17,9 +18,9 @@ import { capitalize } from '@/lib/formatters';
 import { nativeApiFetch } from '@/lib/native-api';
 
 const DEPTH_OPTIONS: { value: SessionDepth; label: string; description: string }[] = [
-    { value: 'BRIEF', label: 'Brief', description: 'Short, focused sessions' },
-    { value: 'STANDARD', label: 'Standard', description: 'Balanced depth and length' },
-    { value: 'DEEP', label: 'Deep', description: 'Thorough, extended sessions' },
+    { value: SessionDepth.QUICK, label: 'Quick', description: 'Short, focused sessions' },
+    { value: SessionDepth.STANDARD, label: 'Standard', description: 'Balanced depth and length' },
+    { value: SessionDepth.DEEP, label: 'Deep', description: 'Thorough, extended sessions' },
 ];
 
 const SUPPORT_LEVELS: { value: string; label: string; description: string }[] = [
@@ -114,7 +115,7 @@ export default function StudyScreen() {
                         ) : null}
                     </View>
                     <View className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm">
-                        {(['GUIDE', 'COMPANION', 'SELF_DIRECTED'] as const).map((mode, idx) => (
+                        {(['guide', 'companion'] as const).map((mode, idx) => (
                             <View key={mode}>
                                 {idx > 0 ? <View className="mx-4 h-px bg-slate-100" /> : null}
                                 <Pressable
@@ -250,7 +251,7 @@ export default function StudyScreen() {
                 </View>
 
                 {/* Companion controls link */}
-                {settings.learningMode === 'COMPANION' ? (
+                {settings.learningMode === 'companion' ? (
                     <View className="rounded-[20px] border border-slate-200 bg-white px-4 py-3.5">
                         <View className="flex-row items-center justify-between">
                             <View>

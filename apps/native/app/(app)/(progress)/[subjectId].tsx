@@ -90,7 +90,7 @@ export default function SubjectDetailScreen() {
                     </Text>
                     <View className="mt-5 flex-row flex-wrap gap-2">
                         <Pill label={`${subject.topics.length} topics`} tone="indigo" />
-                        <Pill label={formatPercent(subject.averageScore)} tone="amber" />
+                        <Pill label={subject.strengthLevel} tone="amber" />
                     </View>
                     <View className="mt-6 flex-row flex-wrap gap-3">
                         <Button

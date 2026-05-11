@@ -4,7 +4,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
     ArrowRight01Icon,
-    Bell01Icon,
     BookOpen01Icon,
     Bookmark01Icon,
     Home01Icon,
@@ -94,7 +93,7 @@ export default function SettingsScreen() {
         return <GuardianSettingsView content={data.content} />;
     }
 
-    return <StudentSettingsView content={data.content} permissions={data.permissions} />;
+    return <StudentSettingsView content={data.content} />;
 }
 
 // ─── Guardian view ───────────────────────────────────────────────────────────
@@ -199,7 +198,6 @@ function StudentSettingsView({
     content,
 }: {
     content: StudentSettingsContent;
-    permissions: string[];
 }) {
     const router = useRouter();
     const viewer = content.viewer;

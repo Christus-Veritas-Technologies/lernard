@@ -17,17 +17,17 @@ import { usePagePayload } from '@/hooks/usePagePayload';
 import { nativeApiFetch } from '@/lib/native-api';
 
 const AGE_GROUPS: { value: AgeGroup; label: string }[] = [
-    { value: 'PRIMARY', label: 'Primary' },
-    { value: 'SECONDARY', label: 'Secondary' },
-    { value: 'UNIVERSITY', label: 'University' },
-    { value: 'ADULT', label: 'Adult' },
+    { value: AgeGroup.PRIMARY, label: 'Primary' },
+    { value: AgeGroup.SECONDARY, label: 'Secondary' },
+    { value: AgeGroup.UNIVERSITY, label: 'University' },
+    { value: AgeGroup.PROFESSIONAL, label: 'Professional' },
 ];
 
 const LEARNING_GOALS: { value: LearningGoal; label: string }[] = [
-    { value: 'EXAM_PREP', label: 'Exam prep' },
-    { value: 'SKILLS_GROWTH', label: 'Skills growth' },
-    { value: 'CURIOSITY', label: 'Curiosity' },
-    { value: 'CATCH_UP', label: 'Catch up' },
+    { value: LearningGoal.EXAM_PREP, label: 'Exam prep' },
+    { value: LearningGoal.KEEP_UP, label: 'Keep up' },
+    { value: LearningGoal.LEARN_NEW, label: 'Learn new' },
+    { value: LearningGoal.FILL_GAPS, label: 'Fill gaps' },
 ];
 
 export default function ProfileScreen() {
@@ -131,7 +131,7 @@ export default function ProfileScreen() {
         .join('')
         .toUpperCase();
 
-    const showGrade = viewer.ageGroup === 'SECONDARY' || viewer.ageGroup === 'UNIVERSITY';
+    const showGrade = viewer.ageGroup === AgeGroup.SECONDARY || viewer.ageGroup === AgeGroup.UNIVERSITY;
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -149,17 +149,9 @@ export default function ProfileScreen() {
                         disabled={uploadingAvatar}
                         onPress={() => void onPickAvatar()}
                     >
-                        {viewer.profilePictureUrl ? (
-                            <Image
-                                className="rounded-full"
-                                source={{ uri: viewer.profilePictureUrl }}
-                                style={{ width: 72, height: 72 }}
-                            />
-                        ) : (
-                            <View className="h-[72px] w-[72px] items-center justify-center rounded-full bg-indigo-100">
-                                <Text className="text-2xl font-semibold text-indigo-600">{initials}</Text>
-                            </View>
-                        )}
+                        <View className="h-[72px] w-[72px] items-center justify-center rounded-full bg-indigo-100">
+                            <Text className="text-2xl font-semibold text-indigo-600">{initials}</Text>
+                        </View>
                         <Text className="mt-2 text-xs text-indigo-500">
                             {uploadingAvatar ? 'Uploading...' : 'Tap to change'}
                         </Text>

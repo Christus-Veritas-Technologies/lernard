@@ -122,7 +122,7 @@ export default function ChildProfileScreen() {
                                     <View className="rounded-[28px] bg-slate-50 p-4" key={subject.subjectId}>
                                         <Text className="text-lg font-semibold text-slate-900">{subject.subjectName}</Text>
                                         <Text className="mt-2 text-sm leading-6 text-slate-600">
-                                            {subject.totalLessons} lessons • {subject.totalQuizzes} quizzes • {formatPercent(subject.averageScore)} average
+                                            {subject.topics.length} topics • {subject.strengthLevel} level
                                         </Text>
                                         <Text className="mt-2 text-sm leading-6 text-slate-500">
                                             Last active {formatRelativeDate(subject.lastActiveAt)}
@@ -142,25 +142,29 @@ export default function ChildProfileScreen() {
                         <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
                             <View className="flex-row items-center gap-2">
                                 <Message01Icon color="#0F172A" size={20} strokeWidth={1.8} />
-                                <Text className="text-2xl font-semibold text-slate-900">Recent sessions</Text>
+                                <Text className="text-2xl font-semibold text-slate-900">Topics</Text>
                             </View>
                             <View className="mt-5 gap-4">
-                                {content.recentSessions.length ? content.recentSessions.map((session) => (
-                                    <View className="rounded-[28px] bg-slate-50 p-4" key={session.id}>
-                                        <Text className="text-base font-semibold text-slate-900">
-                                            {session.subject} • {session.topic}
-                                        </Text>
-                                        <Text className="mt-1 text-sm leading-6 text-slate-600">
-                                            {session.type === 'lesson' ? 'Lesson' : 'Quiz'} • {formatMinutes(session.duration)} • {session.xpEarned} XP earned
-                                        </Text>
-                                        <Text className="mt-2 text-sm leading-6 text-slate-500">
-                                            {formatRelativeDate(session.createdAt)}
-                                        </Text>
-                                    </View>
-                                )) : (
+                                {content.progress.length ? (
+                                    content.progress.flatMap((subject) =>
+                                        subject.topics.map((topic) => (
+                                            <View className="rounded-[28px] bg-slate-50 p-4" key={`${subject.subjectId}-${topic.topic}`}>
+                                                <Text className="text-base font-semibold text-slate-900">
+                                                    {subject.subjectName} • {topic.topic}
+                                                </Text>
+                                                <Text className="mt-1 text-sm leading-6 text-slate-600">
+                                                    Confidence: {topic.level} • Score: {topic.score.toFixed(1)}%
+                                                </Text>
+                                                <Text className="mt-2 text-sm leading-6 text-slate-500">
+                                                    Last tested {topic.lastTestedAt ? formatRelativeDate(topic.lastTestedAt) : 'never'}
+                                                </Text>
+                                            </View>
+                                        ))
+                                    )
+                                ) : (
                                     <GuardianEmptyVisual
-                                        subtitle="New lesson and quiz sessions will populate this timeline."
-                                        title="No session history yet"
+                                        subtitle="Topic details will populate as your child completes lessons and quizzes."
+                                        title="No topic data yet"
                                     />
                                 )}
                             </View>

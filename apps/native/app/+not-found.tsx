@@ -2,7 +2,7 @@ import { Link } from 'expo-router';
 import { Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ArrowLeft01Icon, SearchNotFoundIcon } from 'hugeicons-react-native';
+import { ArrowLeft01Icon } from 'hugeicons-react-native';
 
 import { Text } from '@rnr/text';
 

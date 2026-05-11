@@ -5,10 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
     ArrowLeft01Icon,
-    Check01Icon,
-    Crown02Icon,
-    HomeSmileIcon,
-    Student01Icon,
+    CheckIcon,
+    CrownIcon,
+    SmileIcon,
+    StudentIcon,
 } from 'hugeicons-react-native';
 
 import { ROUTES } from '@lernard/routes';
