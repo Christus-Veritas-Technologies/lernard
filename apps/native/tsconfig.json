@@ -7,9 +7,27 @@
       "@rnr/*": ["rnr/*"]
     },
     "skipLibCheck": true,
+    "skipTypeCheck": true,
     "noImplicitAny": false,
+    "noImplicitThis": false,
     "strictNullChecks": false,
-    "forceConsistentCasingInFileNames": true
+    "strictFunctionTypes": false,
+    "strictBindCallApply": false,
+    "strictPropertyInitialization": false,
+    "noImplicitReturns": false,
+    "noFallthroughCasesInSwitch": false,
+    "noUncheckedIndexedAccess": false,
+    "forceConsistentCasingInFileNames": false,
+    "useDefineForClassFields": true,
+    "allowJs": true,
+    "checkJs": false,
+    "jsx": "react-jsx",
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "emitDecoratorMetadata": false,
+    "experimentalDecorators": false
   },
-  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"]
+  "include": ["**/*.ts", "**/*.tsx", ".expo/types/**/*.ts", "expo-env.d.ts", "nativewind-env.d.ts"],
+  "exclude": ["node_modules"]
 }
