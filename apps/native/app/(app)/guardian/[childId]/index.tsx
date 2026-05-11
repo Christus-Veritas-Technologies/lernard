@@ -17,7 +17,7 @@ import { NativePageHeader } from '@/components/NativePageHeader';
 import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
 import { usePagePayload } from '@/hooks/usePagePayload';
-import { formatMinutes, formatPercent, formatRelativeDate } from '@/lib/formatters';
+import { formatPercent, formatRelativeDate } from '@/lib/formatters';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/rnr/tabs';
 
 export default function ChildProfileScreen() {
