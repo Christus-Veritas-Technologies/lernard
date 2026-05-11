@@ -62,7 +62,7 @@ export default function QuizResultsScreen() {
         <Text className="text-base text-red-600">{error ?? 'Results unavailable.'}</Text>
         <View className="mt-4">
           <Button
-            onPress={() => router.replace({ pathname: '/quiz/[quizId]', params: { quizId } })}
+            onPress={() => router.replace({ pathname: '/practice-exams/[quizId]', params: { quizId } })}
             title="Back to practice exam"
             variant="secondary"
           />

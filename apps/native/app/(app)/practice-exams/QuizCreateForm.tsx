@@ -218,7 +218,7 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
       });
 
       onGenerated?.();
-      router.replace({ pathname: '/quiz/[quizId]', params: { quizId: response.quizId } });
+      router.replace({ pathname: '/practice-exams/[quizId]', params: { quizId: response.quizId } });
     } catch {
       setError('Failed to generate quiz. Please try again.');
     } finally {

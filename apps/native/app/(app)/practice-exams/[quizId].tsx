@@ -134,7 +134,7 @@ export default function QuizScreen() {
       }
 
       if (res.done) {
-        router.replace({ pathname: '/quiz/results/[quizId]', params: { quizId } });
+        router.replace({ pathname: '/practice-exams/results/[quizId]', params: { quizId } });
       }
     } catch {
       setError('Failed to submit answer.');
@@ -163,7 +163,7 @@ export default function QuizScreen() {
       );
       setPartResults((prev) => ({ ...prev, [partLabel]: res }));
       if (res.done) {
-        router.replace({ pathname: '/quiz/results/[quizId]', params: { quizId } });
+        router.replace({ pathname: '/practice-exams/results/[quizId]', params: { quizId } });
       }
     } catch {
       setError('Failed to submit answer.');
