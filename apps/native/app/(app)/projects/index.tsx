@@ -51,6 +51,8 @@ export default function ProjectsScreen() {
                         title="Projects need your session"
                         description="Sign in to view generated projects and edit PDFs."
                         tone="warning"
+                        actionTitle="Go to sign in"
+                        onActionPress={() => router.push('/(auth)/login')}
                     />
                 </View>
             </SafeAreaView>
