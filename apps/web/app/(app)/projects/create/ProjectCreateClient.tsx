@@ -147,7 +147,7 @@ export function ProjectCreateClient() {
         }
     }
 
-    // ── Loading skeleton ──────────────────────────────────────────────────────
+    // â”€â”€ Loading skeleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     if (loading) {
         return (
@@ -181,7 +181,7 @@ export function ProjectCreateClient() {
         );
     }
 
-    // ── Generating splash ─────────────────────────────────────────────────────
+    // â”€â”€ Generating splash â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     if (step === "generating") {
         return (
@@ -194,7 +194,7 @@ export function ProjectCreateClient() {
                     <CardDescription className="mt-2 max-w-md">
                         Lernard is building your{" "}
                         <span className="font-semibold">{selectedTemplate?.name}</span> document. This
-                        takes about 30–60 seconds. You'll land on the project page automatically.
+                        takes about 30â€“60 seconds. You'll land on the project page automatically.
                     </CardDescription>
                     <div className="mt-6 flex gap-1.5">
                         <span className="h-2 w-2 animate-bounce rounded-full bg-primary-400 [animation-delay:0ms]" />
@@ -206,7 +206,7 @@ export function ProjectCreateClient() {
         );
     }
 
-    // ── Shared step header ────────────────────────────────────────────────────
+    // â”€â”€ Shared step header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     const stepHeader = (
         <div className="flex items-center gap-3">
@@ -237,7 +237,7 @@ export function ProjectCreateClient() {
         </div>
     );
 
-    // ── Step 1: Template picker ───────────────────────────────────────────────
+    // â”€â”€ Step 1: Template picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     if (step === "template") {
         return (
@@ -296,7 +296,7 @@ export function ProjectCreateClient() {
         );
     }
 
-    // ── Step 2: Details form ──────────────────────────────────────────────────
+    // â”€â”€ Step 2: Details form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     return (
         <div className="space-y-6">
@@ -308,7 +308,7 @@ export function ProjectCreateClient() {
                     <div className="min-w-0 flex-1">
                         <p className="font-semibold text-primary-900">{selectedTemplate.name}</p>
                         <p className="text-xs text-primary-700">
-                            {selectedTemplate.subject} • {levelLabel(selectedTemplate.level)} • {selectedTemplate.totalMarks} marks
+                            {selectedTemplate.subject} â€¢ {levelLabel(selectedTemplate.level)} â€¢ {selectedTemplate.totalMarks} marks
                         </p>
                     </div>
                     <button
@@ -362,7 +362,7 @@ export function ProjectCreateClient() {
                             id="problemStatement"
                             value={problemStatement}
                             onChange={(e) => setProblemStatement(e.target.value)}
-                            placeholder="Describe the problem or question you are investigating…"
+                            placeholder="Describe the problem or question you are investigatingâ€¦"
                             maxLength={300}
                             className="min-h-[96px]"
                         />
@@ -374,7 +374,7 @@ export function ProjectCreateClient() {
                             id="availableResources"
                             value={availableResources}
                             onChange={(e) => setAvailableResources(e.target.value)}
-                            placeholder="List materials, people, data, or equipment you have access to…"
+                            placeholder="List materials, people, data, or equipment you have access toâ€¦"
                             maxLength={300}
                             className="min-h-[80px]"
                         />
@@ -415,14 +415,5 @@ export function ProjectCreateClient() {
                 </Button>
             </div>
         </div>
-    );
-}
-
-function StepDot({ active, done, label }: { active: boolean; done: boolean; label: string }) {
-    return (
-        <span className={`flex items-center gap-1.5 text-xs font-semibold ${active ? "text-primary-600" : done ? "text-success" : "text-text-tertiary"}`}>
-            <span className={`h-2 w-2 rounded-full ${active ? "bg-primary-500" : done ? "bg-success" : "bg-border"}`} />
-            {label}
-        </span>
     );
 }

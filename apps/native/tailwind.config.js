@@ -3,6 +3,9 @@ module.exports = {
   content: ['./app/**/*.{js,ts,tsx}', './components/**/*.{js,ts,tsx}', './rnr/**/*.{js,ts,tsx}', './hooks/**/*.{js,ts,tsx}'],
 
   presets: [require('nativewind/preset')],
+  corePlugins: {
+    preflight: false,
+  },
   theme: {
     extend: {
       colors: {

@@ -6,7 +6,7 @@ import {
     Clock01Icon,
     FireIcon,
     SchoolBell01Icon,
-    TrendUp01Icon,
+    SparklesIcon,
 } from "hugeicons-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -23,10 +23,10 @@ import { DashStatCard } from "@/components/dashboard/DashStatCard";
 import { browserApiFetch } from "@/lib/browser-api";
 import { usePagePayload } from "@/hooks/usePagePayload";
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 
-// â”€â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function ProgressPageClient() {
     const { data, error, isAuthenticated, loading, refetch } =
@@ -196,7 +196,7 @@ export function ProgressPageClient() {
                         {slots.growth_area_nudge ? (
                             <Card className="border-primary-200 bg-primary-50 sm:col-span-2 lg:col-span-3">
                                 <CardContent className="mt-6 flex items-start gap-3">
-                                    <TrendUp01Icon size={18} className="mt-0.5 text-primary-600" />
+                                    <SparklesIcon size={18} className="mt-0.5 text-primary-600" />
                                     <p className="text-sm leading-6 text-primary-900">
                                         {readSlot(
                                             slots.growth_area_nudge,
@@ -264,7 +264,7 @@ export function ProgressPageClient() {
                                                             {session.type === "lesson" ? "Lesson" : "Quiz"}
                                                         </Badge>
                                                         <span className="text-xs text-text-tertiary">{session.subjectName}</span>
-                                                        <span className="text-xs text-text-tertiary">•</span>
+                                                        <span className="text-xs text-text-tertiary">�</span>
                                                         <span className="flex items-center gap-1 text-xs text-text-tertiary">
                                                             <Clock01Icon size={12} />
                                                             {session.durationMinutes}m
