@@ -14,7 +14,21 @@ module.exports = {
         output: 'static',
         favicon: './assets/favicon.png',
     },
-    plugins: ['expo-router'],
+    plugins: [
+        'expo-router',
+        [
+            'expo-splash-screen',
+            {
+                backgroundColor: '#FFFFFF',
+                image: './assets/images/splash-icon.png',
+                dark: {
+                    image: './assets/images/splash-icon-dark.png',
+                    backgroundColor: '#000000',
+                },
+                imageWidth: 200,
+            },
+        ],
+    ],
     experiments: {
         typedRoutes: true,
         tsconfigPaths: true,
