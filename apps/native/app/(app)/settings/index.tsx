@@ -331,7 +331,7 @@ function NavRow({
     value,
     onPress,
 }: {
-    icon: React.ReactNode;
+    icon?: React.ReactNode;
     label: string;
     value?: string;
     onPress: () => void;

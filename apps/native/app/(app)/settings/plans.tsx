@@ -177,11 +177,7 @@ export default function PlansScreen() {
                             <View className="mt-4 gap-3">
                                 {plan.features.map((feature) => (
                                     <View key={feature} className="flex-row items-start gap-2.5">
-                                        <Check01Icon
-                                            color={plan.featured ? '#4f46e5' : '#64748b'}
-                                            size={16}
-                                            style={{ marginTop: 1 }}
-                                        />
+                                        <Text className="text-lg font-bold text-indigo-500">✓</Text>
                                         <Text className="flex-1 text-sm text-text-secondary">{feature}</Text>
                                     </View>
                                 ))}
