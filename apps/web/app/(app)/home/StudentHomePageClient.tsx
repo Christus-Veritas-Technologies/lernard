@@ -96,7 +96,7 @@ export function StudentHomePageClient() {
                         </div>
                         <div className="flex flex-wrap gap-2 pt-2">
                             <Link href="/learn">
-                                <Button className="bg-white text-sky-900 hover:bg-white/92">
+                                <Button className="bg-white text-slate-900 hover:bg-white/92">
                                     Continue learning
                                     <ArrowRight02Icon size={15} strokeWidth={1.8} />
                                 </Button>
