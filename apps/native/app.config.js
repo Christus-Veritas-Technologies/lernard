@@ -34,6 +34,7 @@ module.exports = {
     assetBundlePatterns: ['**/*'],
     ios: {
         supportsTablet: true,
+        bundleIdentifier: process.env.EXPO_IOS_BUNDLE_ID ?? 'com.christusveritastechnologies.lernard',
     },
     android: {
         adaptiveIcon: {
