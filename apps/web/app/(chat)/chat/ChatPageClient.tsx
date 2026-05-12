@@ -668,6 +668,7 @@ export function ChatPageClient() {
                         </div>
                     </ScrollArea>
 
+                    <div className="shrink-0 rounded-4xl border border-border/70 bg-white/90 p-2 shadow-[0_24px_64px_-40px_rgba(36,52,88,0.48)] backdrop-blur">
                         {isChatExhausted && planUsage && (
                             <LimitBanner
                                 className="mb-2"

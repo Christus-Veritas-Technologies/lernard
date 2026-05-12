@@ -83,7 +83,7 @@ export default function CheckEmailScreen() {
             >
                 <ScrollView
                     className="flex-1"
-                    contentContainerClassName="px-5 pb-8 pt-4"
+                    contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, paddingTop: 16 }}
                     keyboardShouldPersistTaps="handled"
                 >
                     {/* Back */}

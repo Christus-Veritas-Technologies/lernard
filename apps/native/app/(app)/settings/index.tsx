@@ -103,7 +103,7 @@ function GuardianSettingsView({ content }: { content: GuardianSettingsContent })
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
+            <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96, paddingTop: 24, gap: 24 }}>
 
                 {/* Hero */}
                 <View className="rounded-[32px] bg-[rgb(248,251,255)] p-6 shadow-sm">
@@ -212,7 +212,7 @@ function StudentSettingsView({
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
+            <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96, paddingTop: 24, gap: 24 }}>
 
                 {/* Profile header */}
                 <View className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">

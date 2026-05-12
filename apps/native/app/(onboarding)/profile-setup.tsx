@@ -114,7 +114,7 @@ export default function ProfileSetupScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'bottom']}>
-            <ScrollView className="flex-1" contentContainerClassName="gap-5 px-5 pb-8 pt-6" keyboardShouldPersistTaps="handled">
+            <ScrollView className="flex-1" contentContainerStyle={{ gap: 20, paddingHorizontal: 20, paddingBottom: 32, paddingTop: 24 }} keyboardShouldPersistTaps="handled">
                 <View className="gap-2">
                     <View className="flex-row items-center gap-2">
                         <View className="rounded-full bg-primary-100 px-3 py-1">

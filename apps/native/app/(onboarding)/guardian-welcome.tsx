@@ -26,7 +26,7 @@ export default function GuardianWelcomeScreen() {
         <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'bottom']}>
             <ScrollView
                 className="flex-1"
-                contentContainerClassName="flex-grow justify-center px-6 py-10 gap-8"
+                contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24, paddingVertical: 40, gap: 32 }}
             >
                 {/* Icon */}
                 <View className="items-center">

@@ -150,7 +150,7 @@ export default function FirstLookScreen() {
         <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'bottom']}>
             <ScrollView
                 className="flex-1"
-                contentContainerClassName="px-5 pb-8 pt-6 gap-6"
+                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, paddingTop: 24, gap: 24 }}
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Step header */}

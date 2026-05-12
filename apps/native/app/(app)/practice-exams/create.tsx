@@ -14,7 +14,7 @@ export default function QuizCreateScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-5">
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96, paddingTop: 24, gap: 20 }}>
         <CardContent className="mt-0 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-4">
           <Text className="text-2xl font-semibold text-slate-900">Create practice exam</Text>
           <Button onPress={() => router.back()} title="Back" variant="secondary" />

@@ -49,7 +49,7 @@ export default function AccountTypeScreen() {
         <SafeAreaView className="flex-1 bg-slate-50" edges={['top', 'bottom']}>
             <ScrollView
                 className="flex-1"
-                contentContainerClassName="px-5 pb-8 pt-10 gap-8"
+                contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 32, paddingTop: 40, gap: 32 }}
                 keyboardShouldPersistTaps="handled"
             >
                 <View className="gap-1">

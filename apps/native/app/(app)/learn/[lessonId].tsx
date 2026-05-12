@@ -232,7 +232,7 @@ export default function LessonReaderScreen() {
 
       <ScrollView
         className="flex-1 px-4"
-        contentContainerClassName="pb-32 pt-4"
+        contentContainerStyle={{ paddingBottom: 128, paddingTop: 16 }}
         onScroll={(event) => {
           const y = event.nativeEvent.contentOffset.y;
           const approximate = Math.floor(y / 420);

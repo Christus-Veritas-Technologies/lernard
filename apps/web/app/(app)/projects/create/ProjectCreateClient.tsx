@@ -84,7 +84,6 @@ export function ProjectCreateClient() {
     const [topicHint, setTopicHint] = useState("");
 
     useEffect(() => {
-    useEffect(() => {
         void Promise.allSettled([
             browserApiFetch<ProjectTemplateDefinition[]>(ROUTES.PROJECTS.TEMPLATES),
             browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW),

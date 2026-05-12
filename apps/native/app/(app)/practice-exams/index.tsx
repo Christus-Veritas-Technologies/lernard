@@ -96,7 +96,7 @@ export default function QuizDashboardScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-      <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-5">
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96, paddingTop: 24, gap: 20 }}>
         <Card className="rounded-[32px] border border-sky-100 bg-[rgb(244,249,255)] p-6">
           {dashboardLoading ? (
             <>
@@ -234,7 +234,7 @@ export default function QuizDashboardScreen() {
               </View>
               <Button onPress={() => setShowCreateModal(false)} title="Close" variant="ghost" />
             </View>
-            <ScrollView contentContainerClassName="pb-6">
+            <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
               <QuizCreateForm
                 onGenerated={() => {
                   setShowCreateModal(false);

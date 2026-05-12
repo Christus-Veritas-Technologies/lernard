@@ -124,7 +124,7 @@ export default function ChatListScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <ScrollView className="flex-1" contentContainerClassName="px-3 pb-16 pt-4 gap-4">
+            <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: 64, paddingTop: 16, gap: 16 }}>
                 <View className="rounded-[32px] bg-[rgb(248,251,255)] p-2 shadow-sm">
                     <Text className="text-sm font-semibold uppercase tracking-[0.18em] text-indigo-500">Guide + Companion</Text>
                     <Text className="mt-3 text-3xl font-semibold text-slate-900">Live conversation history</Text>

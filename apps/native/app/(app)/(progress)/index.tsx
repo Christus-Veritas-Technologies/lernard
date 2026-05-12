@@ -63,7 +63,7 @@ export default function ProgressScreen() {
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
-            <ScrollView className="flex-1" contentContainerClassName="px-4 pb-24 pt-6 gap-6">
+            <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 96, paddingTop: 24, gap: 24 }}>
                 <NativePageHeader
                     subtitle="Track trends and confidence"
                     title="Lernard's Read on You"

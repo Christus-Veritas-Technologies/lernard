@@ -51,13 +51,12 @@ export default function LoginScreen() {
         >
             <ScrollView
                 className="flex-1 bg-slate-50"
-                contentContainerClassName="flex-grow"
+                contentContainerStyle={{ flexGrow: 1 }}
                 keyboardShouldPersistTaps="handled"
             >
                 <AuthShell
                     badge="Lernard"
-                    title="Your learning,
-your way"
+                    title="Your learning, your way"
                     description="Adaptive lessons, bite-sized quizzes, and an AI guide that remembers your progress from day one."
                     cardTitle="Get your sign-in link"
                     cardSubtitle="No password needed. New to Lernard? Your account is created automatically."
