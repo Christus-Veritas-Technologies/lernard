@@ -330,7 +330,7 @@ export function StudentHomePageClient() {
                     <CardContent>
                         <div className="flex flex-col gap-3">
                             <Input onChange={(event) => setChatPrompt(event.target.value)} placeholder="Ask a question about your current topic" value={chatPrompt} />
-                            <Link className="w-full" href={chatPrompt.trim() ? `/chat?q=${encodeURIComponent(chatPrompt.trim())}` : "/chat"}>
+                            <Link className="w-full" href={chatPrompt.trim() ? `/chat?prompt=${encodeURIComponent(chatPrompt.trim())}` : "/chat"}>
                                 <Button className="w-full">
                                     <Message01Icon size={16} strokeWidth={1.8} />
                                     Open chat

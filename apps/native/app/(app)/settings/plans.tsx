@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -63,7 +63,7 @@ const studentPlans: PlanConfig[] = [
         key: 'student_scholar' as Plan,
         name: 'Student Scholar',
         tagline: 'For consistent learners',
-        price: 'Coming soon',
+        price: '$4.99/mo',
         priceDetail: 'Billed monthly',
         featured: false,
         icon: StudentIcon,
@@ -86,7 +86,7 @@ const studentPlans: PlanConfig[] = [
         key: 'student_pro' as Plan,
         name: 'Student Pro',
         tagline: 'For serious exam preparation',
-        price: 'Coming soon',
+        price: '$9.99/mo',
         priceDetail: 'Billed monthly',
         featured: true,
         icon: CrownIcon,
@@ -112,7 +112,7 @@ const guardianPlans: PlanConfig[] = [
         key: 'guardian_family_starter' as Plan,
         name: 'Family Starter',
         tagline: 'For households beginning with Lernard',
-        price: 'Coming soon',
+        price: '$7.99/mo',
         priceDetail: 'Billed monthly',
         featured: false,
         icon: SmileIcon,
@@ -135,7 +135,7 @@ const guardianPlans: PlanConfig[] = [
         key: 'guardian_family_standard' as Plan,
         name: 'Family Standard',
         tagline: 'For active families',
-        price: 'Coming soon',
+        price: '$14.99/mo',
         priceDetail: 'Billed monthly',
         featured: true,
         icon: UserGroupIcon,
@@ -157,7 +157,7 @@ const guardianPlans: PlanConfig[] = [
         key: 'guardian_family_premium' as Plan,
         name: 'Family Premium',
         tagline: 'For families who want it all',
-        price: 'Coming soon',
+        price: '$24.99/mo',
         priceDetail: 'Billed monthly',
         featured: false,
         icon: CrownIcon,
@@ -177,8 +177,19 @@ const guardianPlans: PlanConfig[] = [
     },
 ];
 
-function PlanCard({ plan, isCurrent }: { plan: PlanConfig; isCurrent: boolean }) {
+function PlanCard({
+    plan,
+    isCurrent,
+    subscribing,
+    onSubscribe,
+}: {
+    plan: PlanConfig;
+    isCurrent: boolean;
+    subscribing: boolean;
+    onSubscribe: () => void;
+}) {
     const PlanIcon = plan.icon;
+    const isFree = plan.key === 'explorer';
     return (
         <View
             className={plan.featured
@@ -208,19 +219,25 @@ function PlanCard({ plan, isCurrent }: { plan: PlanConfig; isCurrent: boolean })
                 <Text className="mt-0.5 text-xs text-text-tertiary">{plan.priceDetail}</Text>
             </View>
 
-            <View className={`mt-4 rounded-xl py-2.5 ${
-                isCurrent
-                    ? 'bg-slate-200 dark:bg-slate-700'
-                    : plan.featured
-                    ? 'bg-indigo-500'
-                    : 'bg-slate-200 dark:bg-slate-700'
-            } items-center`}>
+            <Pressable
+                disabled={isCurrent || isFree || subscribing}
+                onPress={isCurrent || isFree ? undefined : onSubscribe}
+                className={`mt-4 rounded-xl py-2.5 ${
+                    isCurrent || isFree
+                        ? 'bg-slate-200 dark:bg-slate-700'
+                        : plan.featured
+                        ? 'bg-indigo-500'
+                        : 'bg-slate-700 dark:bg-slate-500'
+                } items-center ${
+                    subscribing ? 'opacity-60' : ''
+                }`}
+            >
                 <Text className={`text-sm font-semibold ${
-                    plan.featured && !isCurrent ? 'text-white' : 'text-text-secondary'
+                    !isCurrent && !isFree ? 'text-white' : 'text-text-secondary'
                 }`}>
-                    {isCurrent ? 'Your current plan' : 'Join the waitlist'}
+                    {isCurrent ? 'Your current plan' : subscribing ? 'Loading…' : 'Subscribe'}
                 </Text>
-            </View>
+            </Pressable>
 
             {/* Limits */}
             <View className="mt-5 gap-1.5">
@@ -251,6 +268,7 @@ function PlanCard({ plan, isCurrent }: { plan: PlanConfig; isCurrent: boolean })
 export default function PlansScreen() {
     const router = useRouter();
     const [currentPlan, setCurrentPlan] = useState<Plan>('explorer' as Plan);
+    const [subscribingPlan, setSubscribingPlan] = useState<Plan | null>(null);
 
     useEffect(() => {
         nativeApiFetch<AuthUser>(ROUTES.AUTH.ME)
@@ -259,6 +277,21 @@ export default function PlansScreen() {
             })
             .catch(() => {});
     }, []);
+
+    async function handleSubscribe(plan: Plan) {
+        setSubscribingPlan(plan);
+        try {
+            const response = await nativeApiFetch<{ redirectUrl: string }>(ROUTES.PAYMENTS.INITIATE, {
+                method: 'POST',
+                body: JSON.stringify({ plan }),
+            });
+            await Linking.openURL(response.redirectUrl);
+        } catch {
+            // nativeApiFetch will throw on non-OK responses; swallow silently
+        } finally {
+            setSubscribingPlan(null);
+        }
+    }
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top', 'left', 'right']}>
@@ -285,7 +318,13 @@ export default function PlansScreen() {
                 {/* Student plans */}
                 <Text className="text-base font-semibold text-text-primary">Student plans</Text>
                 {studentPlans.map((plan) => (
-                    <PlanCard key={plan.key} plan={plan} isCurrent={currentPlan === plan.key} />
+                    <PlanCard
+                        key={plan.key}
+                        plan={plan}
+                        isCurrent={currentPlan === plan.key}
+                        subscribing={subscribingPlan === plan.key}
+                        onSubscribe={() => void handleSubscribe(plan.key)}
+                    />
                 ))}
 
                 {/* Guardian plans */}
@@ -296,11 +335,17 @@ export default function PlansScreen() {
                     </Text>
                 </View>
                 {guardianPlans.map((plan) => (
-                    <PlanCard key={plan.key} plan={plan} isCurrent={currentPlan === plan.key} />
+                    <PlanCard
+                        key={plan.key}
+                        plan={plan}
+                        isCurrent={currentPlan === plan.key}
+                        subscribing={subscribingPlan === plan.key}
+                        onSubscribe={() => void handleSubscribe(plan.key)}
+                    />
                 ))}
 
                 <Text className="text-center text-xs text-text-tertiary">
-                    Paid plans are in development. Join the waitlist to be notified at launch.
+                    Subscriptions are processed securely via Paynow. Prices shown in USD.
                 </Text>
             </ScrollView>
         </SafeAreaView>
