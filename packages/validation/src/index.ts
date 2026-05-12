@@ -56,3 +56,7 @@ export {
   updateChildCompanionControlsSchema,
 } from './guardian'
 export type { InviteChildInput, AcceptInviteInput, UpdateChildCompanionControlsInput } from './guardian'
+
+// Payments
+export { initiatePaymentSchema } from './payments'
+export type { InitiatePaymentInput } from './payments'
