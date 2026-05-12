@@ -17,6 +17,7 @@ import { JobsModule } from './jobs/jobs.module';
 import { RedisModule } from './redis/redis.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ProjectsModule } from './modules/projects/projects.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ProjectsModule } from './modules/projects/projects.module';
     QuizzesModule,
     ChatModule,
     ProjectsModule,
+    PaymentsModule,
     NotificationsModule,
     JobsModule,
   ],
