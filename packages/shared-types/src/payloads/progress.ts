@@ -7,6 +7,12 @@ export interface PlanUsage {
   lessonsLimit: number
   quizzesUsed: number
   quizzesLimit: number
+  projectsUsed: number
+  projectsLimit: number
+  chatMessagesUsed: number
+  chatMessagesLimit: number
+  storageUsedMb: number
+  storageLimitMb: number
   /** ISO timestamp of when the limit resets */
   resetAt: string
 }
@@ -78,7 +84,15 @@ export interface PaginatedHistoryResponse {
 export interface PlanLimitError {
   statusCode: 429
   error: 'plan_limit_reached'
-  limitType: 'lessons_daily' | 'lessons_monthly' | 'quizzes_daily' | 'quizzes_monthly'
+  limitType:
+    | 'lessons_daily'
+    | 'lessons_monthly'
+    | 'quizzes_daily'
+    | 'quizzes_monthly'
+    | 'projects_daily'
+    | 'projects_monthly'
+    | 'chatMessages_daily'
+    | 'chatMessages_monthly'
   plan: Plan
   used: number
   limit: number

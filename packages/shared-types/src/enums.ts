@@ -8,9 +8,15 @@ export enum Role {
 
 export enum Plan {
   EXPLORER = 'explorer',
+  /** Legacy student plan — kept for migration safety */
   SCHOLAR = 'scholar',
+  /** Legacy guardian/family plan — kept for migration safety */
   HOUSEHOLD = 'household',
-  CAMPUS = 'campus',
+  STUDENT_SCHOLAR = 'student_scholar',
+  STUDENT_PRO = 'student_pro',
+  GUARDIAN_FAMILY_STARTER = 'guardian_family_starter',
+  GUARDIAN_FAMILY_STANDARD = 'guardian_family_standard',
+  GUARDIAN_FAMILY_PREMIUM = 'guardian_family_premium',
 }
 
 export enum LearningMode {
