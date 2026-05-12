@@ -59,7 +59,7 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
     const initialLessonId = params.get("lessonId") ?? "";
     const initialTopic = params.get("topic") ?? "";
 
-    const [source, setSource] = useState<Source>("text");
+    const [source, setSource] = useState<Source>(initialLessonId ? "lesson" : "text");
     const [questionType, setQuestionType] = useState<"multiple_choice" | "structured">("multiple_choice");
     const [topic, setTopic] = useState(initialTopic);
     const [questionCount, setQuestionCount] = useState(10);
@@ -67,7 +67,7 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
 
     const [lessonSearch, setLessonSearch] = useState("");
     const [lessons, setLessons] = useState<LessonListItem[]>([]);
-    const [lessonsLoaded, setLessonsLoaded] = useState(false);
+    const [lessonsLoaded, setLessonsLoaded] = useState(!!initialLessonId);
     const [selectedLesson, setSelectedLesson] = useState<LessonListItem | null>(
         initialLessonId && initialTopic
             ? { lessonId: initialLessonId, topic: initialTopic, subjectName: "", completedAt: null }
@@ -89,18 +89,40 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
             .catch(() => { /* non-blocking */ });
     }, []);
 
+    // Auto-load lessons if lessonId is provided
+    useEffect(() => {
+        if (initialLessonId && !lessonsLoaded) {
+            void loadLessons();
+        }
+    }, [initialLessonId, lessonsLoaded, loadLessons]);
+
     const loadLessons = useCallback(async () => {
         if (lessonsLoaded) return;
 
         try {
             const data = await browserApiFetch<LessonListItem[]>(ROUTES.LESSONS.LIST);
             setLessons(data);
+            // If we have an initialLessonId, find and select it
+            if (initialLessonId && initialTopic) {
+                const foundLesson = data.find((l) => l.lessonId === initialLessonId);
+                if (foundLesson) {
+                    setSelectedLesson(foundLesson);
+                } else {
+                    // Fallback to the initial lesson with just ID and topic
+                    setSelectedLesson({
+                        lessonId: initialLessonId,
+                        topic: initialTopic,
+                        subjectName: "",
+                        completedAt: null,
+                    });
+                }
+            }
         } catch {
             // Ignore lesson loading failures so text mode still works.
         } finally {
             setLessonsLoaded(true);
         }
-    }, [lessonsLoaded]);
+    }, [lessonsLoaded, initialLessonId, initialTopic]);
 
     function switchSource(nextSource: Source) {
         setSource(nextSource);

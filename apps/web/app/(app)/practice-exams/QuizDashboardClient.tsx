@@ -9,6 +9,7 @@ import {
     SignalMedium02Icon,
 } from "hugeicons-react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
@@ -41,7 +42,9 @@ const EMPTY_STATS: QuizDashboardStats = {
 };
 
 export function QuizDashboardClient() {
-    const [dialogOpen, setDialogOpen] = useState(false);
+    const searchParams = useSearchParams();
+    const lessonId = searchParams.get("lessonId");
+    const [dialogOpen, setDialogOpen] = useState(!!lessonId);
     const [dashboardLoading, setDashboardLoading] = useState(true);
     const [dashboardError, setDashboardError] = useState<string | null>(null);
     const [stats, setStats] = useState<QuizDashboardStats>(EMPTY_STATS);
@@ -74,6 +77,13 @@ export function QuizDashboardClient() {
     useEffect(() => {
         void loadDashboard();
     }, [loadDashboard]);
+
+    // Auto-open dialog if lessonId is in query params
+    useEffect(() => {
+        if (lessonId) {
+            setDialogOpen(true);
+        }
+    }, [lessonId]);
 
     async function loadMoreHistory() {
         if (!historyHasMore || !historyCursor || historyLoadingMore) return;
