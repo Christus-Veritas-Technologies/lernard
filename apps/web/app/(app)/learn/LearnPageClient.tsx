@@ -25,6 +25,7 @@ import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { browserApiFetch } from "@/lib/browser-api";
+import { HardPaywall } from "@/components/quota/HardPaywall";
 
 type Source = "text" | "quiz" | "image" | "document";
 
@@ -218,11 +219,12 @@ export function LearnPageClient() {
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>What do you want to learn today?</CardTitle>
-                <CardDescription>Turn any topic into a personalized lesson.</CardDescription>
-            </CardHeader>
+        <div className="relative">
+            <Card>
+                <CardHeader>
+                    <CardTitle>What do you want to learn today?</CardTitle>
+                    <CardDescription>Turn any topic into a personalized lesson.</CardDescription>
+                </CardHeader>
             <CardContent className="space-y-5">
                 {/* Plan usage row */}
                 {planUsage && (
@@ -519,6 +521,10 @@ export function LearnPageClient() {
                 </div>
             </CardContent>
         </Card>
+        {atLimit && planUsage && (
+            <HardPaywall resource="lessons" resetAt={planUsage.resetAt} />
+        )}
+        </div>
     );
 }
 

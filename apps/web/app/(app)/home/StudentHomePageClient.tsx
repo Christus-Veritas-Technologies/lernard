@@ -12,7 +12,7 @@ import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
-import type { HomeContent, PlanUsage, SlotContent } from "@lernard/shared-types";
+import type { HomeContent, SlotContent } from "@lernard/shared-types";
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { usePagePayload } from "@/hooks/usePagePayload";
+import { PlanUsageCard } from "@/components/quota/PlanUsageCard";
 
 export function StudentHomePageClient() {
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<HomeContent>(ROUTES.HOME.PAYLOAD);
@@ -152,7 +153,7 @@ export function StudentHomePageClient() {
             </section>
 
             {/* ─── Plan usage row ───────────────────────────────────── */}
-            <PlanUsageRow planUsage={content.planUsage} />
+            <PlanUsageCard planUsage={content.planUsage} />
 
             <section className="grid gap-3 rounded-3xl border border-border bg-[linear-gradient(160deg,#eef2ff_0%,#ffffff_100%)] p-4 sm:grid-cols-3">
                 <Link href="/learn">
@@ -345,60 +346,6 @@ export function StudentHomePageClient() {
                     </CardContent>
                 </Card>
             </section>
-        </div>
-    );
-}
-
-function PlanUsageRow({ planUsage }: { planUsage: PlanUsage }) {
-    const isExplorer = planUsage.plan === "explorer";
-
-    const lessonPct = planUsage.lessonsLimit > 0
-        ? Math.round((planUsage.lessonsUsed / planUsage.lessonsLimit) * 100)
-        : 0;
-    const quizPct = planUsage.quizzesLimit > 0
-        ? Math.round((planUsage.quizzesUsed / planUsage.quizzesLimit) * 100)
-        : 0;
-
-    // Only show bars when consumption is > 50%
-    const showLessons = lessonPct > 50;
-    const showQuizzes = quizPct > 50 && planUsage.quizzesLimit > 0;
-
-    if (!showLessons && !showQuizzes && !isExplorer) return null;
-
-    return (
-        <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-border bg-surface px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary capitalize">
-                {planUsage.plan} plan
-            </p>
-            {showLessons && (
-                <div className="flex flex-1 min-w-[140px] items-center gap-2">
-                    <span className="text-xs text-text-secondary whitespace-nowrap">
-                        {isExplorer ? "Daily lessons" : "Lessons"}
-                    </span>
-                    <Progress
-                        value={lessonPct}
-                        className={`flex-1 ${lessonPct >= 100 ? "[&>div]:bg-destructive" : "[&>div]:bg-primary"}`}
-                    />
-                    <span className="text-xs text-text-secondary whitespace-nowrap">
-                        {planUsage.lessonsUsed}/{planUsage.lessonsLimit}
-                    </span>
-                </div>
-            )}
-            {showQuizzes && (
-                <div className="flex flex-1 min-w-[140px] items-center gap-2">
-                    <span className="text-xs text-text-secondary whitespace-nowrap">Practice Exams</span>
-                    <Progress
-                        value={quizPct}
-                        className={`flex-1 ${quizPct >= 100 ? "[&>div]:bg-destructive" : "[&>div]:bg-primary"}`}
-                    />
-                    <span className="text-xs text-text-secondary whitespace-nowrap">
-                        {planUsage.quizzesUsed}/{planUsage.quizzesLimit}
-                    </span>
-                </div>
-            )}
-            <Link href="/progress?tab=history" className="ml-auto text-xs text-primary underline-offset-2 hover:underline whitespace-nowrap">
-                View usage
-            </Link>
         </div>
     );
 }

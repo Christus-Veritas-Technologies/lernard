@@ -10,7 +10,7 @@ import {
 import Link from "next/link";
 
 import { ROUTES } from "@lernard/routes";
-import type { ProjectLevel, ProjectTemplateDefinition } from "@lernard/shared-types";
+import type { PagePayload, PlanUsage, ProgressContent, ProjectLevel, ProjectTemplateDefinition } from "@lernard/shared-types";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -18,6 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { browserApiFetch } from "@/lib/browser-api";
+import { HardPaywall } from "@/components/quota/HardPaywall";
 
 type CreateStep = "template" | "details" | "generating";
 
@@ -69,6 +70,7 @@ export function ProjectCreateClient() {
     const [loadError, setLoadError] = useState<string | null>(null);
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+    const [planUsage, setPlanUsage] = useState<PlanUsage | null>(null);
 
     const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(templateParam);
 
@@ -82,24 +84,29 @@ export function ProjectCreateClient() {
     const [topicHint, setTopicHint] = useState("");
 
     useEffect(() => {
-        void (async () => {
-            setLoading(true);
-            setLoadError(null);
-            try {
-                const response = await browserApiFetch<ProjectTemplateDefinition[]>(ROUTES.PROJECTS.TEMPLATES);
-                setTemplates(response);
-                // If the pre-selected template id doesn't actually exist, fall back to picker
-                if (templateParam && !response.find((t) => t.id === templateParam)) {
+    useEffect(() => {
+        void Promise.allSettled([
+            browserApiFetch<ProjectTemplateDefinition[]>(ROUTES.PROJECTS.TEMPLATES),
+            browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW),
+        ]).then(([templatesResult, planUsageResult]) => {
+            setLoading(false);
+            if (templatesResult.status === "fulfilled") {
+                setTemplates(templatesResult.value);
+                if (templateParam && !templatesResult.value.find((t) => t.id === templateParam)) {
                     setSelectedTemplateId(null);
                     setStep("template");
                 }
-            } catch {
+            } else {
                 setLoadError("Could not load templates. Please try again.");
-            } finally {
-                setLoading(false);
             }
-        })();
-    }, [templateParam]);
+            if (planUsageResult.status === "fulfilled") {
+                setPlanUsage(planUsageResult.value.content.planUsage);
+            }
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const isProjectsExhausted = planUsage !== null && planUsage.projectsLimit > 0 && planUsage.projectsUsed >= planUsage.projectsLimit;
 
     const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null;
 
@@ -148,6 +155,14 @@ export function ProjectCreateClient() {
     }
 
     // â”€â”€ Loading skeleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+    if (isProjectsExhausted && planUsage) {
+        return (
+            <div className="relative min-h-[400px]">
+                <HardPaywall resource="projects" resetAt={planUsage.resetAt} />
+            </div>
+        );
+    }
 
     if (loading) {
         return (

@@ -9,15 +9,17 @@ import {
     UploadCircle02Icon,
 } from "hugeicons-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { type ReactNode, useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 import { ROUTES } from "@lernard/routes";
+import type { PagePayload, PlanUsage, ProgressContent } from "@lernard/shared-types";
 
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { browserApiFetch } from "@/lib/browser-api";
+import { HardPaywall } from "@/components/quota/HardPaywall";
 
 type Source = "text" | "lesson" | "image" | "document";
 
@@ -76,9 +78,16 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
+    const [planUsage, setPlanUsage] = useState<PlanUsage | null>(null);
 
     const imageInputRef = useRef<HTMLInputElement>(null);
     const docInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        void browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW)
+            .then((d) => setPlanUsage(d.content.planUsage))
+            .catch(() => { /* non-blocking */ });
+    }, []);
 
     const loadLessons = useCallback(async () => {
         if (lessonsLoaded) return;
@@ -149,8 +158,10 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
             || lesson.subjectName.toLowerCase().includes(lessonSearch.toLowerCase()),
     );
 
+    const isExhausted = planUsage !== null && planUsage.quizzesLimit > 0 && planUsage.quizzesUsed >= planUsage.quizzesLimit;
+
     const canGenerate = (() => {
-        if (loading || uploading) return false;
+        if (loading || uploading || isExhausted) return false;
         if (source === "text") return topic.trim().length > 0;
         if (source === "lesson") return selectedLesson !== null;
         return uploadResult !== null;
@@ -205,7 +216,7 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
     }
 
     return (
-        <div className="space-y-5">
+        <div className="relative space-y-5">
             <div>
                 <Label className="mb-2 block">Question type</Label>
                 <div className="grid grid-cols-2 gap-1.5 rounded-xl border border-border bg-background-subtle p-1">
@@ -479,6 +490,9 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
             <Button disabled={!canGenerate} onClick={onGenerate}>
                 {loading ? "Generating..." : "Generate Quiz"}
             </Button>
+            {isExhausted && planUsage && (
+                <HardPaywall resource="practice exams" resetAt={planUsage.resetAt} />
+            )}
         </div>
     );
 }

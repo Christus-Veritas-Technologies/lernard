@@ -30,6 +30,9 @@ import type {
     ChatMessageBlock,
     ChatQuizAttachmentOption,
     ConversationListItem,
+    PagePayload,
+    PlanUsage,
+    ProgressContent,
     QuizRemediationContext,
 } from "@lernard/shared-types";
 
@@ -44,6 +47,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Textarea } from "@/components/ui/textarea";
 import { BrowserApiError, BrowserAuthError, browserApiFetch } from "@/lib/browser-api";
 import { cn } from "@/lib/cn";
+import { LimitBanner } from "@/components/quota/LimitBanner";
 
 type UploadAttachmentInput = Extract<ChatAttachmentInput, { type: "upload" }>;
 
@@ -77,6 +81,7 @@ export function ChatPageClient() {
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [quizRemediationContext, setQuizRemediationContext] = useState<QuizRemediationContext | null>(null);
     const [loadingQuizContext, setLoadingQuizContext] = useState(false);
+    const [planUsage, setPlanUsage] = useState<PlanUsage | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -85,6 +90,9 @@ export function ChatPageClient() {
 
     const attachQuizId = searchParams.get("attachQuizId");
     const prefillMessage = searchParams.get("prompt");
+
+    const isChatExhausted = planUsage !== null && planUsage.chatMessagesLimit > 0 && planUsage.chatMessagesUsed >= planUsage.chatMessagesLimit;
+    const chatRemaining = planUsage !== null ? Math.max(planUsage.chatMessagesLimit - planUsage.chatMessagesUsed, 0) : null;
 
     function applySuggestedPrompt(prefill: string) {
         setInput(prefill);
@@ -102,7 +110,8 @@ export function ChatPageClient() {
             browserApiFetch<ConversationListItem[]>(ROUTES.CHAT.CONVERSATIONS),
             browserApiFetch<ChatLessonAttachmentOption[]>(ROUTES.CHAT.ATTACHABLE_LESSONS),
             browserApiFetch<ChatQuizAttachmentOption[]>(ATTACHABLE_QUIZZES_ROUTE),
-        ]).then(([conversationResult, lessonResult, quizResult]) => {
+            browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW),
+        ]).then(([conversationResult, lessonResult, quizResult, planUsageResult]) => {
             if (isDisposed) {
                 return;
             }
@@ -117,6 +126,10 @@ export function ChatPageClient() {
 
             if (quizResult.status === "fulfilled") {
                 setQuizzes(quizResult.value);
+            }
+
+            if (planUsageResult.status === "fulfilled") {
+                setPlanUsage(planUsageResult.value.content.planUsage);
             }
         });
 
@@ -290,6 +303,11 @@ export function ChatPageClient() {
             if (currentConversation) {
                 setConversationTitle(currentConversation.title);
             }
+
+            // Refresh quota after successful send
+            void browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW)
+                .then((d) => setPlanUsage(d.content.planUsage))
+                .catch(() => { /* non-blocking */ });
         } catch (error) {
             setErrorMessage(getErrorMessage(error));
             setMessages((current) => current.filter((message) => message.id !== nextUserMessage.id));
@@ -650,7 +668,18 @@ export function ChatPageClient() {
                         </div>
                     </ScrollArea>
 
-                    <div className="shrink-0 rounded-4xl border border-border/70 bg-white/90 p-2 shadow-[0_24px_64px_-40px_rgba(36,52,88,0.48)] backdrop-blur">
+                        {isChatExhausted && planUsage && (
+                            <LimitBanner
+                                className="mb-2"
+                                message="You've used all your chat messages for this period."
+                                resetAt={planUsage.resetAt}
+                            />
+                        )}
+                        {!isChatExhausted && chatRemaining !== null && chatRemaining <= 5 && chatRemaining > 0 && (
+                            <p className="mb-1 px-1 text-xs text-amber-600">
+                                {chatRemaining} message{chatRemaining === 1 ? "" : "s"} remaining this period.
+                            </p>
+                        )}
                         {attachmentCount > 0 ? (
                             <div className="mb-3 flex flex-wrap gap-2">
                                 {uploadedFiles.map((file) => (
@@ -887,7 +916,7 @@ export function ChatPageClient() {
                                     {uploading ? "Uploading files..." : `${attachmentCount} attachment${attachmentCount === 1 ? "" : "s"}`}
                                 </Badge>
                             </div>
-                            <Button className="gap-2" disabled={!input.trim() || sending || uploading} onClick={() => void onSend()}>
+                            <Button className="gap-2" disabled={!input.trim() || sending || uploading || isChatExhausted} onClick={() => void onSend()}>
                                 <SentIcon size={16} strokeWidth={1.8} />
                                 Send to Lernard
                             </Button>
