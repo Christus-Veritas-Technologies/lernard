@@ -11,8 +11,13 @@ import type {
   QuizQuestionReview,
   QuizQuestionType,
   StructuredPartEvaluation,
+  QuizStreamEvent,
+  QuizQuestion,
+  StructuredQuestion,
 } from '@lernard/shared-types';
 import type { User } from '@prisma/client';
+import { Observable } from 'rxjs';
+import { MessageEvent } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MastraService } from '../../mastra/mastra.service';
@@ -20,6 +25,7 @@ import { StudentContextBuilder } from '../../mastra/student-context.builder';
 import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
 import { R2Service } from '../../r2/r2.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { QuizStreamingService } from '../../common/streaming/quiz-streaming.service';
 import {
   GenerateQuizDto,
   SubmitAnswerDto,
@@ -45,6 +51,7 @@ export class QuizzesService {
     private readonly studentContextBuilder: StudentContextBuilder,
     private readonly r2: R2Service,
     private readonly notificationsService: NotificationsService,
+    private readonly quizStreamingService: QuizStreamingService,
   ) {}
 
   async generate(
@@ -115,6 +122,9 @@ export class QuizzesService {
     difficulty: 'foundation' | 'standard' | 'challenging' | 'extension';
     jobId: string;
   }): Promise<void> {
+    // Open SSE channel before any await so clients can connect immediately
+    this.quizStreamingService.open(input.quizId);
+
     try {
       const claimed = await (this.prisma as any).quiz.updateMany({
         where: {
@@ -136,23 +146,25 @@ export class QuizzesService {
         input.userId,
       );
 
-      let generated: {
-        topic: string;
-        subjectName: string;
-        mode: 'guide' | 'companion';
-        questions: Array<{
-          type: string;
-          text: string;
-          options?: string[];
-          correctAnswer?: string;
-          correctAnswers?: string[];
-          explanation?: string;
-        }>;
-      };
-
       const dto = input.dto;
       const generationPaperType: 'paper1' | 'paper2' =
         dto.questionType === 'structured' ? 'paper2' : 'paper1';
+
+      type GeneratedQuestion = {
+        type: string;
+        text: string;
+        options?: string[];
+        correctAnswer?: string;
+        correctAnswers?: string[];
+        explanation?: string;
+        subtopic?: string;
+        parts?: unknown[];
+        totalMarks?: number;
+      };
+
+      let allQuestions: GeneratedQuestion[] = [];
+      let generatedTopic = dto.topic ?? 'General';
+      let generatedSubjectName = dto.subject ?? 'General';
 
       if (dto.fromUploadId) {
         if (!dto.fromUploadKind) {
@@ -168,7 +180,7 @@ export class QuizzesService {
           );
         }
 
-        generated = await this.mastraService.generateQuizFromFile({
+        const generated = await this.mastraService.generateQuizFromFile({
           buffer: upload.buffer,
           kind: upload.kind,
           mimeType: upload.mimeType,
@@ -181,7 +193,11 @@ export class QuizzesService {
         });
 
         deleteQuizUpload(this.r2, input.userId, dto.fromUploadId).catch(() => {});
+        allQuestions = generated.questions as GeneratedQuestion[];
+        generatedTopic = generated.topic;
+        generatedSubjectName = generated.subjectName;
       } else {
+        // Resolve lesson context for quiz grounding
         let lessonSections: LessonSectionForQuiz[] | undefined;
         let confidenceRating: number | null = null;
 
@@ -198,71 +214,213 @@ export class QuizzesService {
           }
         }
 
-        generated = await this.mastraService.generateQuiz({
-          topic: dto.topic!,
-          paperType: generationPaperType,
-          questionType: dto.questionType,
-          questionCount: dto.questionCount,
-          difficulty: input.difficulty,
-          subjectName: dto.subject,
-          mode: input.mode,
-          studentContext,
-          lessonSections,
-          confidenceRating,
-        });
-        await validateGeneratedContent(generated, this.mastraService);
+        const BATCH_SIZE = 5;
+        const useBatching =
+          dto.questionType === 'multiple_choice' && dto.questionCount > BATCH_SIZE;
+
+        if (useBatching) {
+          // Progressive batched generation for MC quizzes > 5 questions
+          while (allQuestions.length < dto.questionCount) {
+            const remaining = dto.questionCount - allQuestions.length;
+            const batchSize = Math.min(BATCH_SIZE, remaining);
+
+            const batchResult = await this.mastraService.generateQuiz({
+              topic: dto.topic!,
+              paperType: generationPaperType,
+              questionType: dto.questionType,
+              questionCount: batchSize,
+              difficulty: input.difficulty,
+              subjectName: dto.subject,
+              mode: input.mode,
+              studentContext,
+              lessonSections,
+              confidenceRating,
+              avoidQuestions: allQuestions.map((q) => q.text),
+            });
+
+            await validateGeneratedContent(batchResult, this.mastraService);
+            allQuestions.push(...(batchResult.questions as GeneratedQuestion[]));
+            generatedTopic = batchResult.topic;
+            generatedSubjectName = batchResult.subjectName;
+
+            if (!(await this.isActiveGenerationJob(input))) {
+              this.logger.warn(
+                `[quiz.generate] halted after batch quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
+              );
+              return;
+            }
+
+            // Persist and emit batch immediately so clients can start answering
+            const batchStart = allQuestions.length - batchResult.questions.length;
+            for (let qi = batchStart; qi < allQuestions.length; qi++) {
+              const question = allQuestions[qi]!;
+              const questionIndex = qi;
+
+              await (this.prisma as any).quizQuestion.create({
+                data: {
+                  quizId: input.quizId,
+                  questionIndex,
+                  type: toDbQuestionType(question.type),
+                  text: question.text,
+                  options:
+                    question.type === 'structured'
+                      ? Array.isArray(question.parts)
+                        ? question.parts
+                        : null
+                      : (question.options ?? null),
+                  correctAnswer:
+                    question.type === 'structured'
+                      ? 'structured'
+                      : serializeCorrectAnswer(question),
+                  explanation:
+                    question.explanation ??
+                    'Review this concept and compare your answer with the expected pattern.',
+                  subtopic: question.subtopic ?? null,
+                },
+              });
+
+              this.quizStreamingService.emit(input.quizId, {
+                type: 'question',
+                questionIndex,
+                question: buildSseQuestion(question),
+              });
+            }
+          }
+
+          if (allQuestions.length !== dto.questionCount) {
+            throw new Error(
+              `Quiz generation returned ${allQuestions.length} questions instead of ${dto.questionCount}.`,
+            );
+          }
+        } else {
+          // Single-call generation for structured and small MC quizzes
+          const generated = await this.mastraService.generateQuiz({
+            topic: dto.topic!,
+            paperType: generationPaperType,
+            questionType: dto.questionType,
+            questionCount: dto.questionCount,
+            difficulty: input.difficulty,
+            subjectName: dto.subject,
+            mode: input.mode,
+            studentContext,
+            lessonSections,
+            confidenceRating,
+          });
+          await validateGeneratedContent(generated, this.mastraService);
+          allQuestions = generated.questions as GeneratedQuestion[];
+          generatedTopic = generated.topic;
+          generatedSubjectName = generated.subjectName;
+
+          if (allQuestions.length !== dto.questionCount) {
+            throw new Error(
+              `Quiz generation returned ${allQuestions.length} questions instead of ${dto.questionCount}.`,
+            );
+          }
+
+          if (!(await this.isActiveGenerationJob(input))) {
+            this.logger.warn(
+              `[quiz.generate] halted before persisting stale job quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
+            );
+            return;
+          }
+
+          await (this.prisma as any).quizQuestion.deleteMany({
+            where: { quizId: input.quizId },
+          });
+
+          const questionsToCreate = allQuestions.slice(0, dto.questionCount);
+          for (let i = 0; i < questionsToCreate.length; i++) {
+            if (!(await this.isActiveGenerationJob(input))) {
+              this.logger.warn(
+                `[quiz.generate] halted during persist stale job quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
+              );
+              return;
+            }
+
+            const question = questionsToCreate[i]!;
+
+            await (this.prisma as any).quizQuestion.create({
+              data: {
+                quizId: input.quizId,
+                questionIndex: i,
+                type: toDbQuestionType(question.type),
+                text: question.text,
+                options:
+                  question.type === 'structured'
+                    ? Array.isArray(question.parts)
+                      ? question.parts
+                      : null
+                    : (question.options ?? null),
+                correctAnswer:
+                  question.type === 'structured'
+                    ? 'structured'
+                    : serializeCorrectAnswer(question),
+                explanation:
+                  question.explanation ??
+                  'Review this concept and compare your answer with the expected pattern.',
+                subtopic: question.subtopic ?? null,
+              },
+            });
+
+            this.quizStreamingService.emit(input.quizId, {
+              type: 'question',
+              questionIndex: i,
+              question: buildSseQuestion(question),
+            });
+          }
+        }
       }
 
-      if (generated.questions.length !== dto.questionCount) {
-        throw new Error(
-          `Quiz generation returned ${generated.questions.length} questions instead of ${dto.questionCount}.`,
-        );
-      }
+      // For file-based quizzes: persist all questions + emit
+      if (dto.fromUploadId) {
+        if (allQuestions.length !== dto.questionCount) {
+          throw new Error(
+            `Quiz generation returned ${allQuestions.length} questions instead of ${dto.questionCount}.`,
+          );
+        }
 
-      if (!(await this.isActiveGenerationJob(input))) {
-        this.logger.warn(
-          `[quiz.generate] halted before persisting stale job quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
-        );
-        return;
-      }
-
-      await (this.prisma as any).quizQuestion.deleteMany({
-        where: { quizId: input.quizId },
-      });
-
-      const questionsToCreate = generated.questions.slice(0, dto.questionCount);
-      for (let i = 0; i < questionsToCreate.length; i++) {
         if (!(await this.isActiveGenerationJob(input))) {
           this.logger.warn(
-            `[quiz.generate] halted during persist stale job quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
+            `[quiz.generate] halted before persisting stale job quizId=${input.quizId} userId=${input.userId} jobId=${input.jobId}`,
           );
           return;
         }
 
-        const question = questionsToCreate[i];
-
-        await (this.prisma as any).quizQuestion.create({
-          data: {
-            quizId: input.quizId,
-            questionIndex: i,
-            type: toDbQuestionType(question.type),
-            text: question.text,
-            options:
-              question.type === 'structured'
-                ? Array.isArray((question as any).parts)
-                  ? (question as any).parts
-                  : null
-                : (question.options ?? null),
-            correctAnswer:
-              question.type === 'structured'
-                ? 'structured'
-                : serializeCorrectAnswer(question),
-            explanation:
-              question.explanation ??
-              'Review this concept and compare your answer with the expected pattern.',
-            subtopic: (question as any).subtopic ?? null,
-          },
+        await (this.prisma as any).quizQuestion.deleteMany({
+          where: { quizId: input.quizId },
         });
+
+        for (let i = 0; i < allQuestions.length; i++) {
+          if (!(await this.isActiveGenerationJob(input))) {
+            return;
+          }
+          const question = allQuestions[i]!;
+          await (this.prisma as any).quizQuestion.create({
+            data: {
+              quizId: input.quizId,
+              questionIndex: i,
+              type: toDbQuestionType(question.type),
+              text: question.text,
+              options:
+                question.type === 'structured'
+                  ? Array.isArray(question.parts) ? question.parts : null
+                  : (question.options ?? null),
+              correctAnswer:
+                question.type === 'structured'
+                  ? 'structured'
+                  : serializeCorrectAnswer(question),
+              explanation:
+                question.explanation ??
+                'Review this concept and compare your answer with the expected pattern.',
+              subtopic: question.subtopic ?? null,
+            },
+          });
+          this.quizStreamingService.emit(input.quizId, {
+            type: 'question',
+            questionIndex: i,
+            question: buildSseQuestion(question),
+          });
+        }
       }
 
       const markedReady = await (this.prisma as any).quiz.updateMany({
@@ -273,8 +431,8 @@ export class QuizzesService {
           status: 'PROCESSING',
         },
         data: {
-          topic: generated.topic,
-          subjectName: generated.subjectName,
+          topic: generatedTopic,
+          subjectName: generatedSubjectName,
           status: 'READY',
           readyAt: new Date(),
           failedAt: null,
@@ -288,10 +446,12 @@ export class QuizzesService {
         return;
       }
 
+      this.quizStreamingService.close(input.quizId);
+
       await this.notificationsService.sendToUser(input.userId, {
         type: 'quiz_ready',
         title: 'Quiz ready',
-        body: `Your quiz on ${generated.topic} is ready.`,
+        body: `Your quiz on ${generatedTopic} is ready.`,
         url: `/practice-exams/${input.quizId}`,
         quizId: input.quizId,
       });
@@ -316,7 +476,7 @@ export class QuizzesService {
             in: ['QUEUED', 'PROCESSING'],
           },
         },
-        data: { 
+        data: {
           status: 'FAILED',
           failedAt: new Date(),
           failureReason: message.slice(0, 500),
@@ -329,6 +489,8 @@ export class QuizzesService {
         return;
       }
 
+      this.quizStreamingService.emitError(input.quizId, message.slice(0, 200));
+
       await this.notificationsService.sendToUser(input.userId, {
         type: 'quiz_failed',
         title: 'Quiz generation failed',
@@ -337,6 +499,66 @@ export class QuizzesService {
         quizId: input.quizId,
       });
     }
+  }
+
+  streamQuiz(user: User, quizId: string): Observable<MessageEvent> {
+    return new Observable<MessageEvent>((subscriber) => {
+      void this.doStreamQuiz(user, quizId, subscriber).catch(() => {
+        subscriber.next(
+          new MessageEvent('message', {
+            data: JSON.stringify({ type: 'error', message: 'Stream unavailable' } satisfies QuizStreamEvent),
+          }),
+        );
+        subscriber.complete();
+      });
+    });
+  }
+
+  private async doStreamQuiz(
+    user: User,
+    quizId: string,
+    subscriber: { next: (v: MessageEvent) => void; complete: () => void },
+  ): Promise<void> {
+    const quiz = await (this.prisma as any).quiz.findFirst({
+      where: { id: quizId, userId: user.id },
+      select: { id: true },
+    });
+    if (!quiz) {
+      subscriber.next(
+        new MessageEvent('message', {
+          data: JSON.stringify({ type: 'error', message: 'Quiz not found' } satisfies QuizStreamEvent),
+        }),
+      );
+      subscriber.complete();
+      return;
+    }
+
+    // Replay buffer (includes any events already emitted)
+    const buffer = this.quizStreamingService.getBuffer(quizId);
+    for (const event of buffer) {
+      subscriber.next(
+        new MessageEvent('message', { data: JSON.stringify(event) }),
+      );
+      if (event.type === 'done' || event.type === 'error') {
+        subscriber.complete();
+        return;
+      }
+    }
+
+    if (this.quizStreamingService.isClosed(quizId)) {
+      subscriber.complete();
+      return;
+    }
+
+    const unsubscribe = this.quizStreamingService.subscribe(quizId, (event) => {
+      subscriber.next(
+        new MessageEvent('message', { data: JSON.stringify(event) }),
+      );
+      if (event.type === 'done' || event.type === 'error') {
+        subscriber.complete();
+        unsubscribe();
+      }
+    });
   }
 
   private async isActiveGenerationJob(input: {
@@ -641,6 +863,7 @@ export class QuizzesService {
         mode: 'queued',
         status: 'queued',
         quizId: quiz.id,
+        totalQuestions: quiz.totalQuestions,
         estimatedSecondsRemaining: estimateSecondsRemaining(quiz),
       };
     }
@@ -1626,6 +1849,31 @@ function strengthFromScore(
   if (ratio >= 0.8) return 'STRONG';
   if (ratio >= 0.5) return 'DEVELOPING';
   return 'NEEDS_WORK';
+}
+
+function buildSseQuestion(question: {
+  type: string;
+  text: string;
+  options?: string[];
+  subtopic?: string;
+  parts?: unknown[];
+  totalMarks?: number;
+}): QuizQuestion | StructuredQuestion {
+  if (question.type === 'structured') {
+    return {
+      type: 'structured',
+      text: question.text,
+      parts: Array.isArray(question.parts) ? (question.parts as any) : [],
+      totalMarks: typeof question.totalMarks === 'number' ? question.totalMarks : 0,
+      subtopic: question.subtopic,
+    } as StructuredQuestion;
+  }
+  return {
+    type: fromDbQuestionType(toDbQuestionType(question.type)) as QuizQuestion['type'],
+    text: question.text,
+    options: question.options,
+    subtopic: question.subtopic,
+  };
 }
 
 function normalizeMode(mode: string): 'guide' | 'companion' {

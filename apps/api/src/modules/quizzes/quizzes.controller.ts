@@ -2,13 +2,16 @@ import {
   Body,
   Controller,
   Get,
+  MessageEvent,
   Param,
   Post,
   Query,
+  Sse,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -129,5 +132,14 @@ export class QuizzesController {
     @Body() dto: AnswerPartDto,
   ) {
     return this.quizzesService.answerPart(user, quizId, dto);
+  }
+
+  @ProtectedRoute()
+  @Sse(':quizId/stream')
+  streamQuiz(
+    @CurrentUser() user: User,
+    @Param('quizId') quizId: string,
+  ): Observable<MessageEvent> {
+    return this.quizzesService.streamQuiz(user, quizId);
   }
 }

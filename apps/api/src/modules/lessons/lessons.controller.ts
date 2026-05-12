@@ -2,14 +2,17 @@ import {
   Body,
   Controller,
   Get,
+  MessageEvent,
   Param,
   ParseIntPipe,
   Post,
   Query,
+  Sse,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -101,5 +104,14 @@ export class LessonsController {
     @Body() dto: CompleteLessonDto,
   ) {
     return this.lessonsService.complete(user, lessonId, dto);
+  }
+
+  @ProtectedRoute()
+  @Sse(':lessonId/stream')
+  streamLesson(
+    @CurrentUser() user: User,
+    @Param('lessonId') lessonId: string,
+  ): Observable<MessageEvent> {
+    return this.lessonsService.streamLesson(user, lessonId);
   }
 }

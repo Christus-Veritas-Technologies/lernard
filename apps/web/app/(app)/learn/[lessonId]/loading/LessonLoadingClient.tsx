@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import { ROUTES } from "@lernard/routes";
+import type { LessonStreamEvent } from "@lernard/shared-types";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
-import { browserApiFetch } from "@/lib/browser-api";
+import { connectSse } from "@/lib/browser-api";
 
 interface LessonLoadingClientProps {
     lessonId: string;
@@ -17,24 +18,58 @@ export function LessonLoadingClient({ lessonId }: LessonLoadingClientProps) {
     const router = useRouter();
 
     useEffect(() => {
-        let active = true;
+        const abortController = new AbortController();
+        let navigated = false;
 
-        const timer = setInterval(() => {
-            void browserApiFetch<{ status: "generating" | "ready" }>(ROUTES.LESSONS.GET(lessonId))
-                .then((result) => {
-                    if (!active) return;
-                    if (result.status === "ready") {
-                        clearInterval(timer);
-                        router.replace(`/learn/${lessonId}`);
+        void (async () => {
+            try {
+                const body = await connectSse(ROUTES.LESSONS.STREAM(lessonId), abortController.signal);
+                const reader = body.getReader();
+                const decoder = new TextDecoder();
+                let partial = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    partial += decoder.decode(value, { stream: true });
+                    const lines = partial.split("\n");
+                    partial = lines.pop() ?? "";
+
+                    for (const line of lines) {
+                        if (!line.startsWith("data: ")) continue;
+                        try {
+                            const event = JSON.parse(line.slice(6)) as LessonStreamEvent;
+                            if ((event.type === "section" || event.type === "done") && !navigated) {
+                                navigated = true;
+                                abortController.abort();
+                                router.replace(`/learn/${lessonId}`);
+                                return;
+                            }
+                            if (event.type === "error" && !navigated) {
+                                // On error still navigate — LessonReaderClient handles failure state
+                                navigated = true;
+                                abortController.abort();
+                                router.replace(`/learn/${lessonId}`);
+                                return;
+                            }
+                        } catch {
+                            // skip malformed lines
+                        }
                     }
-                })
-                .catch(() => undefined);
-        }, 2000);
+                }
 
-        return () => {
-            active = false;
-            clearInterval(timer);
-        };
+                if (!navigated) {
+                    router.replace(`/learn/${lessonId}`);
+                }
+            } catch {
+                if (!navigated && !abortController.signal.aborted) {
+                    router.replace(`/learn/${lessonId}`);
+                }
+            }
+        })();
+
+        return () => { abortController.abort(); };
     }, [lessonId, router]);
 
     return (

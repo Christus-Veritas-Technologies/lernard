@@ -56,6 +56,7 @@ export const ROUTES = {
     GENERATE: '/v1/lessons/generate',
     ATTACHMENTS_UPLOAD: '/v1/lessons/attachments/upload',
     GET: (lessonId: string) => `/v1/lessons/${lessonId}` as const,
+    STREAM: (lessonId: string) => `/v1/lessons/${lessonId}/stream` as const,
     SECTION_CHECK: (lessonId: string) => `/v1/lessons/${lessonId}/section-check` as const,
     REEXPLAIN: (lessonId: string) => `/v1/lessons/${lessonId}/reexplain` as const,
     COMPLETE: (lessonId: string) => `/v1/lessons/${lessonId}/complete` as const,
@@ -67,6 +68,7 @@ export const ROUTES = {
     DASHBOARD_STATS: '/v1/quizzes/dashboard-stats',
     HISTORY: '/v1/quizzes/history',
     GET: (quizId: string) => `/v1/quizzes/${quizId}` as const,
+    STREAM: (quizId: string) => `/v1/quizzes/${quizId}/stream` as const,
     STATUS: (quizId: string) => `/v1/quizzes/${quizId}/status` as const,
     REMEDIATION_CONTEXT: (quizId: string) =>
       `/v1/quizzes/${quizId}/remediation-context` as const,

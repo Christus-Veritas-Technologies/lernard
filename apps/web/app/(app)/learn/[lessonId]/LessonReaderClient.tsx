@@ -21,6 +21,7 @@ import {
     type LessonContent,
     type LessonSection,
     type LessonSectionType,
+    type LessonStreamEvent,
 } from "@lernard/shared-types";
 
 import { Badge } from "@/components/ui/Badge";
@@ -34,13 +35,16 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { browserApiFetch } from "@/lib/browser-api";
+import { browserApiFetch, connectSse } from "@/lib/browser-api";
 
 interface LessonReaderClientProps {
     lessonId: string;
 }
 
-type LessonResponse = { status: "generating" | "ready"; content?: LessonContent };
+type LessonResponse =
+    | { status: "generating" | "ready"; content?: LessonContent }
+    | { status: "streaming"; content: { lessonId: string; topic: string; subjectName: string; depth: "quick" | "standard" | "deep"; estimatedMinutes: number; availableSections: LessonContent["sections"] } }
+    | { status: "failed"; failureReason: string | null };
 type ConfidenceChoice = "got_it" | "not_sure" | "confused";
 type ThemeMode = "light" | "dark" | "sepia";
 
@@ -81,6 +85,9 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
     const [savingResponseFor, setSavingResponseFor] = useState<number | null>(null);
     const [reexplainLoadingFor, setReexplainLoadingFor] = useState<number | null>(null);
     const [sectionBodyOverrides, setSectionBodyOverrides] = useState<Record<number, string>>({});
+    const [streamingSections, setStreamingSections] = useState<LessonContent["sections"]>([]);
+    const [streamingComplete, setStreamingComplete] = useState(true);
+    const nextSectionIndexRef = useRef(0);
     const [copiedCodeIndex, setCopiedCodeIndex] = useState<string | null>(null);
     const sectionRefs = useRef<Array<HTMLElement | null>>([]);
     const startedAtRef = useRef<number>(Date.now());
@@ -107,11 +114,17 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
         if (lesson?.status === "generating") {
             router.replace(`/learn/${lessonId}/loading`);
         }
+        if (lesson?.status === "streaming") {
+            const initial = lesson.content.availableSections;
+            setStreamingSections(initial);
+            setStreamingComplete(false);
+            nextSectionIndexRef.current = initial.length;
+        }
     }, [lesson, lessonId, router]);
 
     useEffect(() => {
         const onScroll = () => {
-            if (!lesson?.content) return;
+            if (!(lesson as any)?.content) return;
             const nearest = sectionRefs.current
                 .map((node, idx) => ({ idx, distance: node ? Math.abs(node.getBoundingClientRect().top - 170) : Number.MAX_SAFE_INTEGER }))
                 .sort((a, b) => a.distance - b.distance)[0];
@@ -126,15 +139,77 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
         return () => window.removeEventListener("scroll", onScroll);
     }, [lesson, currentSection]);
 
-    const content = lesson?.status === "ready" ? lesson.content : undefined;
+    // SSE effect for streaming lessons
+    useEffect(() => {
+        if (lesson?.status !== "streaming") return;
+
+        const abortController = new AbortController();
+
+        void (async () => {
+            try {
+                const body = await connectSse(ROUTES.LESSONS.STREAM(lessonId), abortController.signal);
+                const reader = body.getReader();
+                const decoder = new TextDecoder();
+                let partial = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    partial += decoder.decode(value, { stream: true });
+                    const lines = partial.split("\n");
+                    partial = lines.pop() ?? "";
+
+                    for (const line of lines) {
+                        if (!line.startsWith("data: ")) continue;
+                        try {
+                            const event = JSON.parse(line.slice(6)) as LessonStreamEvent;
+                            if (event.type === "section") {
+                                if (event.sectionIndex >= nextSectionIndexRef.current) {
+                                    nextSectionIndexRef.current = event.sectionIndex + 1;
+                                    setStreamingSections((prev) => {
+                                        const next = [...prev];
+                                        next[event.sectionIndex] = event.section;
+                                        return next;
+                                    });
+                                }
+                            } else if (event.type === "done" || event.type === "error") {
+                                setStreamingComplete(true);
+                                return;
+                            }
+                        } catch {
+                            // skip malformed lines
+                        }
+                    }
+                }
+
+                setStreamingComplete(true);
+            } catch {
+                if (!abortController.signal.aborted) {
+                    setStreamingComplete(true);
+                }
+            }
+        })();
+
+        return () => { abortController.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lesson?.status === "streaming", lessonId]);
+
+    const content = lesson?.status === "ready" ? lesson.content
+        : lesson?.status === "streaming" ? {
+            ...lesson.content,
+            sections: streamingSections,
+        } as LessonContent
+        : undefined;
 
     const sections = useMemo(() => {
         if (!content) return [];
-        return content.sections.map((section, idx) => ({
+        const src = lesson?.status === "streaming" ? streamingSections : content.sections;
+        return src.map((section, idx) => ({
             ...section,
             body: sectionBodyOverrides[idx] ?? section.body,
         }));
-    }, [content, sectionBodyOverrides]);
+    }, [content, lesson?.status, streamingSections, sectionBodyOverrides]);
 
     const elapsedMinutes = Math.floor((Date.now() - startedAtRef.current) / 60000);
     const remainingMinutes = Math.max(content?.estimatedMinutes ?? 0 - elapsedMinutes, 0);
@@ -377,6 +452,7 @@ export function LessonReaderClient({ lessonId }: LessonReaderClientProps) {
                 <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3">
                     <Button
                         className="flex-1"
+                        disabled={!streamingComplete}
                         onClick={() =>
                             router.push(
                                 `/learn/${lessonId}/complete?topic=${encodeURIComponent(content.topic)}`,

@@ -213,8 +213,14 @@ export interface QuizDetailQueuedPayload {
   mode: 'queued'
   status: 'queued'
   quizId: string
+  totalQuestions: number
   estimatedSecondsRemaining: number | null
 }
+
+export type QuizStreamEvent =
+  | { type: 'question'; questionIndex: number; question: QuizQuestion | StructuredQuestion }
+  | { type: 'done' }
+  | { type: 'error'; message: string }
 
 export interface QuizDetailFailedPayload {
   mode: 'failed'

@@ -373,6 +373,173 @@ export class MastraService {
     );
   }
 
+  async generateLessonStreaming(input: {
+    topic: string;
+    depth: 'quick' | 'standard' | 'deep';
+    subjectName?: string;
+    studentContext: StudentContext;
+    remediationContext?: LessonRemediationContextInput;
+    retryContext?: LessonRetryContextInput;
+    onSection: (section: LessonContent['sections'][number], index: number) => Promise<void>;
+  }): Promise<LessonContent> {
+    if (this.devMode) {
+      const fallback = buildFallbackLesson(input.topic, input.subjectName, input.depth);
+      for (let i = 0; i < fallback.sections.length; i++) {
+        await input.onSection(fallback.sections[i]!, i);
+      }
+      return fallback;
+    }
+
+    const systemPrompt = buildSystemPrompt(input.studentContext, {
+      kind: 'lesson',
+      topic: input.topic,
+      subjectName: input.subjectName,
+      depth: input.depth,
+    });
+    const userPrompt = buildLessonUserPrompt(input.studentContext, {
+      topic: input.topic,
+      subjectName: input.subjectName,
+      depth: input.depth,
+      remediationContext: input.remediationContext,
+      retryContext: input.retryContext,
+    });
+
+    const fallbackEstimatedMinutes = lessonMinutesForDepth(input.depth);
+
+    let response: Response;
+    try {
+      response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': this.apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: SONNET_MODEL,
+          max_tokens: lessonMaxTokens(input.depth),
+          stream: true,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown fetch error';
+      this.logger.error(`[mastra.generateLessonStreaming] fetch_error topic="${input.topic}" error="${message}"`);
+      return buildFallbackLesson(input.topic, input.subjectName, input.depth);
+    }
+
+    if (!response.ok || !response.body) {
+      const bodyText = await response.text().catch(() => '<unavailable>');
+      this.logger.error(
+        `[mastra.generateLessonStreaming] request_failed status=${response.status} body="${truncateForLog(bodyText, 400)}"`,
+      );
+      return buildFallbackLesson(input.topic, input.subjectName, input.depth);
+    }
+
+    let accumulatedText = '';
+    const extractor = new LessonSectionExtractor();
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let partialLine = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        partialLine += chunk;
+        const lines = partialLine.split('\n');
+        partialLine = lines.pop() ?? '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === '[DONE]') continue;
+
+          try {
+            const event = JSON.parse(jsonStr) as {
+              type: string;
+              delta?: { type: string; text: string };
+            };
+
+            if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+              const textChunk = event.delta.text;
+              accumulatedText += textChunk;
+
+              const newSections = extractor.feed(textChunk);
+              for (const { index, json } of newSections) {
+                const parsed = safeJsonParse<{
+                  type?: unknown;
+                  heading?: unknown;
+                  body?: unknown;
+                  terms?: unknown;
+                }>(json);
+                if (!parsed) continue;
+                const normalized: LessonContent['sections'][number] = {
+                  type: normalizeSectionType(parsed.type, index),
+                  heading: typeof parsed.heading === 'string' ? parsed.heading : null,
+                  body: typeof parsed.body === 'string' ? parsed.body : '',
+                  terms: Array.isArray(parsed.terms)
+                    ? parsed.terms
+                        .filter((t) => t && typeof (t as any).term === 'string')
+                        .map((t) => ({
+                          term: (t as any).term as string,
+                          explanation:
+                            typeof (t as any).explanation === 'string'
+                              ? ((t as any).explanation as string)
+                              : 'Definition unavailable.',
+                        }))
+                    : [],
+                };
+                await input.onSection(normalized, index);
+              }
+            }
+          } catch {
+            // skip malformed SSE lines
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    // Parse and return the final complete result
+    const parsed = parseLessonContentFromModelText(accumulatedText);
+    if (!parsed || !Array.isArray(parsed.sections)) {
+      this.logger.warn(
+        `[mastra.generateLessonStreaming] malformed_json_fallback topic="${input.topic}" depth=${input.depth} rawPreview="${truncateForLog(accumulatedText.replace(/\s+/g, ' '), 400)}"`,
+      );
+      return buildFallbackLesson(input.topic, input.subjectName, input.depth);
+    }
+
+    return {
+      lessonId: 'generated',
+      topic: parsed.topic ?? input.topic,
+      subjectName: parsed.subjectName ?? input.subjectName ?? 'General',
+      depth: parsed.depth ?? input.depth,
+      estimatedMinutes: parsed.estimatedMinutes ?? fallbackEstimatedMinutes,
+      sections: parsed.sections.map((section, index) => ({
+        type: normalizeSectionType(section?.type, index),
+        heading: section?.heading ?? null,
+        body: section?.body ?? '',
+        terms: Array.isArray(section?.terms)
+          ? section.terms
+              .filter((term) => term && typeof term.term === 'string')
+              .map((term) => ({
+                term: term.term,
+                explanation:
+                  typeof term.explanation === 'string'
+                    ? term.explanation
+                    : 'Definition unavailable.',
+              }))
+          : [],
+      })),
+    };
+  }
+
   async generateQuiz(input: {
     topic: string;
     questionCount: number;
@@ -384,6 +551,7 @@ export class MastraService {
     studentContext: StudentContext;
     lessonSections?: LessonSectionInput[];
     confidenceRating?: number | null;
+    avoidQuestions?: string[];
   }): Promise<{
     topic: string;
     subjectName: string;
@@ -417,6 +585,11 @@ export class MastraService {
       userPrompt,
     );
 
+    const finalPrompt =
+      input.avoidQuestions && input.avoidQuestions.length > 0
+        ? `${refinedPrompt}\n\nIMPORTANT: You have already generated the following questions in a previous batch. You MUST generate ${input.questionCount} completely different questions that do not overlap with or resemble these:\n${input.avoidQuestions.map((t, i) => `${i + 1}. "${t}"`).join('\n')}`
+        : refinedPrompt;
+
     return this.runWithRetry(async () => {
       let maxTokens = quizMaxTokens(
         input.questionCount,
@@ -432,7 +605,7 @@ export class MastraService {
           model: SONNET_MODEL,
           maxTokens,
           systemPrompt,
-          messages: [{ role: 'user', content: refinedPrompt }],
+          messages: [{ role: 'user', content: finalPrompt }],
           includeTopicAndSubject: false,
           contextTag: 'generateQuiz',
         });
@@ -494,7 +667,7 @@ export class MastraService {
       const completed = await this.supplementMissingQuestions({
         contextTag: 'generateQuiz',
         systemPrompt,
-        baseUserContent: refinedPrompt,
+        baseUserContent: finalPrompt,
         targetCount: input.questionCount,
         existingQuestions: unique,
         baseMaxTokens: maxTokens,
@@ -2177,6 +2350,75 @@ function normalizeQuestionType(type: string | undefined): QuizQuestionType {
       return type;
     default:
       return 'multiple_choice';
+  }
+}
+
+class LessonSectionExtractor {
+  private buffer = '';
+  private inSections = false;
+  private scanPos = 0;
+  private depth = 0;
+  private objStart = -1;
+  private emittedCount = 0;
+  private inString = false;
+  private escape = false;
+
+  feed(chunk: string): Array<{ index: number; json: string }> {
+    this.buffer += chunk;
+    const results: Array<{ index: number; json: string }> = [];
+
+    if (!this.inSections) {
+      // Support both '"sections":[' and '"sections": ['
+      for (const needle of ['"sections":[', '"sections": [']) {
+        const idx = this.buffer.indexOf(needle);
+        if (idx >= 0) {
+          this.inSections = true;
+          this.scanPos = idx + needle.length;
+          break;
+        }
+      }
+      if (!this.inSections) return results;
+    }
+
+    for (let i = this.scanPos; i < this.buffer.length; i++) {
+      const c = this.buffer[i]!;
+
+      if (this.escape) {
+        this.escape = false;
+        continue;
+      }
+
+      if (c === '\\' && this.inString) {
+        this.escape = true;
+        continue;
+      }
+
+      if (c === '"') {
+        this.inString = !this.inString;
+        continue;
+      }
+
+      if (this.inString) continue;
+
+      if (c === '{') {
+        if (this.depth === 0) {
+          this.objStart = i;
+        }
+        this.depth++;
+      } else if (c === '}') {
+        this.depth--;
+        if (this.depth === 0 && this.objStart >= 0) {
+          results.push({
+            index: this.emittedCount++,
+            json: this.buffer.slice(this.objStart, i + 1),
+          });
+          this.objStart = -1;
+        }
+      }
+    }
+
+    this.scanPos = this.buffer.length;
+    return results;
   }
 }
 

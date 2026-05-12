@@ -134,3 +134,8 @@ export interface PostLessonResult {
   xpEarned: number
   recapBullets: string[]
 }
+
+export type LessonStreamEvent =
+  | { type: 'section'; sectionIndex: number; section: LessonSection }
+  | { type: 'done' }
+  | { type: 'error'; message: string }

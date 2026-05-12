@@ -62,6 +62,7 @@ export type {
   LessonRemediationMisconception,
   LessonRemediationContextInput,
   LessonRetryContextInput,
+  LessonStreamEvent,
 } from './payloads/lessons'
 export { SECTION_COLORS, getSubjectIcon } from './payloads/lessons'
 export type {
@@ -93,6 +94,7 @@ export type {
   QuizDetailQueuedPayload,
   QuizDetailFailedPayload,
   QuizDetailResponse,
+  QuizStreamEvent,
 } from './payloads/quizzes'
 export type {
   ConversationListItem,

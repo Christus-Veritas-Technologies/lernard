@@ -7,6 +7,8 @@ import { ROUTES } from "@lernard/routes";
 import type {
     QuizContent,
     QuizDetailResponse,
+    QuizQuestion,
+    QuizStreamEvent,
     ShortAnswerEvaluation,
     StructuredPartEvaluation,
     StructuredQuestion,
@@ -19,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { browserApiFetch } from "@/lib/browser-api";
+import { browserApiFetch, connectSse } from "@/lib/browser-api";
 
 interface QuizScreenClientProps {
     quizId: string;
@@ -36,6 +38,10 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     const [quiz, setQuiz] = useState<QuizContent | null>(null);
     const [quizMode, setQuizMode] = useState<QuizDetailResponse["mode"] | null>(null);
     const [queueEstimate, setQueueEstimate] = useState<number | null>(null);
+    const [totalQueuedQuestions, setTotalQueuedQuestions] = useState<number | null>(null);
+    const [questionCache, setQuestionCache] = useState<Map<number, QuizQuestion | StructuredQuestion>>(new Map());
+    const [localQuestionIndex, setLocalQuestionIndex] = useState(0);
+    const [waitingForNextQuestion, setWaitingForNextQuestion] = useState(false);
     const [failureReason, setFailureReason] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [queuedRefreshing, setQueuedRefreshing] = useState(false);
@@ -76,6 +82,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
 
             if (data.mode === "queued") {
                 setQueueEstimate(data.estimatedSecondsRemaining);
+                setTotalQueuedQuestions(data.totalQuestions);
                 setFailureReason(null);
                 setQuiz(null);
                 return;
@@ -120,28 +127,96 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     useEffect(() => {
         if (quizMode !== "queued") return;
 
-        let cancelled = false;
-        let timer: number | null = null;
+        const abortController = new AbortController();
+        let sseStarted = false;
 
-        const scheduleNextPoll = () => {
-            timer = window.setTimeout(async () => {
-                if (cancelled) return;
-                await loadQuiz({ poll: true });
-                if (!cancelled) {
-                    scheduleNextPoll();
+        void (async () => {
+            try {
+                const body = await connectSse(ROUTES.QUIZZES.STREAM(quizId), abortController.signal);
+                sseStarted = true;
+                const reader = body.getReader();
+                const decoder = new TextDecoder();
+                let partial = "";
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    partial += decoder.decode(value, { stream: true });
+                    const lines = partial.split("\n");
+                    partial = lines.pop() ?? "";
+
+                    for (const line of lines) {
+                        if (!line.startsWith("data: ")) continue;
+                        try {
+                            const event = JSON.parse(line.slice(6)) as QuizStreamEvent;
+                            if (event.type === "question") {
+                                setQuestionCache((prev) => {
+                                    const next = new Map(prev);
+                                    next.set(event.questionIndex, event.question);
+                                    return next;
+                                });
+                                // Show first question immediately
+                                if (event.questionIndex === 0) {
+                                    setLocalQuestionIndex(0);
+                                    // Build a quiz-like object from the streamed question
+                                    setQuizMode("start");
+                                    setQuiz({
+                                        quizId,
+                                        topic: "",
+                                        subjectName: "",
+                                        mode: "guide",
+                                        paperType: "paper1",
+                                        difficulty: "standard",
+                                        totalQuestions: totalQueuedQuestions ?? 1,
+                                        currentQuestionIndex: 0,
+                                        question: event.question,
+                                    });
+                                } else if (waitingForNextQuestion) {
+                                    // The user was waiting for this question
+                                    setWaitingForNextQuestion(false);
+                                    setLocalQuestionIndex(event.questionIndex);
+                                    setQuiz((prev) =>
+                                        prev ? { ...prev, currentQuestionIndex: event.questionIndex, question: event.question } : prev,
+                                    );
+                                    setAnswer("");
+                                    setSelectedOptions([]);
+                                    setResult(null);
+                                    setShortAnswerEval(null);
+                                    setPartInputs({});
+                                    setPartSubmitting({});
+                                    setPartResults({});
+                                }
+                            } else if (event.type === "done") {
+                                // All questions generated — load final state from API
+                                void loadQuiz();
+                                return;
+                            } else if (event.type === "error") {
+                                setFailureReason(event.message);
+                                setQuizMode("failed");
+                                return;
+                            }
+                        } catch {
+                            // skip malformed lines
+                        }
+                    }
                 }
-            }, 3000);
-        };
 
-        scheduleNextPoll();
-
-        return () => {
-            cancelled = true;
-            if (timer !== null) {
-                window.clearTimeout(timer);
+                if (!abortController.signal.aborted) {
+                    void loadQuiz();
+                }
+            } catch (err) {
+                if (!sseStarted && !abortController.signal.aborted) {
+                    // SSE failed — fall back to polling
+                    const timer = window.setTimeout(() => { void loadQuiz({ poll: true }); }, 3000);
+                    return () => window.clearTimeout(timer);
+                }
             }
-        };
-    }, [quizMode, loadQuiz]);
+        })();
+
+        return () => { abortController.abort(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [quizMode === "queued", quizId]);
 
     const progressValue = quiz
         ? ((quiz.currentQuestionIndex + 1) / Math.max(quiz.totalQuestions, 1)) * 100
@@ -258,6 +333,26 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     }
 
     function onNext() {
+        // If we were streaming questions via SSE, try to use the cached next question
+        if (quiz && quizMode === "start" && questionCache.size > 0) {
+            const nextIndex = localQuestionIndex + 1;
+            const cachedQuestion = questionCache.get(nextIndex);
+            if (cachedQuestion) {
+                setLocalQuestionIndex(nextIndex);
+                setQuiz({ ...quiz, currentQuestionIndex: nextIndex, question: cachedQuestion });
+                setAnswer("");
+                setSelectedOptions([]);
+                setResult(null);
+                setShortAnswerEval(null);
+                setPartInputs({});
+                setPartSubmitting({});
+                setPartResults({});
+                return;
+            }
+            // Next question not cached yet — wait for it
+            setWaitingForNextQuestion(true);
+            return;
+        }
         void loadQuiz();
     }
 
@@ -299,7 +394,14 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                 </Button>
             </div>
 
-            <Card>
+            {waitingForNextQuestion ? (
+                <Card>
+                    <CardContent className="flex items-center justify-center py-16 text-text-secondary text-sm">
+                        Generating next question…
+                    </CardContent>
+                </Card>
+            ) : (
+                <Card>
                 <CardHeader>
                     <CardTitle>{quiz.question.text}</CardTitle>
                 </CardHeader>
@@ -567,6 +669,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                     ) : null}
                 </CardContent>
             </Card>
+            )}
         </div>
     );
 }

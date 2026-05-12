@@ -126,3 +126,34 @@ async function refreshSession(refreshToken: string): Promise<string> {
 function getBaseUrl(): string {
     return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4002";
 }
+
+export async function connectSse(
+    route: string,
+    signal?: AbortSignal,
+): Promise<ReadableStream<Uint8Array>> {
+    const refreshToken = getRefreshToken();
+    let accessToken = getAccessToken();
+
+    if (!accessToken && refreshToken) {
+        accessToken = await refreshSession(refreshToken);
+    }
+
+    if (!accessToken) {
+        throw new BrowserAuthError();
+    }
+
+    const response = await fetch(`${getBaseUrl()}${route}`, {
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            Accept: "text/event-stream",
+        },
+        cache: "no-store",
+        signal,
+    });
+
+    if (!response.ok || !response.body) {
+        throw new BrowserApiError(response.status, await response.text().catch(() => ""));
+    }
+
+    return response.body;
+}

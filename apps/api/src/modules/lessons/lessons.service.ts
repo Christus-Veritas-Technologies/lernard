@@ -2,19 +2,23 @@ import {
   BadRequestException,
   Injectable,
   Logger,
+  MessageEvent,
   NotFoundException,
 } from '@nestjs/common';
 import type {
   LessonContent,
   LessonRemediationContextInput,
   LessonRetryContextInput,
+  LessonStreamEvent,
   PostLessonResult,
 } from '@lernard/shared-types';
 import type { User } from '@prisma/client';
+import { Observable } from 'rxjs';
 import { v4 as uuidv4 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MastraService } from '../../mastra/mastra.service';
 import { StudentContextBuilder } from '../../mastra/student-context.builder';
+import { LessonStreamingService } from '../../common/streaming/lesson-streaming.service';
 import { validateGeneratedContent } from '../../common/utils/validate-generated-content';
 import { R2Service } from '../../r2/r2.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -36,6 +40,7 @@ export class LessonsService {
     private readonly prisma: PrismaService,
     private readonly mastraService: MastraService,
     private readonly studentContextBuilder: StudentContextBuilder,
+    private readonly lessonStreamingService: LessonStreamingService,
     private readonly r2: R2Service,
     private readonly notificationsService: NotificationsService,
   ) {}
@@ -107,6 +112,8 @@ export class LessonsService {
         data: { status: 'PROCESSING' },
       });
 
+      this.lessonStreamingService.open(lessonId);
+
       const contextStartedAt = Date.now();
       const studentContext = await this.studentContextBuilder.buildForUser(
         userId,
@@ -118,6 +125,7 @@ export class LessonsService {
       stage = 'generate_lesson';
       const generateStartedAt = Date.now();
       let generated: LessonContent;
+
       if (dto.fromUploadId) {
         const upload = await readLessonUpload(this.r2, userId, dto.fromUploadId);
         if (!upload) {
@@ -141,6 +149,15 @@ export class LessonsService {
         });
 
         deleteLessonUpload(this.r2, userId, dto.fromUploadId).catch(() => {});
+
+        // Emit all sections from batch file generation
+        for (let i = 0; i < generated.sections.length; i++) {
+          this.lessonStreamingService.emit(lessonId, {
+            type: 'section',
+            sectionIndex: i,
+            section: generated.sections[i]!,
+          });
+        }
       } else {
         let topic = dto.topic?.trim() ?? 'Focused revision lesson';
         let subjectName = dto.subject;
@@ -164,15 +181,30 @@ export class LessonsService {
           };
         }
 
-        generated = await this.mastraService.generateLesson({
+        const streamingSections: LessonContent['sections'] = [];
+
+        generated = await this.mastraService.generateLessonStreaming({
           topic,
           depth: dto.depth,
           subjectName,
           studentContext,
           remediationContext,
           retryContext,
+          onSection: async (section, index) => {
+            streamingSections[index] = section;
+            await (this.prisma as any).lesson.update({
+              where: { id: lessonId },
+              data: { sections: streamingSections },
+            });
+            this.lessonStreamingService.emit(lessonId, {
+              type: 'section',
+              sectionIndex: index,
+              section,
+            });
+          },
         });
       }
+
       this.logger.log(
         `[lesson.generate] generated userId=${userId} lessonId=${lessonId} sections=${generated.sections.length} estimatedMinutes=${generated.estimatedMinutes} durationMs=${Date.now() - generateStartedAt}`,
       );
@@ -204,6 +236,8 @@ export class LessonsService {
         `[lesson.generate] persisted userId=${userId} lessonId=${lessonId} durationMs=${Date.now() - persistStartedAt}`,
       );
 
+      this.lessonStreamingService.close(lessonId);
+
       this.logger.log(
         `[lesson.generate] success userId=${userId} lessonId=${lessonId} totalMs=${Date.now() - startedAt}`,
       );
@@ -226,6 +260,8 @@ export class LessonsService {
         `[lesson.generate] failed userId=${userId} lessonId=${lessonId} stage=${stage} totalMs=${Date.now() - startedAt} error="${message}"`,
         stack,
       );
+
+      this.lessonStreamingService.emitError(lessonId, message.slice(0, 200));
 
       await (this.prisma as any).lesson.update({
         where: { id: lessonId },
@@ -281,6 +317,7 @@ export class LessonsService {
     lessonId: string,
   ): Promise<
     | { status: 'generating' | 'ready'; content?: LessonContent }
+    | { status: 'streaming'; content: { lessonId: string; topic: string; subjectName: string; depth: 'quick' | 'standard' | 'deep'; estimatedMinutes: number; availableSections: LessonContent['sections'] } }
     | { status: 'failed'; failureReason: string | null }
   > {
     const lesson = await (this.prisma as any).lesson.findFirst({
@@ -293,6 +330,26 @@ export class LessonsService {
 
     if (lesson.status === 'FAILED') {
       return { status: 'failed', failureReason: lesson.failureReason ?? null };
+    }
+
+    if (lesson.status === 'PROCESSING') {
+      const availableSections: LessonContent['sections'] = Array.isArray(lesson.sections) && lesson.sections.length > 0
+        ? lesson.sections
+        : [];
+      if (availableSections.length > 0) {
+        return {
+          status: 'streaming',
+          content: {
+            lessonId: lesson.id,
+            topic: lesson.topic,
+            subjectName: lesson.subjectName ?? 'General',
+            depth: normalizeDepth(lesson.depth),
+            estimatedMinutes: lesson.estimatedMinutes ?? 5,
+            availableSections,
+          },
+        };
+      }
+      return { status: 'generating' };
     }
 
     if (lesson.status !== 'READY') {
@@ -310,6 +367,66 @@ export class LessonsService {
         sections: Array.isArray(lesson.sections) ? lesson.sections : [],
       },
     };
+  }
+
+  streamLesson(user: User, lessonId: string): Observable<MessageEvent> {
+    return new Observable<MessageEvent>((subscriber) => {
+      void this.doStreamLesson(user, lessonId, subscriber).catch(() => {
+        subscriber.next(
+          new MessageEvent('message', {
+            data: JSON.stringify({ type: 'error', message: 'Stream unavailable' } satisfies LessonStreamEvent),
+          }),
+        );
+        subscriber.complete();
+      });
+    });
+  }
+
+  private async doStreamLesson(
+    user: User,
+    lessonId: string,
+    subscriber: { next: (v: MessageEvent) => void; complete: () => void },
+  ): Promise<void> {
+    const lesson = await (this.prisma as any).lesson.findFirst({
+      where: { id: lessonId, userId: user.id },
+      select: { id: true },
+    });
+    if (!lesson) {
+      subscriber.next(
+        new MessageEvent('message', {
+          data: JSON.stringify({ type: 'error', message: 'Lesson not found' } satisfies LessonStreamEvent),
+        }),
+      );
+      subscriber.complete();
+      return;
+    }
+
+    // Replay buffer (includes any sections already emitted)
+    const buffer = this.lessonStreamingService.getBuffer(lessonId);
+    for (const event of buffer) {
+      subscriber.next(
+        new MessageEvent('message', { data: JSON.stringify(event) }),
+      );
+      if (event.type === 'done' || event.type === 'error') {
+        subscriber.complete();
+        return;
+      }
+    }
+
+    if (this.lessonStreamingService.isClosed(lessonId)) {
+      subscriber.complete();
+      return;
+    }
+
+    const unsubscribe = this.lessonStreamingService.subscribe(lessonId, (event) => {
+      subscriber.next(
+        new MessageEvent('message', { data: JSON.stringify(event) }),
+      );
+      if (event.type === 'done' || event.type === 'error') {
+        subscriber.complete();
+        unsubscribe();
+      }
+    });
   }
 
   async sectionCheck(
