@@ -37,6 +37,7 @@ export class ProgressService {
           sessionCount: true,
           plan: true,
           billingAnchorDay: true,
+          storageBytesUsed: true,
         },
       }),
       this.getSubjects(userId),
@@ -47,6 +48,7 @@ export class ProgressService {
       userId,
       user.plan,
       user.billingAnchorDay,
+      user.storageBytesUsed,
     );
 
     return buildPagePayload(
@@ -66,41 +68,45 @@ export class ProgressService {
     userId: string,
     plan: Plan,
     billingAnchorDay: number | null,
+    storageBytesUsed: number,
   ): Promise<PlanUsage> {
     const anchor = billingAnchorDay ?? 1;
     const isDaily = plan === Plan.EXPLORER;
+    const periodKey = isDaily ? `day:${todayKey()}` : `month:${billingPeriodKey(anchor)}`;
 
-    const lessonsKey = isDaily
-      ? `rate:${userId}:lessons:day:${todayKey()}`
-      : `rate:${userId}:lessons:month:${billingPeriodKey(anchor)}`;
-    const quizzesKey = isDaily
-      ? `rate:${userId}:quizzes:day:${todayKey()}`
-      : `rate:${userId}:quizzes:month:${billingPeriodKey(anchor)}`;
-
-    const [lessonsUsed, quizzesUsed] = await Promise.all([
-      this.redis.getCount(lessonsKey),
-      this.redis.getCount(quizzesKey),
+    const [lessonsUsed, quizzesUsed, projectsUsed, chatMessagesUsed] = await Promise.all([
+      this.redis.getCount(`rate:${userId}:lessons:${periodKey}`),
+      this.redis.getCount(`rate:${userId}:quizzes:${periodKey}`),
+      this.redis.getCount(`rate:${userId}:projects:${periodKey}`),
+      this.redis.getCount(`rate:${userId}:chatMessages:${periodKey}`),
     ]);
 
-    const limits: Record<Plan, { lessons: number; quizzes: number }> = {
-      [Plan.EXPLORER]: { lessons: 2, quizzes: 0 },
-      [Plan.SCHOLAR]: { lessons: 80, quizzes: 80 },
-      [Plan.HOUSEHOLD]: { lessons: 100, quizzes: 100 },
-      [Plan.CAMPUS]: { lessons: 200, quizzes: 200 },
+    const limits: Record<Plan, { lessons: number; quizzes: number; projects: number; chatMessages: number; storageMb: number }> = {
+      [Plan.EXPLORER]:               { lessons: 2,   quizzes: 2,   projects: 1,  chatMessages: 10,   storageMb: 100  },
+      [Plan.SCHOLAR]:                { lessons: 40,  quizzes: 40,  projects: 5,  chatMessages: 500,  storageMb: 500  },
+      [Plan.HOUSEHOLD]:              { lessons: 80,  quizzes: 80,  projects: 10, chatMessages: 800,  storageMb: 2000 },
+      [Plan.STUDENT_SCHOLAR]:        { lessons: 40,  quizzes: 40,  projects: 5,  chatMessages: 500,  storageMb: 500  },
+      [Plan.STUDENT_PRO]:            { lessons: 120, quizzes: 120, projects: 15, chatMessages: 1500, storageMb: 2000 },
+      [Plan.GUARDIAN_FAMILY_STARTER]:  { lessons: 50,  quizzes: 50,  projects: 5,  chatMessages: 600,  storageMb: 1000 },
+      [Plan.GUARDIAN_FAMILY_STANDARD]: { lessons: 80,  quizzes: 80,  projects: 10, chatMessages: 800,  storageMb: 2000 },
+      [Plan.GUARDIAN_FAMILY_PREMIUM]:  { lessons: 150, quizzes: 150, projects: 15, chatMessages: 1200, storageMb: 5000 },
     };
 
-    const { lessons: lessonsLimit, quizzes: quizzesLimit } = limits[plan];
-
-    const resetAt = isDaily
-      ? tomorrowMidnightIso()
-      : nextBillingAnchorIso(anchor);
+    const planLimits = limits[plan] ?? limits[Plan.EXPLORER];
+    const resetAt = isDaily ? tomorrowMidnightIso() : nextBillingAnchorIso(anchor);
 
     return {
       plan: plan.toLowerCase() as PlanUsage['plan'],
       lessonsUsed,
-      lessonsLimit,
+      lessonsLimit: planLimits.lessons,
       quizzesUsed,
-      quizzesLimit,
+      quizzesLimit: planLimits.quizzes,
+      projectsUsed,
+      projectsLimit: planLimits.projects,
+      chatMessagesUsed,
+      chatMessagesLimit: planLimits.chatMessages,
+      storageUsedMb: Math.round(storageBytesUsed / (1024 * 1024)),
+      storageLimitMb: planLimits.storageMb,
       resetAt,
     };
   }
