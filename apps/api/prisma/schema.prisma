@@ -22,9 +22,15 @@ enum Role {
 
 enum Plan {
   EXPLORER
+  /// Legacy student plan — kept for migration safety
   SCHOLAR
+  /// Legacy guardian/family plan — kept for migration safety
   HOUSEHOLD
-  CAMPUS
+  STUDENT_SCHOLAR
+  STUDENT_PRO
+  GUARDIAN_FAMILY_STARTER
+  GUARDIAN_FAMILY_STANDARD
+  GUARDIAN_FAMILY_PREMIUM
 }
 
 enum LearningMode {
@@ -150,6 +156,7 @@ model User {
   stripePriceId           String?
   stripeSubscriptionId    String?
   invalidatePermissionsAt DateTime?
+  storageBytesUsed        Int     @default(0)
 
   // Account activation (for guardian-created child accounts)
   accountStatus       String    @default("ACTIVE")   // "ACTIVE" | "PENDING_SETUP"

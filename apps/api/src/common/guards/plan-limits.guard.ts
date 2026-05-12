@@ -11,7 +11,7 @@ import { Plan } from '@prisma/client';
 import type { User } from '@prisma/client';
 import { RedisService } from '../../redis/redis.service';
 
-export type LimitResource = 'lessons' | 'quizzes';
+export type LimitResource = 'lessons' | 'quizzes' | 'projects' | 'chatMessages';
 
 export const PLAN_LIMIT_RESOURCE = 'planLimitResource';
 /** Decorate a controller method with the resource type being limited */
@@ -22,13 +22,19 @@ interface PlanConfig {
   window: 'daily' | 'monthly';
   lessonsLimit: number;
   quizzesLimit: number;
+  projectsLimit: number;
+  chatMessagesLimit: number;
 }
 
 const PLAN_CONFIG: Record<Plan, PlanConfig> = {
-  [Plan.EXPLORER]: { window: 'daily', lessonsLimit: 2, quizzesLimit: 0 },
-  [Plan.SCHOLAR]: { window: 'monthly', lessonsLimit: 80, quizzesLimit: 80 },
-  [Plan.HOUSEHOLD]: { window: 'monthly', lessonsLimit: 100, quizzesLimit: 100 },
-  [Plan.CAMPUS]: { window: 'monthly', lessonsLimit: 200, quizzesLimit: 200 },
+  [Plan.EXPLORER]: { window: 'daily', lessonsLimit: 2, quizzesLimit: 2, projectsLimit: 1, chatMessagesLimit: 10 },
+  [Plan.SCHOLAR]: { window: 'monthly', lessonsLimit: 40, quizzesLimit: 40, projectsLimit: 5, chatMessagesLimit: 500 },
+  [Plan.HOUSEHOLD]: { window: 'monthly', lessonsLimit: 80, quizzesLimit: 80, projectsLimit: 10, chatMessagesLimit: 800 },
+  [Plan.STUDENT_SCHOLAR]: { window: 'monthly', lessonsLimit: 40, quizzesLimit: 40, projectsLimit: 5, chatMessagesLimit: 500 },
+  [Plan.STUDENT_PRO]: { window: 'monthly', lessonsLimit: 120, quizzesLimit: 120, projectsLimit: 15, chatMessagesLimit: 1500 },
+  [Plan.GUARDIAN_FAMILY_STARTER]: { window: 'monthly', lessonsLimit: 50, quizzesLimit: 50, projectsLimit: 5, chatMessagesLimit: 600 },
+  [Plan.GUARDIAN_FAMILY_STANDARD]: { window: 'monthly', lessonsLimit: 80, quizzesLimit: 80, projectsLimit: 10, chatMessagesLimit: 800 },
+  [Plan.GUARDIAN_FAMILY_PREMIUM]: { window: 'monthly', lessonsLimit: 150, quizzesLimit: 150, projectsLimit: 15, chatMessagesLimit: 1200 },
 };
 
 @Injectable()
@@ -56,8 +62,13 @@ export class PlanLimitsGuard implements CanActivate {
     }
 
     const config = PLAN_CONFIG[user.plan] ?? PLAN_CONFIG[Plan.EXPLORER];
-    const limit =
-      resource === 'lessons' ? config.lessonsLimit : config.quizzesLimit;
+    const limitMap: Record<LimitResource, number> = {
+      lessons: config.lessonsLimit,
+      quizzes: config.quizzesLimit,
+      projects: config.projectsLimit,
+      chatMessages: config.chatMessagesLimit,
+    };
+    const limit = limitMap[resource];
     const limitType =
       config.window === 'daily'
         ? (`${resource}_daily` as const)

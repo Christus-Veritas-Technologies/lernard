@@ -7,6 +7,7 @@ import {
   Post,
   Sse,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import type { User } from '@prisma/client';
@@ -14,6 +15,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Observable } from 'rxjs';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
+import { CheckPlanLimit, PlanLimitsGuard } from '../../common/guards/plan-limits.guard';
 import { SendMessageDto } from './dto/send-message.dto';
 import type { ChatUploadFile } from './chat-uploads';
 import { MAX_CHAT_UPLOAD_SIZE } from './chat-uploads';
@@ -65,6 +67,8 @@ export class ChatController {
   }
 
   @ProtectedRoute()
+  @CheckPlanLimit('chatMessages')
+  @UseGuards(PlanLimitsGuard)
   @Post('message')
   async sendMessage(@CurrentUser() user: User, @Body() dto: SendMessageDto) {
     return this.chatService.sendMessage(user, dto);
