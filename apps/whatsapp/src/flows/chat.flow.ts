@@ -4,6 +4,7 @@ import { LernardApiService, PlanLimitError } from '../api/lernard-api.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { PlanLimitFlow } from './plan-limit.flow';
 import { WhatsAppState } from '@lernard/whatsapp-core';
+import { ROUTES } from '@lernard/routes';
 import { stripMarkdown } from '@lernard/whatsapp-core';
 
 interface ChatResponse {
@@ -34,11 +35,16 @@ export class ChatFlow {
     const stateData = (session.stateData ?? {}) as Record<string, unknown>;
     const conversationId = (stateData['conversationId'] as string) ?? undefined;
 
+    await this.wa.sendTyping(phone);
+
     try {
-      const response = await this.api.call<ChatResponse>(phone, '/v1/chat/message', {
+      // Cap message length — server limit is 2000, but keep WhatsApp messages concise
+      const cappedMessage = messageText.length > 1000 ? messageText.slice(0, 1000) : messageText;
+
+      const response = await this.api.call<ChatResponse>(phone, ROUTES.CHAT.MESSAGE, {
         method: 'POST',
         body: JSON.stringify({
-          message: messageText,
+          message: cappedMessage,
           ...(conversationId ? { conversationId } : {}),
         }),
       });

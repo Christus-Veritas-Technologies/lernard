@@ -12,14 +12,22 @@ import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { WhatsAppState } from '@lernard/whatsapp-core';
 import { LernardIntent } from '@lernard/whatsapp-core';
 import { formatProgressSummary } from '@lernard/whatsapp-core';
+import { ROUTES } from '@lernard/routes';
 import {
   MENU_MESSAGE,
   HELP_MESSAGE,
   CANCEL_MESSAGE,
+  LOGOUT_MESSAGE,
+  THROTTLE_MESSAGE,
   VIEW_PLAN_MESSAGE,
   PROGRESS_UNAVAILABLE_MESSAGE,
   APP_URL,
 } from '@lernard/whatsapp-core';
+
+// ─── Rate-limiting config ─────────────────────────────────────────────────────
+const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_MAX = 12; // max messages per window
+const DEDUP_WINDOW_MS = 3_000; // ignore identical body within 3 s
 
 const UNAUTHENTICATED_STATES = new Set<string>([
   WhatsAppState.UNAUTHENTICATED,
@@ -36,15 +44,23 @@ interface PlanResponse {
 }
 
 interface ProgressResponse {
-  totalLessons: number;
-  totalQuizzes: number;
-  averageScore: number;
-  subjectBreakdown?: Array<{ subject: string; score: number }>;
+  streak: number;
+  xpPoints: number;
+  planUsage: {
+    plan: string;
+    lessonsUsed: number;
+    quizzesUsed: number;
+  };
 }
 
 @Injectable()
 export class MessageHandlerService {
   private readonly logger = new Logger(MessageHandlerService.name);
+
+  // Per-phone in-memory rate limiting: phone → { count, windowStart }
+  private readonly rateLimit = new Map<string, { count: number; windowStart: number }>();
+  // Per-phone deduplication: phone → { body, ts }
+  private readonly lastMsg = new Map<string, { body: string; ts: number }>();
 
   constructor(
     private readonly sessions: SessionsService,
@@ -68,6 +84,32 @@ export class MessageHandlerService {
 
     if (!body) return;
 
+    // ── Deduplication (double-tap / rapid-fire guard) ────────────────────────
+    const lastEntry = this.lastMsg.get(phone);
+    const now = Date.now();
+    if (lastEntry && lastEntry.body === body && now - lastEntry.ts < DEDUP_WINDOW_MS) {
+      return; // silent drop — same message within 3 s
+    }
+    this.lastMsg.set(phone, { body, ts: now });
+
+    // ── Per-phone rate limiting ──────────────────────────────────────────────
+    const rl = this.rateLimit.get(phone) ?? { count: 0, windowStart: now };
+    if (now - rl.windowStart > RATE_LIMIT_WINDOW_MS) {
+      // New window
+      rl.count = 1;
+      rl.windowStart = now;
+    } else {
+      rl.count += 1;
+    }
+    this.rateLimit.set(phone, rl);
+    if (rl.count > RATE_LIMIT_MAX) {
+      // Only send throttle message once per window (on the first over-limit hit)
+      if (rl.count === RATE_LIMIT_MAX + 1) {
+        await wa.sendText(phone, THROTTLE_MESSAGE);
+      }
+      return;
+    }
+
     const session = await this.sessions.getOrCreate(phone);
     const upper = body.toUpperCase();
 
@@ -80,7 +122,25 @@ export class MessageHandlerService {
       await wa.sendText(phone, HELP_MESSAGE);
       return;
     }
+    if (
+      upper === 'LOGOUT' ||
+      upper === 'LOG OUT' ||
+      upper === 'SIGNOUT' ||
+      upper === 'SIGN OUT'
+    ) {
+      await this.sessions.clearTokens(phone);
+      await wa.sendText(phone, LOGOUT_MESSAGE);
+      return;
+    }
     if (upper === 'CANCEL' || upper === 'STOP' || upper === 'QUIT') {
+      // If currently generating, set cancellation flag so the poll loop aborts
+      if (
+        session.state === WhatsAppState.LESSON_GENERATING ||
+        session.state === WhatsAppState.QUIZ_ACTIVE ||
+        session.state === WhatsAppState.QUIZ_GENERATING
+      ) {
+        await this.sessions.updateStateData(phone, { cancelled: true });
+      }
       await wa.sendText(phone, CANCEL_MESSAGE);
       await this.sessions.setState(phone, WhatsAppState.IDLE);
       return;
@@ -170,14 +230,16 @@ export class MessageHandlerService {
     wa: WhatsAppService,
   ): Promise<void> {
     try {
-      const data = await this.api.call<ProgressResponse>(phone, '/v1/users/me/progress');
+      const data = await this.api.call<ProgressResponse>(phone, ROUTES.PROGRESS.OVERVIEW);
       await wa.sendText(
         phone,
         formatProgressSummary({
-          totalLessons: data.totalLessons,
-          totalQuizzes: data.totalQuizzes,
-          averageScore: data.averageScore,
-          subjectBreakdown: data.subjectBreakdown,
+          name: 'Student',
+          streak: data.streak,
+          xp: data.xpPoints,
+          plan: data.planUsage.plan,
+          lessonsThisMonth: data.planUsage.lessonsUsed,
+          quizzesThisMonth: data.planUsage.quizzesUsed,
         }),
       );
     } catch {

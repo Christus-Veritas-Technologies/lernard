@@ -27,13 +27,23 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
   constructor() {
     const keyHex = process.env.WHATSAPP_TOKEN_ENCRYPTION_KEY ?? '';
+    const isProduction = process.env.NODE_ENV === 'production';
+
     if (keyHex.length !== 64) {
+      if (isProduction) {
+        // SECURITY: refuse to start in production with a missing/invalid key.
+        // A zero-padded key would encrypt tokens with a publicly known key.
+        throw new Error(
+          'WHATSAPP_TOKEN_ENCRYPTION_KEY must be a 64-character hex string (32 bytes). ' +
+          'Generate one with: openssl rand -hex 32',
+        );
+      }
       this.logger.warn(
         'WHATSAPP_TOKEN_ENCRYPTION_KEY is missing or not 64 hex chars. ' +
-          'Token storage will be insecure in development mode.',
+          'Token storage will be insecure. Set the env var before deploying.',
       );
     }
-    // Pad or truncate to 32 bytes so the app boots even without a real key
+    // In dev: pad to 64 chars so the app boots without a real key.
     const padded = keyHex.padEnd(64, '0').slice(0, 64);
     this.encKey = Buffer.from(padded, 'hex');
   }
@@ -151,7 +161,17 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private decrypt(stored: string): string {
-    const [ivHex, tagHex, ctHex] = stored.split(':');
+    const parts = stored.split(':');
+    if (parts.length !== 3) {
+      throw new Error(
+        `Malformed encrypted token — expected 3 colon-separated parts, got ${parts.length}. ` +
+        'The stored value may be corrupted.',
+      );
+    }
+    const [ivHex, tagHex, ctHex] = parts as [string, string, string];
+    if (!ivHex || !tagHex || !ctHex) {
+      throw new Error('Malformed encrypted token — one or more parts are empty.');
+    }
     const iv = Buffer.from(ivHex, 'hex');
     const tag = Buffer.from(tagHex, 'hex');
     const ct = Buffer.from(ctHex, 'hex');

@@ -183,6 +183,24 @@ export const PROGRESS_UNAVAILABLE_MESSAGE =
 export const GENERIC_ERROR_MESSAGE =
   `😔 Something went wrong. Please try again, or reply *MENU* to start fresh.`;
 
+// ─── Auth extra ───────────────────────────────────────────────────────────────
+
+export const OTP_TOO_MANY_ATTEMPTS_MESSAGE =
+  `🔒 *Too many incorrect attempts.*\n\n` +
+  `For your security, this session has been reset. Please send your email address again to get a new code.`;
+
+// ─── Session / account ────────────────────────────────────────────────────────
+
+export const LOGOUT_MESSAGE =
+  `👋 *You've been signed out* of Lernard on WhatsApp.\n\n` +
+  `Your account is safe. Send any message to sign back in.`;
+
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+
+export const THROTTLE_MESSAGE =
+  `⏸️ *Slow down!* You're sending messages too fast.\n\n` +
+  `Please wait a moment before sending another message.`;
+
 export const SESSION_EXPIRED_MESSAGE =
   `🔐 Your session has expired. Please reply with your *email address* to sign in again.`;
 

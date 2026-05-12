@@ -5,10 +5,12 @@ import { SessionsModule } from './sessions/sessions.module';
 import { IntentModule } from './intent/intent.module';
 import { LernardApiModule } from './api/lernard-api.module';
 import { HandlerModule } from './handler/handler.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    HealthModule,
     SessionsModule,
     LernardApiModule,
     IntentModule,

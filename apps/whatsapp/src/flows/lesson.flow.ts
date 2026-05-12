@@ -5,6 +5,7 @@ import { LernardApiService, PlanLimitError } from '../api/lernard-api.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { PlanLimitFlow } from './plan-limit.flow';
 import { WhatsAppState } from '@lernard/whatsapp-core';
+import { ROUTES } from '@lernard/routes';
 import { formatLesson } from '@lernard/whatsapp-core';
 import type { ClassificationResult } from '@lernard/whatsapp-core';
 import {
@@ -24,12 +25,16 @@ interface GenerateLessonResponse {
 interface LessonStatusResponse {
   status: 'generating' | 'ready' | 'failed';
   content?: {
-    hook?: string;
-    concept?: string;
-    examples?: string;
-    practice?: string;
-    recap?: string;
-    topic?: string;
+    topic: string;
+    subjectName?: string;
+    estimatedMinutes?: number;
+    depth?: string;
+    sections: Array<{
+      type: string;
+      heading: string | null;
+      body: string;
+      terms?: Array<{ term: string; explanation: string }>;
+    }>;
   };
 }
 
@@ -52,13 +57,14 @@ export class LessonFlow {
     const topic = classification.topic ?? 'a general topic';
     const depth = classification.depth ?? 'standard';
 
+    await this.wa.sendTyping(phone);
     await this.wa.sendText(phone, GENERATING_LESSON_MESSAGE(topic));
 
     let generateRes: GenerateLessonResponse;
     try {
       generateRes = await this.api.call<GenerateLessonResponse>(
         phone,
-        '/v1/lessons/generate',
+        ROUTES.LESSONS.GENERATE,
         {
           method: 'POST',
           body: JSON.stringify({
@@ -88,10 +94,19 @@ export class LessonFlow {
     for (let attempt = 0; attempt < POLL_MAX_RETRIES; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
 
+      // Check if user cancelled while we were waiting
+      const currentSession = await this.sessions.getOrCreate(phone);
+      const currentData = (currentSession.stateData ?? {}) as Record<string, unknown>;
+      if (currentData['cancelled'] === true) {
+        this.logger.log(`Lesson generation cancelled by user for ${phone}`);
+        await this.sessions.setState(phone, WhatsAppState.IDLE);
+        return;
+      }
+
       try {
         const status = await this.api.call<LessonStatusResponse>(
           phone,
-          `/v1/lessons/${lessonId}`,
+          ROUTES.LESSONS.GET(lessonId),
         );
 
         if (status.status === 'ready' && status.content) {

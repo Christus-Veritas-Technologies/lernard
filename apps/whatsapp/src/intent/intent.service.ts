@@ -58,14 +58,44 @@ export class IntentService {
     currentState: WhatsAppState,
   ): Promise<ClassificationResult> {
     // Fast keyword shortcuts to save API calls
-    const upper = messageText.trim().toUpperCase();
-    if (upper === 'MENU') return { intent: LernardIntent.MENU };
-    if (upper === 'CANCEL' || upper === 'STOP' || upper === 'QUIT') {
-      return { intent: LernardIntent.CANCEL };
+    const trimmed = messageText.trim();
+    const upper = trimmed.toUpperCase();
+
+    // ─ Exact keyword shortcuts (no Haiku call needed) ──────────────────────
+    if (upper === 'MENU' || upper === 'OPTIONS') return { intent: LernardIntent.MENU };
+    if (upper === 'CANCEL' || upper === 'STOP' || upper === 'QUIT') return { intent: LernardIntent.CANCEL };
+    if (/^[ABCD]$/.test(upper)) return { intent: LernardIntent.ANSWER_SUBMISSION, answer: upper };
+
+    // Yes / No
+    if (/^(YES|Y|YEAH|YEP|OK|OKAY|SURE)$/.test(upper)) return { intent: LernardIntent.YES_CONFIRM };
+    if (/^(NO|N|NOPE|NAH|NAH)$/.test(upper)) return { intent: LernardIntent.NO_CONFIRM };
+
+    // Plan / progress
+    if (/^(PLAN|MY PLAN|SUBSCRIPTION|MY SUBSCRIPTION)$/.test(upper)) return { intent: LernardIntent.VIEW_PLAN };
+    if (/^(PROGRESS|MY PROGRESS|STATS|MY STATS|HOW AM I DOING)$/.test(upper)) return { intent: LernardIntent.VIEW_PROGRESS };
+    if (/^(UPGRADE|UPGRADE PLAN)$/.test(upper)) return { intent: LernardIntent.UPGRADE_PLAN };
+
+    // Lesson / Quiz prefix shortcut — "LESSON <topic>" or "QUIZ <topic>"
+    const lessonMatch = /^LESSON\s+(.+)$/.exec(upper);
+    if (lessonMatch) {
+      return {
+        intent: LernardIntent.START_LESSON,
+        topic: trimmed.slice(7).trim(),
+        depth: 'standard',
+      };
     }
-    if (/^[ABCD]$/.test(upper)) {
-      return { intent: LernardIntent.ANSWER_SUBMISSION, answerText: upper };
+    const quizMatch = /^QUIZ\s+(.+)$/.exec(upper);
+    if (quizMatch) {
+      return {
+        intent: LernardIntent.START_QUIZ,
+        topic: trimmed.slice(5).trim(),
+        depth: 'standard',
+      };
     }
+    if (upper === 'PROJECT') return { intent: LernardIntent.START_PROJECT };
+
+    // ─ Truncate before sending to Haiku ────────────────────────────────────
+    const textForClassification = trimmed.length > 500 ? trimmed.slice(0, 500) : trimmed;
 
     try {
       const response = await this.anthropic.messages.create({
@@ -75,7 +105,7 @@ export class IntentService {
         messages: [
           {
             role: 'user',
-            content: `Current state: ${currentState}\nMessage: ${messageText}`,
+            content: `Current state: ${currentState}\nMessage: ${textForClassification}`,
           },
         ],
       });

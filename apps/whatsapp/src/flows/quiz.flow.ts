@@ -5,6 +5,7 @@ import { LernardApiService, PlanLimitError } from '../api/lernard-api.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { PlanLimitFlow } from './plan-limit.flow';
 import { WhatsAppState } from '@lernard/whatsapp-core';
+import { ROUTES } from '@lernard/routes';
 import {
   formatQuestion,
   formatAnswerFeedback,
@@ -32,9 +33,19 @@ interface QuizStatusResponse {
 
 interface QuizQuestion {
   id: string;
+  type: string;
   text: string;
   options: { label: string; text: string }[];
   index: number;
+}
+
+/** Map QuizQuestion from the API to the flat shape formatQuestion expects */
+function toQuizQuestionLike(q: QuizQuestion) {
+  return {
+    type: q.type,
+    text: q.text,
+    options: q.options.map((o) => `${o.label}) ${o.text}`),
+  };
 }
 
 interface QuizCurrentResponse {
@@ -69,13 +80,14 @@ export class QuizFlow {
     const phone = session.phoneNumber;
     const topic = classification.topic ?? 'a general topic';
 
+    await this.wa.sendTyping(phone);
     await this.wa.sendText(phone, GENERATING_QUIZ_MESSAGE(topic));
 
     let generateRes: GenerateQuizResponse;
     try {
       generateRes = await this.api.call<GenerateQuizResponse>(
         phone,
-        '/v1/quizzes/generate',
+        ROUTES.QUIZZES.GENERATE,
         {
           method: 'POST',
           body: JSON.stringify({
@@ -102,10 +114,20 @@ export class QuizFlow {
     let totalQuestions = 5;
     for (let attempt = 0; attempt < POLL_MAX_RETRIES; attempt++) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+
+      // Check if user cancelled while we were waiting
+      const currentSession = await this.sessions.getOrCreate(phone);
+      const currentData = (currentSession.stateData ?? {}) as Record<string, unknown>;
+      if (currentData['cancelled'] === true) {
+        this.logger.log(`Quiz generation cancelled by user for ${phone}`);
+        await this.sessions.setState(phone, WhatsAppState.IDLE);
+        return;
+      }
+
       try {
         const status = await this.api.call<QuizStatusResponse>(
           phone,
-          `/v1/quizzes/${quizId}`,
+          ROUTES.QUIZZES.GET(quizId),
         );
         if (status.status === 'ready') {
           totalQuestions = status.totalQuestions ?? 5;
@@ -144,7 +166,7 @@ export class QuizFlow {
       }
       await this.wa.sendText(
         phone,
-        formatQuestion(current.question, 0, totalQuestions),
+        formatQuestion(toQuizQuestionLike(current.question), 0, totalQuestions),
       );
       await this.sessions.setState(phone, WhatsAppState.QUIZ_ACTIVE, {
         quizId,
@@ -168,7 +190,6 @@ export class QuizFlow {
     const quizId = stateData['quizId'] as string;
     const totalQuestions = (stateData['totalQuestions'] as number) ?? 5;
     const currentIndex = (stateData['currentIndex'] as number) ?? 0;
-    const topic = (stateData['topic'] as string) ?? '';
 
     if (!quizId) {
       await this.wa.sendText(phone, `Something went wrong. Starting over.`);
@@ -176,13 +197,23 @@ export class QuizFlow {
       return;
     }
 
+    // Validate that the answer is a single letter A–D
+    const answer = messageText.trim().toUpperCase();
+    if (!/^[ABCD]$/.test(answer)) {
+      await this.wa.sendText(
+        phone,
+        `Please reply with *A*, *B*, *C*, or *D* to answer the question.`,
+      );
+      return;
+    }
+
     try {
       const result = await this.api.call<SubmitAnswerResponse>(
         phone,
-        `/v1/quizzes/${quizId}/answer`,
+        ROUTES.QUIZZES.ANSWER(quizId),
         {
           method: 'POST',
-          body: JSON.stringify({ answer: messageText.trim().toUpperCase() }),
+          body: JSON.stringify({ answer }),
         },
       );
 
@@ -210,7 +241,7 @@ export class QuizFlow {
         // More questions
         await this.wa.sendText(
           phone,
-          formatQuestion(result.nextQuestion, nextIndex, totalQuestions),
+          formatQuestion(toQuizQuestionLike(result.nextQuestion), nextIndex, totalQuestions),
         );
         await this.sessions.updateStateData(phone, { currentIndex: nextIndex });
       }

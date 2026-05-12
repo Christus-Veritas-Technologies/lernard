@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SessionsService } from '../sessions/sessions.service';
+import { ROUTES } from '@lernard/routes';
 
 export class PlanLimitError extends Error {
   constructor(
@@ -130,7 +131,7 @@ export class LernardApiService {
     refreshToken: string,
   ): Promise<{ accessToken: string } | null> {
     try {
-      const res = await globalThis.fetch(`${this.baseUrl}/v1/auth/refresh`, {
+      const res = await globalThis.fetch(`${this.baseUrl}${ROUTES.AUTH.REFRESH}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken }),

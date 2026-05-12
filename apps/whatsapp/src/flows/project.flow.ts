@@ -4,6 +4,7 @@ import { LernardApiService, PlanLimitError } from '../api/lernard-api.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 import { PlanLimitFlow } from './plan-limit.flow';
 import { WhatsAppState } from '@lernard/whatsapp-core';
+import { ROUTES } from '@lernard/routes';
 import { PROJECT_WIZARD_STEPS } from '@lernard/whatsapp-core';
 import {
   PROJECT_GENERATING_MESSAGE,
@@ -88,6 +89,7 @@ export class ProjectFlow {
       });
     } else {
       // All steps collected — generate project
+      await this.wa.sendTyping(phone);
       await this.wa.sendText(phone, PROJECT_GENERATING_MESSAGE);
       await this.sessions.setState(phone, WhatsAppState.PROJECT_GENERATING, {
         fields,
@@ -105,7 +107,7 @@ export class ProjectFlow {
       // Create draft
       const draftRes = await this.api.call<ProjectDraftResponse>(
         phone,
-        '/v1/projects/draft',
+        ROUTES.PROJECTS.CREATE_DRAFT,
         {
           method: 'POST',
           body: JSON.stringify({
@@ -139,14 +141,14 @@ export class ProjectFlow {
 
         const status = await this.api.call<ProjectStatusResponse>(
           phone,
-          `/v1/projects/${projectId}`,
+          ROUTES.PROJECTS.GET(projectId),
         );
 
         if (status.status === 'ready' && status.pdfReadyAt) {
           // Download PDF
           const tokens = await this.sessions.getTokens(phone);
           const pdfRes = await globalThis.fetch(
-            `${process.env.LERNARD_API_URL ?? 'http://localhost:3000'}/v1/projects/${projectId}/download`,
+            `${process.env.LERNARD_API_URL ?? 'http://localhost:3000'}${ROUTES.PROJECTS.DOWNLOAD_PDF(projectId)}`,
             {
               headers: {
                 Authorization: `Bearer ${tokens?.accessToken ?? ''}`,
