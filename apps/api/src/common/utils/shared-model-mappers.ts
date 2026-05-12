@@ -38,8 +38,16 @@ export function toSharedPlan(plan: PrismaPlan | null | undefined): Plan {
       return Plan.SCHOLAR;
     case PrismaPlan.HOUSEHOLD:
       return Plan.HOUSEHOLD;
-    case PrismaPlan.CAMPUS:
-      return Plan.CAMPUS;
+    case PrismaPlan.STUDENT_SCHOLAR:
+      return Plan.STUDENT_SCHOLAR;
+    case PrismaPlan.STUDENT_PRO:
+      return Plan.STUDENT_PRO;
+    case PrismaPlan.GUARDIAN_FAMILY_STARTER:
+      return Plan.GUARDIAN_FAMILY_STARTER;
+    case PrismaPlan.GUARDIAN_FAMILY_STANDARD:
+      return Plan.GUARDIAN_FAMILY_STANDARD;
+    case PrismaPlan.GUARDIAN_FAMILY_PREMIUM:
+      return Plan.GUARDIAN_FAMILY_PREMIUM;
     case PrismaPlan.EXPLORER:
     default:
       return Plan.EXPLORER;
