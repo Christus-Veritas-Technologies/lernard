@@ -89,13 +89,6 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
             .catch(() => { /* non-blocking */ });
     }, []);
 
-    // Auto-load lessons if lessonId is provided
-    useEffect(() => {
-        if (initialLessonId && !lessonsLoaded) {
-            void loadLessons();
-        }
-    }, [initialLessonId, lessonsLoaded, loadLessons]);
-
     const loadLessons = useCallback(async () => {
         if (lessonsLoaded) return;
 
@@ -123,6 +116,13 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
             setLessonsLoaded(true);
         }
     }, [lessonsLoaded, initialLessonId, initialTopic]);
+
+    // Auto-load lessons if lessonId is provided
+    useEffect(() => {
+        if (initialLessonId && !lessonsLoaded) {
+            void loadLessons();
+        }
+    }, [initialLessonId, lessonsLoaded, loadLessons]);
 
     function switchSource(nextSource: Source) {
         setSource(nextSource);
