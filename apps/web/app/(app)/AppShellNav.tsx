@@ -70,7 +70,7 @@ export function AppShellNav() {
                         </p>
                     </div>
 
-                    <nav className="mt-6 flex-1 space-y-2">
+                    <nav className="mt-6 flex-1 space-y-2 overflow-y-auto">
                         {navItems.map((item) => {
                             const isActive = matchesPath(pathname, item.href);
                             const Icon = item.icon;
