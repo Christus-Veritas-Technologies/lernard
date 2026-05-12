@@ -1,6 +1,7 @@
 "use client";
 
-import { CheckmarkCircle01Icon } from "hugeicons-react";
+import { useState } from "react";
+import { CheckmarkCircle01Icon, Loading03Icon } from "hugeicons-react";
 
 import { Plan } from "@lernard/shared-types";
 
@@ -9,6 +10,8 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { cn } from "@/lib/cn";
 import { useAuthMeQuery } from "@/hooks/useAuthMutations";
+import { initiatePayment } from "@/lib/payments-client";
+import { BrowserApiError } from "@/lib/browser-api";
 
 interface PlanConfig {
     key: Plan;
@@ -16,7 +19,6 @@ interface PlanConfig {
     tagline: string;
     price: string;
     priceDetail: string;
-    cta: string;
     featured: boolean;
     features: string[];
     limits: string[];
@@ -29,7 +31,6 @@ const studentPlans: PlanConfig[] = [
         tagline: "For anyone getting started",
         price: "Free",
         priceDetail: "No card needed",
-        cta: "Current plan",
         featured: false,
         features: [
             "First Look baseline assessment",
@@ -49,9 +50,8 @@ const studentPlans: PlanConfig[] = [
         key: Plan.STUDENT_SCHOLAR,
         name: "Student Scholar",
         tagline: "For consistent learners",
-        price: "Coming soon",
+        price: "$4.99/mo",
         priceDetail: "Billed monthly",
-        cta: "Join the waitlist",
         featured: false,
         features: [
             "Everything in Explorer",
@@ -71,9 +71,8 @@ const studentPlans: PlanConfig[] = [
         key: Plan.STUDENT_PRO,
         name: "Student Pro",
         tagline: "For serious exam preparation",
-        price: "Coming soon",
+        price: "$9.99/mo",
         priceDetail: "Billed monthly",
-        cta: "Join the waitlist",
         featured: true,
         features: [
             "Everything in Student Scholar",
@@ -96,9 +95,8 @@ const guardianPlans: PlanConfig[] = [
         key: Plan.GUARDIAN_FAMILY_STARTER,
         name: "Family Starter",
         tagline: "For households beginning with Lernard",
-        price: "Coming soon",
+        price: "$7.99/mo",
         priceDetail: "Billed monthly",
-        cta: "Join the waitlist",
         featured: false,
         features: [
             "Guardian dashboard",
@@ -118,9 +116,8 @@ const guardianPlans: PlanConfig[] = [
         key: Plan.GUARDIAN_FAMILY_STANDARD,
         name: "Family Standard",
         tagline: "For active families",
-        price: "Coming soon",
+        price: "$14.99/mo",
         priceDetail: "Billed monthly",
-        cta: "Join the waitlist",
         featured: true,
         features: [
             "Everything in Family Starter",
@@ -139,9 +136,8 @@ const guardianPlans: PlanConfig[] = [
         key: Plan.GUARDIAN_FAMILY_PREMIUM,
         name: "Family Premium",
         tagline: "For families who want it all",
-        price: "Coming soon",
+        price: "$24.99/mo",
         priceDetail: "Billed monthly",
-        cta: "Join the waitlist",
         featured: false,
         features: [
             "Everything in Family Standard",
@@ -158,8 +154,34 @@ const guardianPlans: PlanConfig[] = [
     },
 ];
 
-function PlanCard({ plan, currentPlan }: { plan: PlanConfig; currentPlan: Plan }) {
+interface PlanCardProps {
+    plan: PlanConfig;
+    currentPlan: Plan;
+    initiatingPlan: Plan | null;
+    errorPlan: Plan | null;
+    errorMessage: string | null;
+    onSubscribe: (plan: Plan) => void;
+}
+
+function PlanCard({
+    plan,
+    currentPlan,
+    initiatingPlan,
+    errorPlan,
+    errorMessage,
+    onSubscribe,
+}: PlanCardProps) {
     const isCurrent = currentPlan === plan.key;
+    const isFree = plan.key === Plan.EXPLORER;
+    const isInitiating = initiatingPlan === plan.key;
+    const isDisabled = isCurrent || isFree || (initiatingPlan !== null && !isInitiating);
+    const hasError = errorPlan === plan.key && !!errorMessage;
+
+    function getCtaLabel() {
+        if (isCurrent) return "Your current plan";
+        if (isFree) return "Always free";
+        return "Subscribe";
+    }
 
     return (
         <Card
@@ -191,13 +213,23 @@ function PlanCard({ plan, currentPlan }: { plan: PlanConfig; currentPlan: Plan }
                 </div>
 
                 {/* CTA */}
-                <Button
-                    className="w-full"
-                    disabled={isCurrent}
-                    variant={plan.featured ? "primary" : "secondary"}
-                >
-                    {isCurrent ? "Your current plan" : plan.cta}
-                </Button>
+                <div className="flex flex-col gap-1.5">
+                    <Button
+                        className="w-full"
+                        disabled={isDisabled}
+                        variant={plan.featured ? "primary" : "secondary"}
+                        onClick={isFree || isCurrent ? undefined : () => onSubscribe(plan.key)}
+                    >
+                        {isInitiating ? (
+                            <Loading03Icon className="animate-spin" size={16} />
+                        ) : (
+                            getCtaLabel()
+                        )}
+                    </Button>
+                    {hasError && (
+                        <p className="text-center text-xs text-destructive">{errorMessage}</p>
+                    )}
+                </div>
 
                 {/* Limits */}
                 <div>
@@ -231,6 +263,41 @@ function PlanCard({ plan, currentPlan }: { plan: PlanConfig; currentPlan: Plan }
 export function PlansPageClient() {
     const { data: me } = useAuthMeQuery();
     const currentPlan = me?.plan ?? Plan.EXPLORER;
+    const [initiatingPlan, setInitiatingPlan] = useState<Plan | null>(null);
+    const [errorPlan, setErrorPlan] = useState<Plan | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    async function handleSubscribe(plan: Plan) {
+        setInitiatingPlan(plan);
+        setErrorPlan(null);
+        setErrorMessage(null);
+
+        try {
+            const response = await initiatePayment(plan);
+            window.location.href = response.redirectUrl;
+        } catch (err) {
+            let message = "Something went wrong. Please try again.";
+            if (err instanceof BrowserApiError) {
+                try {
+                    const body = JSON.parse(err.body) as { message?: string };
+                    if (body.message) message = body.message;
+                } catch {
+                    // ignore parse error
+                }
+            }
+            setErrorPlan(plan);
+            setErrorMessage(message);
+            setInitiatingPlan(null);
+        }
+    }
+
+    const sharedCardProps = {
+        currentPlan,
+        initiatingPlan,
+        errorPlan,
+        errorMessage,
+        onSubscribe: handleSubscribe,
+    };
 
     return (
         <div className="flex flex-col gap-10">
@@ -252,7 +319,7 @@ export function PlansPageClient() {
                 <h2 className="text-lg font-semibold text-text-primary">Student plans</h2>
                 <div className="grid gap-4 sm:grid-cols-3">
                     {studentPlans.map((plan) => (
-                        <PlanCard key={plan.key} plan={plan} currentPlan={currentPlan} />
+                        <PlanCard key={plan.key} plan={plan} {...sharedCardProps} />
                     ))}
                 </div>
             </section>
@@ -267,14 +334,12 @@ export function PlansPageClient() {
                 </div>
                 <div className="grid gap-4 sm:grid-cols-3">
                     {guardianPlans.map((plan) => (
-                        <PlanCard key={plan.key} plan={plan} currentPlan={currentPlan} />
+                        <PlanCard key={plan.key} plan={plan} {...sharedCardProps} />
                     ))}
                 </div>
             </section>
-
-            <p className="text-center text-xs text-text-tertiary">
-                Paid plans are in development. Join the waitlist to be notified at launch.
-            </p>
         </div>
     );
 }
+
+
