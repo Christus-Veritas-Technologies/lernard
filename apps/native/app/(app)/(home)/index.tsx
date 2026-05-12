@@ -11,6 +11,7 @@ import { Text } from '@rnr/text';
 import { Button } from '@/components/Button';
 import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoadingOverlay';
 import { StateNotice } from '@/components/StateNotice';
+import { PlanUsageCard } from '@/components/quota/PlanUsageCard';
 import GuardianDashboardScreen from '@/app/(app)/guardian';
 import { usePagePayload } from '@/hooks/usePagePayload';
 import { formatRelativeDate } from '@/lib/formatters';
@@ -324,6 +325,8 @@ function StudentHomeDashboardScreen() {
                         </Text>
                     </View>
                 </View>
+
+                <PlanUsageCard planUsage={content.planUsage} />
 
                 <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
                     <View className="flex-row items-start justify-between gap-4">
