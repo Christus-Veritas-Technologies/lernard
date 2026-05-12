@@ -8,6 +8,7 @@ export {
   LearningGoal,
   SessionDepth,
   Appearance,
+  PaymentStatus,
 } from './enums'
 
 // Entities
@@ -153,3 +154,7 @@ export type {
   FirstLookResult,
   FirstLookSkipResponse,
 } from './payloads/onboarding'
+export type {
+  PaymentInitResponse,
+  PaymentStatusResponse,
+} from './payloads/payments'

@@ -55,3 +55,10 @@ export enum Appearance {
   DARK = 'dark',
   SYSTEM = 'system',
 }
+
+export enum PaymentStatus {
+  PENDING = 'pending',
+  PAID = 'paid',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled',
+}
