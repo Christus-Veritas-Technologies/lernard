@@ -65,6 +65,7 @@ export function LearnPageClient() {
     const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
     const [uploadError, setUploadError] = useState<string | null>(null);
+    const [generationError, setGenerationError] = useState<string | null>(null);
 
     const imageInputRef = useRef<HTMLInputElement>(null);
     const docInputRef = useRef<HTMLInputElement>(null);
@@ -184,6 +185,7 @@ export function LearnPageClient() {
         if (!canGenerate) return;
 
         setLoading(true);
+        setGenerationError(null);
         try {
             const body: Record<string, unknown> = {
                 depth,
@@ -204,6 +206,10 @@ export function LearnPageClient() {
                 body: JSON.stringify(body),
             });
 
+            if (!response?.lessonId) {
+                throw new Error("No lesson ID returned from server");
+            }
+
             setPlanUsage((current) => {
                 if (!current) return current;
                 return {
@@ -213,6 +219,9 @@ export function LearnPageClient() {
             });
 
             router.push(`/learn/${response.lessonId}/loading`);
+        } catch (error) {
+            console.error("Lesson generation failed:", error);
+            setGenerationError((error as Error).message || "Failed to generate lesson. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -510,11 +519,13 @@ export function LearnPageClient() {
                     </RadioGroup>
                 </div>
 
+                {generationError && (
+                    <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3">
+                        <p className="text-sm text-destructive">{generationError}</p>
+                    </div>
+                )}
+
                 <div className="grid gap-3">
-                    <Button disabled={atLimit} variant="secondary">
-                        <SparklesIcon size={16} strokeWidth={1.8} />
-                        Lernard&apos;s Choice
-                    </Button>
                     <Button disabled={!canGenerate} onClick={onGenerate}>
                         {loading ? "Generating..." : "Generate Lesson"}
                     </Button>
