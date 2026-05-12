@@ -6,6 +6,6 @@ export class RequestMagicLinkDto {
   email: string;
 
   @IsOptional()
-  @IsIn(['web', 'native'])
-  platform?: 'web' | 'native';
+  @IsIn(['web', 'native', 'whatsapp'])
+  platform?: 'web' | 'native' | 'whatsapp';
 }

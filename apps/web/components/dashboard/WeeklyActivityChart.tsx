@@ -23,10 +23,10 @@ function getY(active: boolean): number {
 
 function buildCubicPath(points: Array<{ x: number; y: number }>): string {
     if (points.length < 2) return "";
-    let d = `M ${points[0].x} ${points[0].y}`;
+    let d = `M ${points[0]!.x} ${points[0]!.y}`;
     for (let i = 1; i < points.length; i++) {
-        const prev = points[i - 1];
-        const curr = points[i];
+        const prev = points[i - 1]!;
+        const curr = points[i]!;
         const cpX = (prev.x + curr.x) / 2;
         d += ` C ${cpX} ${prev.y}, ${cpX} ${curr.y}, ${curr.x} ${curr.y}`;
     }
@@ -52,19 +52,19 @@ export function WeeklyActivityChart({ activity, streak }: WeeklyActivityChartPro
     const baseY = PADDING_TOP + CHART_H;
     const areaPath =
         linePath +
-        ` L ${points[points.length - 1].x} ${baseY}` +
-        ` L ${points[0].x} ${baseY} Z`;
+        ` L ${points[points.length - 1]!.x} ${baseY}` +
+        ` L ${points[0]!.x} ${baseY} Z`;
 
     // Find peak (most-recent active day) for the badge
     let peakIndex = days.length - 1;
     for (let i = days.length - 1; i >= 0; i--) {
-        if (days[i].active) {
+        if (days[i]!.active) {
             peakIndex = i;
             break;
         }
     }
-    const badgeX = points[peakIndex].x;
-    const badgeY = points[peakIndex].y - 14;
+    const badgeX = points[peakIndex]!.x;
+    const badgeY = points[peakIndex]!.y - 14;
 
     const badgeText = `${streak} day streak`;
     const badgeW = badgeText.length * 6.5 + 16;
@@ -103,7 +103,7 @@ export function WeeklyActivityChart({ activity, streak }: WeeklyActivityChartPro
                         key={i}
                         cx={p.x}
                         cy={p.y}
-                        fill={days[i].active ? PRIMARY_COLOR : "#D1D5E8"}
+                        fill={days[i]!.active ? PRIMARY_COLOR : "#D1D5E8"}
                         r={3.5}
                     />
                 ))}
@@ -142,7 +142,7 @@ export function WeeklyActivityChart({ activity, streak }: WeeklyActivityChartPro
                         fill="#9CA3AF"
                         fontSize={10}
                         textAnchor="middle"
-                        x={points[i].x}
+                        x={points[i]!.x}
                         y={PADDING_TOP + CHART_H + 8}
                     >
                         {d.day}

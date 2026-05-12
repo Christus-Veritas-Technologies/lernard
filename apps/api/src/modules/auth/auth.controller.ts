@@ -62,6 +62,12 @@ export class AuthController {
       return res.json({ sessionCode });
     }
 
+    // WhatsApp: return tokens directly (server-to-server, no browser involved)
+    if (result.platform === 'whatsapp') {
+      const { platform: _p, ...response } = result;
+      return res.json(response);
+    }
+
     const { platform: _platform, ...response } = result;
     return res.json(response);
   }

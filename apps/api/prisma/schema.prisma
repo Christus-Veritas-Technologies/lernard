@@ -184,6 +184,7 @@ model User {
   conversations     Conversation[]
   pushSubscriptions PushSubscription[]
   paymentOrders     PaymentOrder[]
+  whatsAppSession   WhatsAppSession?
   @@index([email])
   @@index([role])
   @@index([deletedAt])
@@ -584,4 +585,30 @@ model PaymentOrder {
   @@index([userId])
   @@index([reference])
   @@index([userId, status])
+}
+
+// ─── WhatsApp Sessions ────────────────────────────────────────────────────────
+// Stores one session per WhatsApp phone number.
+// Tokens are AES-256-GCM encrypted before storage.
+
+model WhatsAppSession {
+  id              String   @id @default(cuid())
+  /// E.164 format, e.g. "263771234567@c.us" (wweb.js phone ID)
+  phoneNumber     String   @unique
+  userId          String?  @unique
+  /// WhatsAppState enum value (string)
+  state           String   @default("UNAUTHENTICATED")
+  /// JSON blob: varies per state (AuthStateData | QuizStateData | etc.)
+  stateData       Json?
+  /// AES-256-GCM encrypted JWT access token
+  accessTokenEnc  String?
+  /// AES-256-GCM encrypted JWT refresh token
+  refreshTokenEnc String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([phoneNumber])
+  @@index([userId])
 }

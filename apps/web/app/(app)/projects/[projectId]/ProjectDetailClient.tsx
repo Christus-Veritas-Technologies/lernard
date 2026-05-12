@@ -176,7 +176,7 @@ export function ProjectDetailClient({ projectId }: ProjectDetailClientProps) {
                 editedBytes.byteOffset,
                 editedBytes.byteOffset + editedBytes.byteLength,
             );
-            const blob = new Blob([editedBuffer], { type: "application/pdf" });
+            const blob = new Blob([editedBuffer as ArrayBuffer], { type: "application/pdf" });
             const url = URL.createObjectURL(blob);
             const anchor = window.document.createElement("a");
             anchor.href = url;

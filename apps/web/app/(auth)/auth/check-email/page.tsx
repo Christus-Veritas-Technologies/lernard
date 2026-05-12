@@ -2,16 +2,16 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 
 import { Mail01Icon, ArrowLeft01Icon, Loading03Icon } from "hugeicons-react";
 
 import { BrowserApiError } from "@/lib/browser-api";
 import { useRequestMagicLinkMutation } from "@/hooks/useAuthMutations";
 
-const item = {
+const item: Variants = {
     hidden: { opacity: 0, y: 10 },
-    show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" } },
+    show: { opacity: 1, y: 0, transition: { duration: 0.35, ease: "easeOut" as const } },
 };
 
 function CheckEmailContent() {

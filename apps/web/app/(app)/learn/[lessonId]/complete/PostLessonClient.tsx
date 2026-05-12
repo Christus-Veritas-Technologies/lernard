@@ -62,7 +62,7 @@ export function PostLessonClient({ lessonId }: PostLessonClientProps) {
                 <p className="mb-4 text-sm font-semibold text-slate-700">How confident are you right now?</p>
                 <div className="grid grid-cols-5 gap-2">
                     {[1, 2, 3, 4, 5].map((value) => {
-                        const meta = CONFIDENCE_LABELS[value];
+                        const meta = CONFIDENCE_LABELS[value]!;
                         const isSelected = rating === value;
                         return (
                             <button

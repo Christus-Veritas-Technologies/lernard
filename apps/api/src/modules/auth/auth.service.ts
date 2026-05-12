@@ -53,7 +53,7 @@ export class AuthService {
 
   // ─── Magic Link ────────────────────────────────────────────────────────────
 
-  async sendMagicLink(email: string, platform: 'web' | 'native' = 'web') {
+  async sendMagicLink(email: string, platform: 'web' | 'native' | 'whatsapp' = 'web') {
     const normalizedEmail = email.toLowerCase();
 
     // Invalidate any previous unused tokens for this address

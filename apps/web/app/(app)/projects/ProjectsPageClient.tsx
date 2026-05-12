@@ -49,7 +49,7 @@ export function ProjectsPageClient() {
                     <CardDescription>Projects are linked to your Lernard account.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Link href={ROUTES.AUTH.LOGIN}>
+                    <Link href="/auth/login">
                         <Button>
                             Go to sign in
                             <ArrowRight01Icon className="ml-2 size-4" />

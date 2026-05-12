@@ -23,7 +23,7 @@ import {
     Settings02Icon,
     SparklesIcon,
     SunCloud01Icon,
-    SystemUpdateIcon,
+    SystemUpdate01Icon as SystemUpdateIcon,
     UserCircleIcon,
 } from "hugeicons-react";
 import Link from "next/link";
@@ -51,13 +51,6 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";

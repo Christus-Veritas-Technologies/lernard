@@ -44,7 +44,7 @@ export function ProgressPageClient() {
 
         void browserApiFetch<PaginatedHistoryResponse>(route)
             .then(setHistory)
-            .catch(() => setHistory({ sessions: [], hasMore: false, nextCursor: null }));
+            .catch(() => setHistory({ sessions: [], hasMore: false, nextCursor: null, historyCapDays: null }));
     }, [historyTypeFilter, isAuthenticated]);
 
     const totalLessons = useMemo(
@@ -154,7 +154,7 @@ export function ProgressPageClient() {
                             const growthAreaCount = subject.topics.filter(
                                 (topic) => topic.level === "needs_work",
                             ).length;
-                            const strengthLevel = subject.strengthLevel === "confident" ? "success" : subject.strengthLevel === "getting_there" ? "warning" : "muted";
+                            const strengthLevel = subject.strengthLevel === "strong" ? "success" : subject.strengthLevel === "developing" ? "warning" : "muted";
 
                             return (
                                 <Link href={`/progress/${subject.subjectId}`} key={subject.subjectId}>

@@ -191,7 +191,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                         <Button onClick={() => router.push("/practice-exams")} variant="secondary">
                             Back to Practice Exams dashboard
                         </Button>
-                        <Button onClick={loadQuiz}>Try loading again</Button>
+                        <Button onClick={() => void loadQuiz()}>Try loading again</Button>
                     </CardContent>
                 </Card>
             );
@@ -204,7 +204,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                     <CardDescription>{error?.message ?? "Try again"}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Button onClick={loadQuiz}>Retry</Button>
+                    <Button onClick={() => void loadQuiz()}>Retry</Button>
                 </CardContent>
             </Card>
         );

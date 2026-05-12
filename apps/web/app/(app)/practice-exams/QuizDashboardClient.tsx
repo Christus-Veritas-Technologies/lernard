@@ -269,7 +269,7 @@ export function QuizDashboardClient() {
                                                     {statusLabel(item.status)}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell>{formatDate(item.updatedAt)}</TableCell>
+                                            <TableCell>{formatDate(item.completedAt ?? item.createdAt)}</TableCell>
                                             <TableCell className="text-right">
                                                 <Link href={`/practice-exams/${item.quizId}`}>
                                                     <Button variant="secondary">Open</Button>

@@ -1,22 +1,22 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { SparklesIcon } from "hugeicons-react";
 import Link from "next/link";
 
 export default function Loading() {
-  const dotVariants = {
+  const dotVariants: Variants = {
     animate: {
       y: [0, -10, 0],
       transition: {
         duration: 0.6,
         repeat: Infinity,
-        ease: "easeInOut",
+        ease: "easeInOut" as const,
       },
     },
   };
 
-  const containerVariants = {
+  const containerVariants: Variants = {
     animate: {
       transition: {
         staggerChildren: 0.1,

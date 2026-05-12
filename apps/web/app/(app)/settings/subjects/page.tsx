@@ -93,9 +93,9 @@ export default function SubjectsPage() {
         const newIndex = direction === "up" ? index - 1 : index + 1;
         if (newIndex < 0 || newIndex >= selected.length) return;
 
-        const reordered = [...selected];
-        const tmp = reordered[index] as UserSubject;
-        reordered[index] = reordered[newIndex] as UserSubject;
+        const reordered = [...selected] as UserSubject[];
+        const tmp = reordered[index]!;
+        reordered[index] = reordered[newIndex]!;
         reordered[newIndex] = tmp;
         setSelected(reordered);
 
