@@ -144,4 +144,10 @@ export const ROUTES = {
   WEBHOOKS: {
     BILLING: '/webhooks/billing',
   },
+
+  PAYMENTS: {
+    INITIATE: '/v1/payments/initiate',
+    STATUS: (reference: string) => `/v1/payments/status/${reference}` as const,
+    PAYNOW_CALLBACK: '/v1/payments/paynow/callback',
+  },
 } as const
