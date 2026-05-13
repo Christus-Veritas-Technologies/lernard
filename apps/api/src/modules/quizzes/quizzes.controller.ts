@@ -8,7 +8,6 @@ import {
   Query,
   Sse,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
@@ -16,10 +15,6 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
-import {
-  CheckPlanLimit,
-  PlanLimitsGuard,
-} from '../../common/guards/plan-limits.guard';
 import { R2Service } from '../../r2/r2.service';
 import {
   EvaluateShortAnswerDto,
@@ -54,9 +49,7 @@ export class QuizzesController {
     return storeQuizUpload(this.r2, user.id, file);
   }
 
-  @ProtectedRoute()
-  @UseGuards(PlanLimitsGuard)
-  @CheckPlanLimit('quizzes')
+  @ProtectedRoute({ planLimit: 'quizzes' })
   @Post('generate')
   async generate(@CurrentUser() user: User, @Body() dto: GenerateQuizDto) {
     return this.quizzesService.generate(user, dto);

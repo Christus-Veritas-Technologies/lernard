@@ -585,6 +585,21 @@ export class QuizzesService {
       user.billingAnchorDay ?? 1,
     );
 
+    // quizzesThisMonth = all quizzes generated (READY) this billing period
+    const quizzesThisMonth = await (this.prisma as any).quiz.count({
+      where: {
+        userId: user.id,
+        status: 'READY',
+        createdAt: {
+          gte: periodStart,
+          lt: periodEnd,
+        },
+      },
+    });
+
+    const monthlyLimit = getMonthlyQuizLimit(user.plan);
+
+    // averageScoreThisMonth = from quizzes the student fully completed this period
     const completedThisMonth = await (this.prisma as any).quiz.findMany({
       where: {
         userId: user.id,
@@ -605,9 +620,6 @@ export class QuizzesService {
       },
     });
 
-    const quizzesThisMonth = completedThisMonth.length;
-    const monthlyLimit = getMonthlyQuizLimit(user.plan);
-
     const normalizedScores = completedThisMonth
       .map((quiz: any) => computeNormalizedScoreOutOfTen(quiz))
       .filter((score: number | null): score is number => score !== null);
@@ -621,10 +633,12 @@ export class QuizzesService {
           )
         : null;
 
+    // quizzesInProgress = READY quizzes not yet completed, with at least one answer submitted
     const readyQuizzes = await (this.prisma as any).quiz.findMany({
       where: {
         userId: user.id,
         status: 'READY',
+        completedAt: null,
       },
       include: {
         _count: {
