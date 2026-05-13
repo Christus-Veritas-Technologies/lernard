@@ -9,7 +9,6 @@ import {
   Query,
   Sse,
   UploadedFile,
-  UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
@@ -17,10 +16,6 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
-import {
-  CheckPlanLimit,
-  PlanLimitsGuard,
-} from '../../common/guards/plan-limits.guard';
 import { R2Service } from '../../r2/r2.service';
 import {
   CompleteLessonDto,
@@ -59,9 +54,7 @@ export class LessonsController {
     return this.lessonsService.list(user);
   }
 
-  @ProtectedRoute()
-  @UseGuards(PlanLimitsGuard)
-  @CheckPlanLimit('lessons')
+  @ProtectedRoute({ planLimit: 'lessons' })
   @Post('generate')
   async generate(@CurrentUser() user: User, @Body() dto: GenerateLessonDto) {
     return this.lessonsService.generate(user, dto);

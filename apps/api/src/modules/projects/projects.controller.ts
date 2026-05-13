@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import type {
   PagePayload,
   ProjectDraft,
@@ -7,7 +7,6 @@ import type {
 import type { User } from '@prisma/client';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ProtectedRoute } from '../../common/decorators/protected-route.decorator';
-import { CheckPlanLimit, PlanLimitsGuard } from '../../common/guards/plan-limits.guard';
 import {
   CreateProjectDraftDto,
   EditProjectPdfDto,
@@ -58,9 +57,7 @@ export class ProjectsController {
     return this.projectsService.getDraft(user, draftId);
   }
 
-  @ProtectedRoute()
-  @CheckPlanLimit('projects')
-  @UseGuards(PlanLimitsGuard)
+  @ProtectedRoute({ planLimit: 'projects' })
   @Post('generate')
   async generate(@CurrentUser() user: User, @Body() dto: GenerateProjectDto) {
     return this.projectsService.generateFromDraft(user, dto);
