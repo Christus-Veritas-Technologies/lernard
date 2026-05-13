@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
     ArrowLeft01Icon,
     SparklesIcon,
@@ -9,12 +9,13 @@ import {
 import Link from "next/link";
 
 import { ROUTES } from "@lernard/routes";
-import type { PagePayload, PlanUsage, ProgressContent, ProjectLevel } from "@lernard/shared-types";
+import type { PagePayload, PlanUsage, ProgressContent, ProjectLevel, ProjectTemplateDefinition } from "@lernard/shared-types";
 
+import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/input";
-import { browserApiFetch, tryParsePlanLimitError } from "@/lib/browser-api";
+import { BrowserAuthError, browserApiFetch, tryParsePlanLimitError } from "@/lib/browser-api";
 import { HardPaywall } from "@/components/quota/HardPaywall";
 
 type CreateStep = "details" | "generating";
@@ -35,10 +36,17 @@ const LEVEL_OPTIONS: { value: ProjectLevel; label: string }[] = [
 
 export function ProjectCreateClient() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const preselectedTemplateId = searchParams?.get("template") ?? null;
 
     const [step, setStep] = useState<CreateStep>("details");
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+    const [authRequiredMessage, setAuthRequiredMessage] = useState<string | null>(null);
+    const [templates, setTemplates] = useState<ProjectTemplateDefinition[]>([]);
+    const [templatesLoading, setTemplatesLoading] = useState(true);
+    const [templatesError, setTemplatesError] = useState<string | null>(null);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(preselectedTemplateId);
     const [planUsage, setPlanUsage] = useState<PlanUsage | null>(null);
 
     const [fullName, setFullName] = useState("");
@@ -49,10 +57,34 @@ export function ProjectCreateClient() {
     const [level, setLevel] = useState<ProjectLevel>("olevel");
 
     useEffect(() => {
+        setTemplatesLoading(true);
         void browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW)
             .then((d) => setPlanUsage(d.content.planUsage))
             .catch(() => undefined);
+
+        void browserApiFetch<ProjectTemplateDefinition[]>(ROUTES.PROJECTS.TEMPLATES)
+            .then((result) => {
+                setTemplates(result);
+                setTemplatesError(null);
+            })
+            .catch(() => setTemplatesError("Could not load project templates."))
+            .finally(() => setTemplatesLoading(false));
     }, []);
+
+    useEffect(() => {
+        if (!preselectedTemplateId || templates.length === 0) {
+            return;
+        }
+
+        const template = templates.find((item) => item.id === preselectedTemplateId);
+        if (!template) {
+            setSelectedTemplateId(null);
+            return;
+        }
+
+        setSelectedTemplateId(template.id);
+        setLevel(template.level);
+    }, [preselectedTemplateId, templates]);
 
     const isProjectsExhausted =
         planUsage !== null && planUsage.projectsLimit > 0 && planUsage.projectsUsed >= planUsage.projectsLimit;
@@ -63,10 +95,12 @@ export function ProjectCreateClient() {
         candidateNumber.trim().length > 0 &&
         centreNumber.trim().length > 0 &&
         subject.trim().length > 0;
+    const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
 
     async function handleSubmit() {
         if (!detailsValid) return;
         setFormError(null);
+        setAuthRequiredMessage(null);
         setSubmitting(true);
         setStep("generating");
 
@@ -74,6 +108,7 @@ export function ProjectCreateClient() {
             const draft = await browserApiFetch<{ draftId: string }>(ROUTES.PROJECTS.CREATE_DRAFT, {
                 method: "POST",
                 body: JSON.stringify({
+                    templateId: selectedTemplate?.id,
                     subject: subject.trim(),
                     level,
                     studentInfo: {
@@ -95,8 +130,16 @@ export function ProjectCreateClient() {
 
             router.push(`/projects/${result.projectId}`);
         } catch (err) {
+            if (err instanceof BrowserAuthError) {
+                setSubmitting(false);
+                setStep("details");
+                setAuthRequiredMessage(err.message);
+                return;
+            }
+
             const resetAt = tryParsePlanLimitError(err);
             if (resetAt !== null) {
+                setSubmitting(false);
                 if (planUsage) {
                     setPlanUsage({ ...planUsage, projectsUsed: planUsage.projectsLimit });
                 } else {
@@ -116,6 +159,26 @@ export function ProjectCreateClient() {
             <div className="relative min-h-[400px]">
                 <HardPaywall resource="projects" resetAt={planUsage.resetAt} />
             </div>
+        );
+    }
+
+    if (authRequiredMessage) {
+        return (
+            <Card className="border-primary-200 bg-[linear-gradient(160deg,#eef3ff_0%,#f8fbff_50%,#ffffff_100%)]">
+                <CardHeader>
+                    <Badge tone="cool">Session required</Badge>
+                    <CardTitle className="mt-2 text-2xl">Sign in to create projects</CardTitle>
+                    <CardDescription>{authRequiredMessage}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Link href="/auth/login">
+                        <Button size="lg">
+                            Go to sign in
+                            <ArrowLeft01Icon size={16} className="ml-2 rotate-180" />
+                        </Button>
+                    </Link>
+                </CardContent>
+            </Card>
         );
     }
 
@@ -153,6 +216,93 @@ export function ProjectCreateClient() {
                 </Link>
                 <h1 className="text-2xl font-semibold text-text-primary">New project</h1>
             </div>
+
+            <Card className="overflow-hidden border-primary-100 bg-[linear-gradient(170deg,#f3f7ff_0%,#fcfdff_55%,#ffffff_100%)]">
+                <CardHeader>
+                    <Badge tone="cool" className="w-fit">Lernard project studio</Badge>
+                    <CardTitle className="mt-2 text-2xl">Set your exam details once</CardTitle>
+                    <CardDescription>
+                        Lernard generates the full document structure and marks for your selected level.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-2">
+                    {LEVEL_OPTIONS.map((opt) => (
+                        <span
+                            key={`preview-${opt.value}`}
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${
+                                level === opt.value
+                                    ? "border-primary-300 bg-primary-100 text-primary-700"
+                                    : "border-border bg-white text-text-tertiary"
+                            }`}
+                        >
+                            {opt.label}
+                        </span>
+                    ))}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Project templates</CardTitle>
+                    <CardDescription>
+                        Selecting a template is optional. If selected, Lernard follows the exact template structure.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {templatesLoading ? (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                            {Array.from({ length: 2 }).map((_, index) => (
+                                <div className="h-32 animate-pulse rounded-2xl border border-border bg-background-subtle" key={`template-loading-${index}`} />
+                            ))}
+                        </div>
+                    ) : null}
+
+                    {!templatesLoading && templatesError ? (
+                        <div className="rounded-2xl border border-warning/50 bg-warning-bg px-4 py-3 text-sm text-warning">
+                            {templatesError}
+                        </div>
+                    ) : null}
+
+                    {!templatesLoading && !templatesError ? (
+                        <div className="space-y-3">
+                            <button
+                                type="button"
+                                onClick={() => setSelectedTemplateId(null)}
+                                className={`w-full rounded-2xl border p-3 text-left transition ${
+                                    selectedTemplateId === null
+                                        ? "border-primary-300 bg-primary-50"
+                                        : "border-border bg-white"
+                                }`}
+                            >
+                                <p className="text-sm font-semibold text-text-primary">No template (Lernard decides structure)</p>
+                                <p className="mt-1 text-xs text-text-secondary">Flexible structure guided by level and subject.</p>
+                            </button>
+
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                {templates.map((template) => (
+                                    <button
+                                        key={template.id}
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedTemplateId(template.id);
+                                            setLevel(template.level);
+                                        }}
+                                        className={`rounded-2xl border p-3 text-left transition ${
+                                            selectedTemplateId === template.id
+                                                ? "border-primary-300 bg-primary-50"
+                                                : "border-border bg-white"
+                                        }`}
+                                    >
+                                        <p className="text-sm font-semibold text-text-primary">{template.name}</p>
+                                        <p className="mt-1 text-xs text-text-secondary">{template.steps.length} sections • {template.level.toUpperCase()}</p>
+                                        <p className="mt-2 text-xs leading-5 text-text-secondary">{template.description}</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    ) : null}
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader>
@@ -217,7 +367,7 @@ export function ProjectCreateClient() {
                 disabled={submitting || !detailsValid}
             >
                 <SparklesIcon size={16} className="mr-2" />
-                Generate project
+                Generate with Lernard
             </Button>
         </div>
     );

@@ -6,7 +6,7 @@ import { ArrowRight01Icon, BookOpen01Icon, CheckmarkCircle02Icon, Clock01Icon, F
 import Link from "next/link";
 
 import { ROUTES } from "@lernard/routes";
-import type { PagePayload, PlanUsage, ProgressContent, ProjectsContent } from "@lernard/shared-types";
+import type { PagePayload, PlanUsage, ProgressContent, ProjectLevel, ProjectTemplateDefinition, ProjectsContent } from "@lernard/shared-types";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -17,11 +17,24 @@ import { usePagePayload } from "@/hooks/usePagePayload";
 
 export function ProjectsPageClient() {
     const [planUsage, setPlanUsage] = useState<PlanUsage | null>(null);
+    const [templates, setTemplates] = useState<ProjectTemplateDefinition[]>([]);
+    const [templatesLoading, setTemplatesLoading] = useState(true);
+    const [templatesError, setTemplatesError] = useState<string | null>(null);
+    const [activeLevel, setActiveLevel] = useState<ProjectLevel | "all">("all");
 
     useEffect(() => {
+        setTemplatesLoading(true);
         void browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW)
             .then((d) => setPlanUsage(d.content.planUsage))
             .catch(() => undefined);
+
+        void browserApiFetch<ProjectTemplateDefinition[]>(ROUTES.PROJECTS.TEMPLATES)
+            .then((result) => {
+                setTemplates(result);
+                setTemplatesError(null);
+            })
+            .catch(() => setTemplatesError("Templates could not load right now."))
+            .finally(() => setTemplatesLoading(false));
     }, []);
 
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<ProjectsContent>(
@@ -74,6 +87,9 @@ export function ProjectsPageClient() {
 
     const { content } = data;
     const isProjectsExhausted = planUsage !== null && planUsage.projectsLimit > 0 && planUsage.projectsUsed >= planUsage.projectsLimit;
+    const visibleTemplates = activeLevel === "all"
+        ? templates
+        : templates.filter((template) => template.level === activeLevel);
 
     return (
         <div className="space-y-6">
@@ -153,6 +169,84 @@ export function ProjectsPageClient() {
                             </Button>
                         </Link>
                     )}
+                </CardContent>
+            </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Project templates</CardTitle>
+                    <CardDescription>
+                        Pick a template to prefill the structure, or skip templates and let Lernard design the document flow.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                        {([
+                            { value: "all", label: "All levels" },
+                            { value: "grade7", label: "Grade 7" },
+                            { value: "olevel", label: "O Level" },
+                            { value: "alevel", label: "A Level" },
+                        ] as const).map((tab) => (
+                            <button
+                                key={tab.value}
+                                type="button"
+                                onClick={() => setActiveLevel(tab.value)}
+                                className={`rounded-full border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${
+                                    activeLevel === tab.value
+                                        ? "border-primary-300 bg-primary-100 text-primary-700"
+                                        : "border-border bg-white text-text-secondary"
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+
+                    {templatesLoading ? (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {Array.from({ length: 3 }).map((_, index) => (
+                                <div className="h-44 animate-pulse rounded-2xl border border-border bg-background-subtle" key={`template-skeleton-${index}`} />
+                            ))}
+                        </div>
+                    ) : null}
+
+                    {!templatesLoading && templatesError ? (
+                        <div className="rounded-2xl border border-warning/50 bg-warning-bg px-4 py-3 text-sm text-warning">
+                            {templatesError}
+                        </div>
+                    ) : null}
+
+                    {!templatesLoading && !templatesError && visibleTemplates.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-border bg-background-subtle p-4 text-sm text-text-secondary">
+                            No templates for this level yet.
+                        </div>
+                    ) : null}
+
+                    {!templatesLoading && !templatesError && visibleTemplates.length > 0 ? (
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {visibleTemplates.map((template) => (
+                                <Link
+                                    href={`/projects/create?template=${encodeURIComponent(template.id)}`}
+                                    key={template.id}
+                                    className="rounded-2xl border border-border bg-white p-4 transition hover:border-primary-200 hover:shadow-sm"
+                                >
+                                    <p className="text-sm font-semibold text-text-primary">{template.name}</p>
+                                    <p className="mt-1 text-xs text-text-secondary">{formatTemplateLevel(template.level)} • {template.steps.length} sections</p>
+                                    <p className="mt-2 text-sm leading-6 text-text-secondary">{template.description}</p>
+                                    <div className="mt-3 flex flex-wrap gap-1.5">
+                                        {template.labels.slice(0, 3).map((label) => (
+                                            <span
+                                                className="rounded-full bg-background-subtle px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-text-tertiary"
+                                                key={`${template.id}-${label}`}
+                                            >
+                                                {label}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </Link>
+                            ))}
+                        </div>
+                    ) : null}
                 </CardContent>
             </Card>
 
@@ -256,3 +350,13 @@ const statIconTone = {
     success: "flex h-8 w-8 items-center justify-center rounded-xl bg-success-bg text-success",
     primary: "flex h-8 w-8 items-center justify-center rounded-xl bg-primary-50 text-primary-700",
 } as const;
+
+function formatTemplateLevel(level: ProjectLevel): string {
+    if (level === "grade7") {
+        return "Grade 7";
+    }
+    if (level === "olevel") {
+        return "O Level";
+    }
+    return "A Level";
+}

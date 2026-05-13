@@ -80,6 +80,7 @@ export const ROUTES = {
 
   PROJECTS: {
     PAYLOAD: '/v1/projects/payload',
+    TEMPLATES: '/v1/projects/templates',
     CREATE_DRAFT: '/v1/projects/drafts',
     UPDATE_DRAFT: (draftId: string) => `/v1/projects/drafts/${draftId}` as const,
     GET_DRAFT: (draftId: string) => `/v1/projects/drafts/${draftId}` as const,

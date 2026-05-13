@@ -1,17 +1,18 @@
-import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ArrowLeft01Icon, SparklesIcon } from 'hugeicons-react-native';
 
 import { ROUTES } from '@lernard/routes';
-import type { ProjectLevel } from '@lernard/shared-types';
+import type { ProjectLevel, ProjectTemplateDefinition } from '@lernard/shared-types';
 
 import { Text } from '@rnr/text';
 
 import { Button } from '@/components/Button';
-import { nativeApiFetch } from '@/lib/native-api';
+import { NativeAuthError, nativeApiFetch } from '@/lib/native-api';
+import { StateNotice } from '@/components/StateNotice';
 
 type CreateStep = 'details' | 'generating';
 
@@ -31,10 +32,17 @@ function generateUUID(): string {
 
 export default function ProjectCreateScreen() {
     const router = useRouter();
+    const params = useLocalSearchParams<{ template?: string }>();
+    const initialTemplateId = typeof params.template === 'string' ? params.template : null;
 
     const [step, setStep] = useState<CreateStep>('details');
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
+    const [authRequiredMessage, setAuthRequiredMessage] = useState<string | null>(null);
+    const [templates, setTemplates] = useState<ProjectTemplateDefinition[]>([]);
+    const [templatesLoading, setTemplatesLoading] = useState(true);
+    const [templatesError, setTemplatesError] = useState<string | null>(null);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(initialTemplateId);
 
     const [fullName, setFullName] = useState('');
     const [schoolName, setSchoolName] = useState('');
@@ -43,16 +51,44 @@ export default function ProjectCreateScreen() {
     const [subject, setSubject] = useState('');
     const [level, setLevel] = useState<ProjectLevel>('olevel');
 
+    useEffect(() => {
+        setTemplatesLoading(true);
+        void nativeApiFetch<ProjectTemplateDefinition[]>(ROUTES.PROJECTS.TEMPLATES)
+            .then((result) => {
+                setTemplates(result);
+                setTemplatesError(null);
+            })
+            .catch(() => setTemplatesError('Could not load templates right now.'))
+            .finally(() => setTemplatesLoading(false));
+    }, []);
+
+    useEffect(() => {
+        if (!initialTemplateId || templates.length === 0) {
+            return;
+        }
+
+        const template = templates.find((item) => item.id === initialTemplateId);
+        if (!template) {
+            setSelectedTemplateId(null);
+            return;
+        }
+
+        setSelectedTemplateId(template.id);
+        setLevel(template.level);
+    }, [initialTemplateId, templates]);
+
     const detailsValid =
         fullName.trim().length > 0 &&
         schoolName.trim().length > 0 &&
         candidateNumber.trim().length > 0 &&
         centreNumber.trim().length > 0 &&
         subject.trim().length > 0;
+    const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
 
     async function handleSubmit() {
         if (!detailsValid) return;
         setFormError(null);
+        setAuthRequiredMessage(null);
         setSubmitting(true);
         setStep('generating');
 
@@ -60,6 +96,7 @@ export default function ProjectCreateScreen() {
             const draft = await nativeApiFetch<{ draftId: string }>(ROUTES.PROJECTS.CREATE_DRAFT, {
                 method: 'POST',
                 body: JSON.stringify({
+                    templateId: selectedTemplate?.id,
                     subject: subject.trim(),
                     level,
                     studentInfo: {
@@ -81,11 +118,35 @@ export default function ProjectCreateScreen() {
 
             router.replace(`/(app)/projects/${result.projectId}`);
         } catch (err) {
+            if (err instanceof NativeAuthError) {
+                setSubmitting(false);
+                setStep('details');
+                setAuthRequiredMessage(err.message);
+                return;
+            }
+
             const message = err instanceof Error ? err.message : 'Could not create project. Please try again.';
             setFormError(message);
             setSubmitting(false);
             setStep('details');
         }
+    }
+
+    if (authRequiredMessage) {
+        return (
+            <SafeAreaView className="flex-1 bg-background" edges={['top']}>
+                <View className="flex-1 px-4 pb-24 pt-6">
+                    <StateNotice
+                        badge="Sign in required"
+                        title="You need to sign in"
+                        description={authRequiredMessage}
+                        tone="warning"
+                        actionTitle="Go to sign in"
+                        onActionPress={() => router.replace('/(auth)/login')}
+                    />
+                </View>
+            </SafeAreaView>
+        );
     }
 
     if (step === 'generating') {
@@ -117,14 +178,92 @@ export default function ProjectCreateScreen() {
                 contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 100, paddingTop: 16, gap: 14 }}
                 keyboardShouldPersistTaps="handled"
             >
-                <View className="flex-row items-center gap-3">
-                    <Pressable
-                        className="h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
-                        onPress={() => router.back()}
-                    >
-                        <ArrowLeft01Icon color="#334155" size={18} strokeWidth={1.9} />
-                    </Pressable>
-                    <Text className="text-2xl font-semibold text-slate-900">New project</Text>
+                <View className="rounded-[28px] border border-indigo-100 bg-[rgb(238,244,255)] p-5">
+                    <View className="flex-row items-center gap-3">
+                        <Pressable
+                            className="h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white"
+                            onPress={() => router.back()}
+                        >
+                            <ArrowLeft01Icon color="#334155" size={18} strokeWidth={1.9} />
+                        </Pressable>
+                        <Text className="text-2xl font-semibold text-slate-900">New project</Text>
+                    </View>
+                    <Text className="mt-3 text-sm leading-6 text-slate-600">
+                        Share exam details once. Lernard generates the full section flow and marks for your level.
+                    </Text>
+                    <View className="mt-3 flex-row flex-wrap gap-2">
+                        <View className="rounded-full bg-white px-3 py-1">
+                            <Text className="text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700">AI generated</Text>
+                        </View>
+                        <View className="rounded-full bg-white px-3 py-1">
+                            <Text className="text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700">Level-based structure</Text>
+                        </View>
+                        <View className="rounded-full bg-white px-3 py-1">
+                            <Text className="text-[11px] font-semibold uppercase tracking-[0.12em] text-indigo-700">Automatic marks</Text>
+                        </View>
+                    </View>
+                </View>
+
+                <View className="flex-row items-center gap-3 px-1">
+                    <Text className="text-xl font-semibold text-slate-900">Your details</Text>
+                </View>
+
+                <View className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+                    <Text className="text-lg font-semibold text-slate-900">Project templates</Text>
+                    <Text className="mt-1 text-sm text-slate-600">
+                        Optional. If you choose a template, Lernard must follow that exact structure.
+                    </Text>
+
+                    {templatesLoading ? (
+                        <View className="mt-4 gap-3">
+                            {Array.from({ length: 2 }).map((_, index) => (
+                                <View className="h-24 rounded-2xl border border-slate-200 bg-slate-100" key={`template-loading-${index}`} />
+                            ))}
+                        </View>
+                    ) : null}
+
+                    {!templatesLoading && templatesError ? (
+                        <View className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+                            <Text className="text-sm text-rose-700">{templatesError}</Text>
+                        </View>
+                    ) : null}
+
+                    {!templatesLoading && !templatesError ? (
+                        <View className="mt-4 gap-3">
+                            <Pressable
+                                className={`rounded-2xl border px-4 py-3 ${
+                                    selectedTemplateId === null
+                                        ? 'border-primary-300 bg-primary-50'
+                                        : 'border-slate-200 bg-slate-50'
+                                }`}
+                                onPress={() => setSelectedTemplateId(null)}
+                            >
+                                <Text className="text-sm font-semibold text-slate-900">No template</Text>
+                                <Text className="mt-1 text-xs leading-5 text-slate-600">
+                                    Lernard chooses structure based on your level and subject.
+                                </Text>
+                            </Pressable>
+
+                            {templates.map((template) => (
+                                <Pressable
+                                    className={`rounded-2xl border px-4 py-3 ${
+                                        selectedTemplateId === template.id
+                                            ? 'border-primary-300 bg-primary-50'
+                                            : 'border-slate-200 bg-slate-50'
+                                    }`}
+                                    key={template.id}
+                                    onPress={() => {
+                                        setSelectedTemplateId(template.id);
+                                        setLevel(template.level);
+                                    }}
+                                >
+                                    <Text className="text-sm font-semibold text-slate-900">{template.name}</Text>
+                                    <Text className="mt-1 text-xs text-slate-600">{formatTemplateLevel(template.level)} • {template.steps.length} sections</Text>
+                                    <Text className="mt-2 text-xs leading-5 text-slate-600">{template.description}</Text>
+                                </Pressable>
+                            ))}
+                        </View>
+                    ) : null}
                 </View>
 
                 <View className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -182,6 +321,16 @@ export default function ProjectCreateScreen() {
             </ScrollView>
         </SafeAreaView>
     );
+}
+
+function formatTemplateLevel(level: ProjectLevel): string {
+    if (level === 'grade7') {
+        return 'Grade 7';
+    }
+    if (level === 'olevel') {
+        return 'O Level';
+    }
+    return 'A Level';
 }
 
 function FormField({

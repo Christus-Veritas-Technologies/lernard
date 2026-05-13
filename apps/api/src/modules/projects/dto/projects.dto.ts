@@ -51,6 +51,12 @@ class EditProjectSectionDto {
 }
 
 export class CreateProjectDraftDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  templateId?: string;
+
   @IsString()
   @MinLength(1)
   @MaxLength(300)
@@ -65,6 +71,12 @@ export class CreateProjectDraftDto {
 }
 
 export class UpdateProjectDraftDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  templateId?: string;
+
   @IsOptional()
   @IsString()
   @MinLength(1)
@@ -92,6 +104,12 @@ export class GenerateProjectDto {
 
   @IsUUID()
   idempotencyKey!: string;
+}
+
+export class ProjectTemplatesQueryDto {
+  @IsOptional()
+  @IsIn(['grade7', 'olevel', 'alevel'])
+  level?: 'grade7' | 'olevel' | 'alevel';
 }
 
 export class EditProjectPdfDto {

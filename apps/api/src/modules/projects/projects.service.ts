@@ -11,6 +11,7 @@ import type {
   ProjectGenerationStatus,
   ProjectLevel,
   ProjectSection,
+  ProjectTemplateDefinition,
   ProjectsContent,
   ProjectStatusResponse,
   ScopedPermission,
@@ -27,9 +28,14 @@ import {
   GenerateProjectDto,
   UpdateProjectDraftDto,
 } from './dto/projects.dto';
-import { getProjectLayout } from './project-layouts';
 import { getProjectLevelLanguageProfile } from './project-level-language';
 import { ProjectPdfRendererService } from './project-pdf-renderer.service';
+import {
+  buildAutoTemplateId,
+  buildAutoTemplateName,
+  findProjectTemplate,
+  listProjectTemplates,
+} from './project-templates';
 
 @Injectable()
 export class ProjectsService {
@@ -102,17 +108,29 @@ export class ProjectsService {
     });
   }
 
-  listTemplates(_level?: ProjectLevel): never[] {
-    return [];
+  listTemplates(level?: ProjectLevel): ProjectTemplateDefinition[] {
+    return listProjectTemplates(level);
   }
 
   async createDraft(user: User, dto: CreateProjectDraftDto): Promise<ProjectDraft> {
-    const layout = getProjectLayout(dto.level);
+    const selectedTemplate = dto.templateId
+      ? findProjectTemplate(dto.templateId)
+      : null;
+
+    if (dto.templateId && !selectedTemplate) {
+      throw new BadRequestException('Selected project template was not found.');
+    }
+
+    if (selectedTemplate && selectedTemplate.level !== dto.level) {
+      throw new BadRequestException('Selected project template does not match the chosen level.');
+    }
+
+    const templateId = selectedTemplate?.id ?? buildAutoTemplateId(dto.level);
 
     const draft = await (this.prisma as any).projectDraft.create({
       data: {
         userId: user.id,
-        templateId: layout.id,
+        templateId,
         subjectName: dto.subject,
         level: toDbLevel(dto.level),
         topicHint: null,
@@ -141,12 +159,28 @@ export class ProjectsService {
     }
 
     const nextLevel = dto.level ?? toSharedLevel(existing.level);
-    const nextLayout = getProjectLayout(nextLevel);
+    const selectedTemplate = dto.templateId
+      ? findProjectTemplate(dto.templateId)
+      : null;
+
+    if (dto.templateId && !selectedTemplate) {
+      throw new BadRequestException('Selected project template was not found.');
+    }
+
+    if (selectedTemplate && selectedTemplate.level !== nextLevel) {
+      throw new BadRequestException('Selected project template does not match the chosen level.');
+    }
+
+    const nextTemplateId = dto.templateId
+      ? selectedTemplate!.id
+      : dto.level
+        ? buildAutoTemplateId(nextLevel)
+        : existing.templateId;
 
     const draft = await (this.prisma as any).projectDraft.update({
       where: { id: draftId },
       data: {
-        templateId: nextLayout.id,
+        templateId: nextTemplateId,
         subjectName: dto.subject ?? existing.subjectName,
         level: dto.level ? toDbLevel(dto.level) : existing.level,
         studentInfo: dto.studentInfo ?? existing.studentInfo,
@@ -192,16 +226,19 @@ export class ProjectsService {
     }
 
     const sharedLevel = toSharedLevel(draft.level);
-    const layout = getProjectLayout(sharedLevel);
+    const selectedTemplate = findProjectTemplate(draft.templateId);
+    const strictTemplate = Boolean(selectedTemplate);
+    const templateId = selectedTemplate?.id ?? buildAutoTemplateId(sharedLevel);
+    const templateName = selectedTemplate?.name ?? buildAutoTemplateName(sharedLevel);
     const jobId = uuidv4();
 
     const queuedProject = await (this.prisma as any).project.create({
       data: {
         userId: user.id,
         draftId: draft.id,
-        templateId: layout.id,
-        templateName: layout.name,
-        title: `${layout.name}: ${draft.subjectName}`,
+        templateId,
+        templateName,
+        title: `${templateName}: ${draft.subjectName}`,
         subjectName: draft.subjectName,
         level: draft.level,
         totalMarks: 0,
@@ -217,7 +254,9 @@ export class ProjectsService {
       userId: user.id,
       jobId,
       draft,
-      layout,
+      templateDefinition: selectedTemplate,
+      strictTemplate,
+      templateName,
     });
 
     return { projectId: queuedProject.id, status: 'queued' };
@@ -228,7 +267,9 @@ export class ProjectsService {
     userId: string;
     jobId: string;
     draft: any;
-    layout: import('./project-layouts').ProjectLayoutDefinition;
+    templateDefinition: ProjectTemplateDefinition | null;
+    strictTemplate: boolean;
+    templateName: string;
   }): Promise<void> {
     try {
       const claimed = await (this.prisma as any).project.updateMany({
@@ -263,7 +304,8 @@ export class ProjectsService {
         studentInfo,
         subject: input.draft.subjectName,
         level: sharedLevel,
-        layoutSections: input.layout.sections,
+        layoutSections: input.templateDefinition?.steps,
+        strictTemplate: input.strictTemplate,
         languageProfile,
       });
 
@@ -274,7 +316,7 @@ export class ProjectsService {
       const pdfBuffer = await this.projectPdfRenderer.render({
         projectId: input.projectId,
         title,
-        templateName: input.layout.name,
+        templateName: input.templateName,
         subject: input.draft.subjectName,
         level: sharedLevel,
         totalMarks,
@@ -512,6 +554,7 @@ function toSharedStatus(status: string): ProjectGenerationStatus {
 function toDraftResponse(draft: any): ProjectDraft {
   return {
     draftId: draft.id,
+    templateId: draft.templateId,
     subject: draft.subjectName,
     level: toSharedLevel(draft.level),
     studentInfo: draft.studentInfo,

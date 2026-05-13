@@ -1554,7 +1554,8 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
     };
     subject: string;
     level: 'grade7' | 'olevel' | 'alevel';
-    layoutSections: Array<{ key: string; title: string }>;
+    layoutSections?: Array<{ key: string; title: string }>;
+    strictTemplate?: boolean;
     languageProfile: {
       audienceLabel: string;
       vocabularyGuidance: string;
@@ -1571,9 +1572,12 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
       input.level === 'grade7' ? '25–40' :
       input.level === 'olevel' ? '45–70' : '80–120';
 
-    const sectionsSpec = input.layoutSections
-      .map((s, i) => `${i + 1}. key: "${s.key}" | title: "${s.title}"`)
-      .join('\n');
+    const strictMode = Boolean(input.strictTemplate && input.layoutSections?.length);
+    const sectionsSpec = strictMode
+      ? input.layoutSections!
+          .map((s, i) => `${i + 1}. key: "${s.key}" | title: "${s.title}"`)
+          .join('\n')
+      : '';
 
     const systemPrompt = `You are Lernard, an expert educational assistant generating ZIMSEC-aligned coursework projects for Zimbabwean students.
 You write content appropriate for the student's academic level and grounded in Zimbabwe's educational, cultural, and environmental context.
@@ -1595,15 +1599,17 @@ Language requirements:
 - Depth: ${input.languageProfile.explanationDepth}
 - Examples: ${input.languageProfile.examplesGuidance}
 
-The project must use EXACTLY these sections in this order:
-${sectionsSpec}
+${strictMode
+  ? `The project must use EXACTLY these sections in this order:\n${sectionsSpec}`
+  : `Create an academically correct section structure for a ${levelLabel} ${input.subject} project.
+The structure should be coherent, exam-appropriate, and have 5-8 sections depending on scope.`}
 
 Return a JSON object with this exact structure:
 {
   "title": "A descriptive project title that reflects the subject and level (max 120 characters)",
   "totalMarks": <a whole number between ${marksGuidance}>,
   "sections": [
-    { "key": "<section key>", "title": "<section title>", "body": "<full section content, well-developed and appropriate for ${levelLabel} ZIMSEC assessment>" },
+    { "key": "<section key in snake_case>", "title": "<section title>", "body": "<full section content, well-developed and appropriate for ${levelLabel} ZIMSEC assessment>" },
     ...
   ]
 }
@@ -1613,7 +1619,8 @@ Requirements:
 - Each section body must be substantive, complete, and appropriate for ZIMSEC ${levelLabel} assessment
 - Ground all content in Zimbabwe's educational context — reference local communities, environments, and practices where relevant
 - Do not include any marks allocation, assessment criteria, or instructions inside section bodies
-- Return ONLY valid JSON — no markdown, no extra commentary`;
+- Return ONLY valid JSON — no markdown, no extra commentary
+- Keys must be unique and section order must be logical`;
 
     return completeWithRetry(async () => {
       const text = await this.completeText({
@@ -1640,17 +1647,28 @@ Requirements:
         .filter((s) => typeof s.key === 'string' && typeof s.title === 'string' && typeof s.body === 'string')
         .map((s) => ({ key: String(s.key), title: String(s.title), body: String(s.body) }));
 
-      if (sections.length !== input.layoutSections.length) {
-        throw new Error(
-          `Project section count mismatch: expected ${input.layoutSections.length}, got ${sections.length}`,
-        );
-      }
-
-      for (let i = 0; i < input.layoutSections.length; i++) {
-        if (sections[i]!.key !== input.layoutSections[i]!.key) {
+      if (strictMode) {
+        if (sections.length !== input.layoutSections!.length) {
           throw new Error(
-            `Project section key mismatch at index ${i}: expected "${input.layoutSections[i]!.key}", got "${sections[i]!.key}"`,
+            `Project section count mismatch: expected ${input.layoutSections!.length}, got ${sections.length}`,
           );
+        }
+
+        for (let i = 0; i < input.layoutSections!.length; i++) {
+          if (sections[i]!.key !== input.layoutSections![i]!.key) {
+            throw new Error(
+              `Project section key mismatch at index ${i}: expected "${input.layoutSections![i]!.key}", got "${sections[i]!.key}"`,
+            );
+          }
+        }
+      } else {
+        if (sections.length === 0) {
+          throw new Error('Project generation returned no sections.');
+        }
+
+        const uniqueKeys = new Set(sections.map((section) => section.key));
+        if (uniqueKeys.size !== sections.length) {
+          throw new Error('Project generation returned duplicate section keys.');
         }
       }
 
