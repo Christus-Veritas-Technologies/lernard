@@ -231,6 +231,7 @@ export function QuizDashboardClient() {
                                         <TableHead>Subject</TableHead>
                                         <TableHead>Difficulty</TableHead>
                                         <TableHead>Status</TableHead>
+                                        <TableHead>Score</TableHead>
                                         <TableHead>Updated</TableHead>
                                         <TableHead className="text-right">Action</TableHead>
                                     </TableRow>
@@ -242,6 +243,7 @@ export function QuizDashboardClient() {
                                             <TableCell><div className="h-4 w-20 rounded bg-slate-200" /></TableCell>
                                             <TableCell><div className="h-4 w-20 rounded bg-slate-200" /></TableCell>
                                             <TableCell><div className="h-5 w-16 rounded-full bg-slate-200" /></TableCell>
+                                            <TableCell><div className="h-4 w-14 rounded bg-slate-200" /></TableCell>
                                             <TableCell><div className="h-4 w-20 rounded bg-slate-200" /></TableCell>
                                             <TableCell className="text-right"><div className="ml-auto h-8 w-16 rounded bg-slate-200" /></TableCell>
                                         </TableRow>
@@ -262,6 +264,7 @@ export function QuizDashboardClient() {
                                         <TableHead>Subject</TableHead>
                                         <TableHead>Difficulty</TableHead>
                                         <TableHead>Status</TableHead>
+                                        <TableHead>Score</TableHead>
                                         <TableHead>Updated</TableHead>
                                         <TableHead className="text-right">Action</TableHead>
                                     </TableRow>
@@ -279,6 +282,7 @@ export function QuizDashboardClient() {
                                                     {statusLabel(item.status)}
                                                 </Badge>
                                             </TableCell>
+                                            <TableCell>{scoreLabel(item)}</TableCell>
                                             <TableCell>{formatDate(item.completedAt ?? item.createdAt)}</TableCell>
                                             <TableCell className="text-right">
                                                 <Link href={`/practice-exams/${item.quizId}`}>
@@ -327,6 +331,17 @@ function DashboardStatSkeletonCard({ bgColor, borderColor }: { bgColor: string; 
             </CardContent>
         </Card>
     );
+}
+
+function scoreLabel(item: QuizHistoryItem): string {
+    if (item.status !== "completed") return "—";
+    if (item.score !== null && item.totalQuestions > 0) {
+        return `${item.score} / ${item.totalQuestions}`;
+    }
+    if (item.totalMarks !== null && item.totalMarks > 0) {
+        return `— / ${item.totalMarks} marks`;
+    }
+    return "—";
 }
 
 function statusTone(status: QuizHistoryItem["status"]): string {
