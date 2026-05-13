@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowRight01Icon,
   Bookmark01Icon,
-  ChartBarLineIcon,
   Settings02Icon,
   UserCircleIcon,
 } from 'hugeicons-react-native';
@@ -17,18 +16,12 @@ import { useRouter } from 'expo-router';
 
 interface DrawerLink {
   label: string;
-  path: '/(app)/(progress)' | '/(app)/projects' | '/(app)/settings' | '/(app)/settings/profile' | '/(app)/settings/preferences';
+  path: '/(app)/projects' | '/(app)/settings' | '/(app)/settings/profile' | '/(app)/settings/preferences';
   description: string;
   Icon: React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
 }
 
 const DRAWER_LINKS: DrawerLink[] = [
-  {
-    label: 'Lernard\'s Read on You',
-    path: '/(app)/(progress)',
-    description: 'Track momentum, strengths, and growth areas.',
-    Icon: ChartBarLineIcon,
-  },
   {
     label: 'Projects',
     path: '/(app)/projects',
@@ -77,7 +70,7 @@ export function StudentDrawer() {
           <View className="rounded-[26px] bg-[rgb(239,246,255)] p-5">
             <Text className="text-xs font-semibold uppercase tracking-[0.18em] text-indigo-500">Student drawer</Text>
             <Text className="mt-2 text-2xl font-semibold text-slate-900">More learning spaces</Text>
-            <Text className="mt-2 text-sm leading-6 text-slate-600">Open progress and settings without crowding your bottom tabs.</Text>
+            <Text className="mt-2 text-sm leading-6 text-slate-600">Open projects and settings without crowding your bottom tabs.</Text>
           </View>
 
           <View className="mt-5 gap-3">

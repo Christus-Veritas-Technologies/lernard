@@ -3,7 +3,6 @@
 import type { ComponentType } from "react";
 import {
     BookOpen01Icon,
-    ChartBarLineIcon,
     FolderLibraryIcon,
     Home01Icon,
     Message01Icon,
@@ -32,7 +31,6 @@ const studentNavItems: NavItem[] = [
     { href: "/learn", label: "Lessons", description: "Set Work", icon: BookOpen01Icon },
     { href: "/practice-exams", label: "Practice Exams", description: "Test yourself", icon: SchoolBell01Icon },
     { href: "/projects", label: "Projects", description: "Coursework", icon: FolderLibraryIcon },
-    { href: "/progress", label: "Progress", description: "Read on You", icon: ChartBarLineIcon },
     { href: "/chat", label: "Chat", description: "Ask Lernard", icon: Message01Icon },
     { href: "/settings", label: "Settings", description: "Your setup", icon: Settings02Icon },
 ];
@@ -51,7 +49,7 @@ export function AppShellNav() {
     const mobileNavItems = isGuardian ? guardianNavItems : studentNavItems.slice(0, 5);
     const sidebarDescription = isGuardian
         ? "Manage your children's learning and configure your household."
-        : "Move between home, progress, chat, settings, and your household.";
+        : "Move between home, lessons, practice exams, chat, and settings.";
     const mobileGridCols = isGuardian ? "grid-cols-3" : "grid-cols-5";
 
     return (

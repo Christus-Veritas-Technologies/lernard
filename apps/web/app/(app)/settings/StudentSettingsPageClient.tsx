@@ -202,6 +202,30 @@ export function StudentSettingsPageClient({ content, permissions }: StudentSetti
                                         />
                                     </div>
                                 )}
+                                {planUsage.projectsLimit > 0 && (
+                                    <div className="flex flex-col gap-1.5">
+                                        <div className="flex justify-between text-xs text-text-secondary">
+                                            <span>Projects</span>
+                                            <span>{planUsage.projectsUsed} / {planUsage.projectsLimit}</span>
+                                        </div>
+                                        <Progress
+                                            value={Math.round((planUsage.projectsUsed / planUsage.projectsLimit) * 100)}
+                                            className={planUsage.projectsUsed >= planUsage.projectsLimit ? "[&>div]:bg-destructive" : undefined}
+                                        />
+                                    </div>
+                                )}
+                                {planUsage.chatMessagesLimit > 0 && (
+                                    <div className="flex flex-col gap-1.5">
+                                        <div className="flex justify-between text-xs text-text-secondary">
+                                            <span>AI Chat messages</span>
+                                            <span>{planUsage.chatMessagesUsed} / {planUsage.chatMessagesLimit}</span>
+                                        </div>
+                                        <Progress
+                                            value={Math.round((planUsage.chatMessagesUsed / planUsage.chatMessagesLimit) * 100)}
+                                            className={planUsage.chatMessagesUsed >= planUsage.chatMessagesLimit ? "[&>div]:bg-destructive" : undefined}
+                                        />
+                                    </div>
+                                )}
                                 <div className="flex flex-wrap gap-3 pt-1">
                                     <Link href="/plans">
                                         <Button variant="secondary" size="sm">View plans</Button>

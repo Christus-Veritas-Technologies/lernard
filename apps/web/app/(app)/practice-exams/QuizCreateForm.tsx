@@ -16,6 +16,7 @@ import type { PagePayload, PlanUsage, ProgressContent } from "@lernard/shared-ty
 
 import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { browserApiFetch, tryParsePlanLimitError } from "@/lib/browser-api";
@@ -228,6 +229,13 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
             const response = await browserApiFetch<{ quizId: string }>(ROUTES.QUIZZES.GENERATE, {
                 method: "POST",
                 body: JSON.stringify(body),
+            });
+
+            // Update local counter so the quota bar reflects the new usage
+            // before the user navigates away and the form unmounts.
+            setPlanUsage((current) => {
+                if (!current) return current;
+                return { ...current, quizzesUsed: Math.min(current.quizzesUsed + 1, current.quizzesLimit) };
             });
 
             onGenerated?.();
@@ -518,6 +526,23 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
                     ))}
                 </RadioGroup>
             </div>
+
+            {planUsage && planUsage.quizzesLimit > 0 && (
+                <div className="flex flex-col gap-1.5 rounded-xl border border-border p-3">
+                    <div className="flex items-center justify-between text-xs text-text-secondary">
+                        <span>
+                            {planUsage.plan === "explorer" ? "Daily" : "Monthly"} practice exams
+                        </span>
+                        <span>
+                            {planUsage.quizzesUsed} / {planUsage.quizzesLimit}
+                        </span>
+                    </div>
+                    <Progress
+                        value={Math.min((planUsage.quizzesUsed / planUsage.quizzesLimit) * 100, 100)}
+                        className="h-1.5"
+                    />
+                </div>
+            )}
 
             <Button disabled={!canGenerate} onClick={onGenerate}>
                 {loading ? "Generating..." : "Generate Quiz"}
