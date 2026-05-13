@@ -10,6 +10,7 @@ import {
 } from "hugeicons-react";
 import Link from "next/link";
 import { type ReactNode, useMemo, useState } from "react";
+import { motion } from "framer-motion";
 
 import { ROUTES } from "@lernard/routes";
 import type { HomeContent, SlotContent } from "@lernard/shared-types";
@@ -42,7 +43,7 @@ export function StudentHomePageClient() {
         );
     }
 
-    if (loading) return <div className="h-72 rounded-3xl bg-background-subtle" />;
+    if (loading) return <SkeletonLoading />;
 
     if (error || !data) {
         return (
@@ -86,6 +87,9 @@ export function StudentHomePageClient() {
                                 <p className="text-sm text-white/72">Good to see you</p>
                                 <h1 className="text-2xl font-semibold text-white">{content.greeting}</h1>
                             </div>
+                        </div>
+                        <div className="pt-1">
+                            <p className="text-xs font-medium uppercase tracking-widest text-white/60">Lernard — Your personal tutor. Always ready.</p>
                         </div>
                         <p className="max-w-2xl text-sm leading-6 text-white/82">
                             Your dashboard is built around momentum first: quick progress reads, subject health, and fast actions into lessons, Practice Exams, and chat.
@@ -347,6 +351,57 @@ export function StudentHomePageClient() {
                 </Card>
             </section>
         </div>
+    );
+}
+
+function SkeletonLoading() {
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.08,
+            },
+        },
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0.6 },
+        visible: {
+            opacity: 1,
+            transition: {
+                duration: 1.5,
+                repeat: Infinity,
+                repeatType: "reverse" as const,
+            },
+        },
+    };
+
+    return (
+        <motion.div
+            className="flex flex-col gap-5"
+            initial="hidden"
+            animate="visible"
+            variants={containerVariants}
+        >
+            <motion.div
+                className="h-60 rounded-3xl bg-gradient-to-r from-background-subtle via-background-subtle to-background-subtle"
+                variants={itemVariants}
+            />
+            <motion.div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" variants={containerVariants}>
+                {[...Array(4)].map((_, i) => (
+                    <motion.div
+                        key={i}
+                        className="h-40 rounded-3xl bg-gradient-to-r from-background-subtle via-background-subtle to-background-subtle"
+                        variants={itemVariants}
+                    />
+                ))}
+            </motion.div>
+            <motion.div
+                className="h-48 rounded-3xl bg-gradient-to-r from-background-subtle via-background-subtle to-background-subtle"
+                variants={itemVariants}
+            />
+        </motion.div>
     );
 }
 
