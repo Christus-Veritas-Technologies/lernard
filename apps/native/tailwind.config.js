@@ -2,7 +2,7 @@
 module.exports = {
   content: ['./app/**/*.{js,ts,tsx}', './components/**/*.{js,ts,tsx}', './rnr/**/*.{js,ts,tsx}', './hooks/**/*.{js,ts,tsx}'],
 
-  presets: [require('nativewind/tailwind')],
+  presets: [require('nativewind/tailwind/native')],
   corePlugins: {
     preflight: false,
   },
