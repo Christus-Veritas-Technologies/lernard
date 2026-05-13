@@ -1,17 +1,16 @@
 /**
- * Patches nativewind@2.x styled-component.js to remove the React.useMemo hook call.
+ * Patches nativewind@2.x for React Native Fabric + React 19 compatibility.
  *
- * Root cause: NativeWind 2.x's StyledComponent HOC calls React.useMemo inside a
- * forwardRef callback. With React Native 0.81+ (New Architecture / Fabric), the
- * Fabric renderer has React's internals bundled internally. This means Fabric sets
- * ReactCurrentDispatcher.current on its own bundled React copy, not on the standalone
- * react package that NativeWind imports. So when NativeWind's StyledComponent calls
- * react_1.default.useMemo(), the dispatcher is null → "Cannot read property 'useMemo'
- * of null" / "Invalid hook call".
+ * NativeWind's runtime styled wrappers call hooks through the standalone "react" package.
+ * Under Fabric, dispatcher state is owned by renderer-bundled React internals, so these
+ * calls can resolve to a null dispatcher and crash with "Invalid hook call".
  *
- * Fix: Replace the useMemo(() => styled(component), [component]) call with a
- * module-level Map cache. styled(component) is a pure function; caching globally
- * is semantically equivalent and eliminates the React hook dependency entirely.
+ * We run NativeWind in transformOnly mode, so className->style work is already done at
+ * Babel compile time. Runtime styled processing is unnecessary.
+ *
+ * This patch applies two safe transforms:
+ * 1) styled-component.js: replace useMemo with a module-level cache.
+ * 2) styled/index.js: replace Styled function body with hook-free passthrough.
  */
 
 import fs from "node:fs";
@@ -21,32 +20,44 @@ import { fileURLToPath } from "node:url";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const bunStoreDir = path.join(repoRoot, "node_modules", ".bun");
 
-const ALREADY_PATCHED_MARKER = "_styledCache";
+const STYLED_COMPONENT_PATCH_MARKER = "_styledCache";
+const STYLED_COMPONENT_NEEDLE = "react_1.default.useMemo";
+const STYLED_INDEX_PATCH_MARKER = "nativewind-transformOnly-passthrough";
 
-const PATCH_NEEDLE = "react_1.default.useMemo";
-
-const PATCH_PREFIX = `const _styledCache = new Map();
+const STYLED_COMPONENT_HELPER = `const _styledCache = new Map();
 function _getStyledComponent(c) {
     if (!_styledCache.has(c)) _styledCache.set(c, (0, styled_1.styled)(c));
     return _styledCache.get(c);
 }
 `;
 
-function patchFile(filePath) {
+const STYLED_INDEX_PASSTHROUGH_FUNCTION = `function Styled({ className: propClassName = "", tw: twClassName, style: inlineStyles, children: componentChildren, ...componentProps }, ref) {
+  // nativewind-transformOnly-passthrough
+  // transformOnly mode already compiled className to style.
+  // Avoid NativeWind runtime hook calls (incompatible with Fabric dispatcher ownership).
+  return (0, react_1.createElement)(Component, {
+    ...componentProps,
+    style: inlineStyles,
+    children: componentChildren,
+    ref,
+  });
+}`;
+
+function patchStyledComponentFile(filePath) {
   const source = fs.readFileSync(filePath, "utf8");
 
-  if (source.includes(ALREADY_PATCHED_MARKER)) {
+  if (source.includes(STYLED_COMPONENT_PATCH_MARKER)) {
     return false;
   }
 
-  if (!source.includes(PATCH_NEEDLE)) {
+  if (!source.includes(STYLED_COMPONENT_NEEDLE)) {
     return false;
   }
 
   // Replace the full StyledComponent export that uses useMemo
   let patched = source.replace(
     /exports\.StyledComponent = react_1\.default\.forwardRef\(\(\{ component, \.\.\.options \}, ref\) => \{[\s\S]*?const Component = react_1\.default\.useMemo\([^)]+\[[^\]]*\]\);[\s\S]*?\}\);/,
-    PATCH_PREFIX +
+    STYLED_COMPONENT_HELPER +
       `exports.StyledComponent = react_1.default.forwardRef(({ component, ...options }, ref) => {
     const Component = _getStyledComponent(component);
     return ((0, jsx_runtime_1.jsx)(Component, { ...options, ref: ref }));
@@ -68,9 +79,43 @@ function patchFile(filePath) {
     // Inject the helper before the StyledComponent export
     patched = patched.replace(
       "exports.StyledComponent = react_1.default.forwardRef(",
-      PATCH_PREFIX + "exports.StyledComponent = react_1.default.forwardRef(",
+      STYLED_COMPONENT_HELPER + "exports.StyledComponent = react_1.default.forwardRef(",
     );
   }
+
+  fs.writeFileSync(filePath, patched, "utf8");
+  return true;
+}
+
+function patchStyledIndexFile(filePath) {
+  const source = fs.readFileSync(filePath, "utf8");
+
+  const functionStart = source.indexOf("function Styled(");
+  if (functionStart === -1) {
+    console.warn(`[nativewind-patch] Styled function not found in: ${filePath}`);
+    return false;
+  }
+
+  const functionEndAnchor = source.indexOf("    if (typeof Component !== \"string\") {", functionStart);
+  if (functionEndAnchor === -1) {
+    console.warn(`[nativewind-patch] Styled function end anchor not found in: ${filePath}`);
+    return false;
+  }
+
+  const originalFunctionBlock = source.slice(functionStart, functionEndAnchor);
+  const replacementFunctionBlock = `    ${STYLED_INDEX_PASSTHROUGH_FUNCTION}\n`;
+
+  if (originalFunctionBlock === replacementFunctionBlock || source.includes(STYLED_INDEX_PATCH_MARKER)) {
+    // If already patched correctly, do nothing.
+    if (originalFunctionBlock === replacementFunctionBlock) {
+      return false;
+    }
+  }
+
+  const patched =
+    source.slice(0, functionStart) +
+    replacementFunctionBlock +
+    source.slice(functionEndAnchor);
 
   fs.writeFileSync(filePath, patched, "utf8");
   return true;
@@ -85,8 +130,8 @@ function main() {
   const entries = fs.readdirSync(bunStoreDir, { withFileTypes: true });
   const targets = entries
     .filter((entry) => entry.isDirectory() && entry.name.startsWith("nativewind@"))
-    .map((entry) =>
-      path.join(
+    .map((entry) => ({
+      styledComponent: path.join(
         bunStoreDir,
         entry.name,
         "node_modules",
@@ -94,8 +139,17 @@ function main() {
         "dist",
         "styled-component.js",
       ),
-    )
-    .filter((targetPath) => fs.existsSync(targetPath));
+      styledIndex: path.join(
+        bunStoreDir,
+        entry.name,
+        "node_modules",
+        "nativewind",
+        "dist",
+        "styled",
+        "index.js",
+      ),
+    }))
+    .filter((target) => fs.existsSync(target.styledComponent) || fs.existsSync(target.styledIndex));
 
   if (!targets.length) {
     console.log("[nativewind-patch] No nativewind targets found, skipping.");
@@ -104,8 +158,13 @@ function main() {
 
   let patched = 0;
   for (const target of targets) {
-    if (patchFile(target)) {
-      console.log(`[nativewind-patch] Patched: ${path.relative(repoRoot, target)}`);
+    if (fs.existsSync(target.styledComponent) && patchStyledComponentFile(target.styledComponent)) {
+      console.log(`[nativewind-patch] Patched: ${path.relative(repoRoot, target.styledComponent)}`);
+      patched++;
+    }
+
+    if (fs.existsSync(target.styledIndex) && patchStyledIndexFile(target.styledIndex)) {
+      console.log(`[nativewind-patch] Patched: ${path.relative(repoRoot, target.styledIndex)}`);
       patched++;
     }
   }
