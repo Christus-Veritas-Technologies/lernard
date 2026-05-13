@@ -292,6 +292,7 @@
       "name": "@lernard/validation",
       "version": "0.0.0",
       "dependencies": {
+        "@lernard/shared-types": "*",
         "zod": "^3.23.0",
       },
       "devDependencies": {
