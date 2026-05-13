@@ -24,7 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { browserApiFetch } from "@/lib/browser-api";
+import { browserApiFetch, tryParsePlanLimitError } from "@/lib/browser-api";
 import { HardPaywall } from "@/components/quota/HardPaywall";
 
 type Source = "text" | "quiz" | "image" | "document";
@@ -220,8 +220,17 @@ export function LearnPageClient() {
 
             router.push(`/learn/${response.lessonId}/loading`);
         } catch (error) {
-            console.error("Lesson generation failed:", error);
-            setGenerationError((error as Error).message || "Failed to generate lesson. Please try again.");
+            const resetAt = tryParsePlanLimitError(error);
+            if (resetAt !== null) {
+                if (planUsage) {
+                    setPlanUsage({ ...planUsage, lessonsUsed: planUsage.lessonsLimit });
+                } else {
+                    router.push("/plans");
+                }
+            } else {
+                console.error("Lesson generation failed:", error);
+                setGenerationError((error as Error).message || "Failed to generate lesson. Please try again.");
+            }
         } finally {
             setLoading(false);
         }

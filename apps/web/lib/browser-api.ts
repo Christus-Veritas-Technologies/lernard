@@ -35,6 +35,23 @@ export class BrowserAuthError extends Error {
     }
 }
 
+/**
+ * Returns the `resetAt` ISO string if the error is a 429 plan_limit_reached response,
+ * or `null` for any other error type.
+ */
+export function tryParsePlanLimitError(err: unknown): string | null {
+    if (!(err instanceof BrowserApiError) || err.status !== 429) return null;
+    try {
+        const body = JSON.parse(err.body) as Record<string, unknown>;
+        if (body.error === "plan_limit_reached") {
+            return typeof body.resetAt === "string" ? body.resetAt : null;
+        }
+    } catch {
+        // non-JSON body — treat as generic error
+    }
+    return null;
+}
+
 export async function browserApiFetch<T>(
     route: string,
     options: BrowserApiOptions = {},

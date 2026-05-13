@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/Button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
-import { browserApiFetch } from "@/lib/browser-api";
+import { browserApiFetch, tryParsePlanLimitError } from "@/lib/browser-api";
 import { HardPaywall } from "@/components/quota/HardPaywall";
 
 type Source = "text" | "lesson" | "image" | "document";
@@ -232,6 +232,16 @@ export function QuizCreateForm({ onGenerated }: QuizCreateFormProps) {
 
             onGenerated?.();
             router.push(`/practice-exams/${response.quizId}`);
+        } catch (err) {
+            const resetAt = tryParsePlanLimitError(err);
+            if (resetAt !== null) {
+                if (planUsage) {
+                    setPlanUsage({ ...planUsage, quizzesUsed: planUsage.quizzesLimit });
+                } else {
+                    router.push("/plans");
+                }
+            }
+            // other errors are swallowed here; the form stays open
         } finally {
             setLoading(false);
         }

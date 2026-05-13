@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { browserApiFetch } from "@/lib/browser-api";
+import { browserApiFetch, tryParsePlanLimitError } from "@/lib/browser-api";
 import { HardPaywall } from "@/components/quota/HardPaywall";
 
 type CreateStep = "template" | "details" | "generating";
@@ -147,9 +147,19 @@ export function ProjectCreateClient() {
 
             router.push(`/projects/${result.projectId}`);
         } catch (err) {
-            setFormError(err instanceof Error ? err.message : "Could not create project. Please try again.");
-            setSubmitting(false);
-            setStep("details");
+            const resetAt = tryParsePlanLimitError(err);
+            if (resetAt !== null) {
+                if (planUsage) {
+                    setPlanUsage({ ...planUsage, projectsUsed: planUsage.projectsLimit });
+                    setStep("template");
+                } else {
+                    router.push("/plans");
+                }
+            } else {
+                setFormError(err instanceof Error ? err.message : "Could not create project. Please try again.");
+                setSubmitting(false);
+                setStep("details");
+            }
         }
     }
 

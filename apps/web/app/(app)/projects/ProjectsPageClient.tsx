@@ -6,11 +6,12 @@ import { ArrowRight01Icon, BookOpen01Icon, CheckmarkCircle02Icon, Clock01Icon, F
 import Link from "next/link";
 
 import { ROUTES } from "@lernard/routes";
-import type { ProjectLevel, ProjectTemplateDefinition, ProjectsContent } from "@lernard/shared-types";
+import type { PagePayload, PlanUsage, ProgressContent, ProjectLevel, ProjectTemplateDefinition, ProjectsContent } from "@lernard/shared-types";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
+import { Progress } from "@/components/ui/progress";
 import { browserApiFetch } from "@/lib/browser-api";
 import { usePagePayload } from "@/hooks/usePagePayload";
 
@@ -18,6 +19,7 @@ export function ProjectsPageClient() {
     const [templates, setTemplates] = useState<ProjectTemplateDefinition[]>([]);
     const [templatesLoading, setTemplatesLoading] = useState(true);
     const [templatesError, setTemplatesError] = useState<string | null>(null);
+    const [planUsage, setPlanUsage] = useState<PlanUsage | null>(null);
 
     async function loadTemplates() {
         setTemplatesLoading(true);
@@ -34,7 +36,13 @@ export function ProjectsPageClient() {
     }
 
     useEffect(() => {
-        void loadTemplates();
+        void Promise.allSettled([
+            loadTemplates(),
+            browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW)
+                .then((d) => setPlanUsage(d.content.planUsage))
+                .catch(() => undefined),
+        ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<ProjectsContent>(
@@ -86,6 +94,7 @@ export function ProjectsPageClient() {
     }
 
     const { content } = data;
+    const isProjectsExhausted = planUsage !== null && planUsage.projectsLimit > 0 && planUsage.projectsUsed >= planUsage.projectsLimit;
 
     return (
         <div className="space-y-6">
@@ -170,12 +179,33 @@ export function ProjectsPageClient() {
 
                     {!templatesLoading && !templatesError && templates.length > 0 ? (
                         <div className="space-y-4">
-                            <Link href="/projects/create" className="block">
-                                <Button className="w-full" size="lg">
-                                    <SparklesIcon size={18} />
-                                    <span className="ml-2">Create new project</span>
-                                </Button>
-                            </Link>
+                            {planUsage && planUsage.projectsLimit > 0 && (
+                                <div className="flex flex-col gap-1.5 rounded-xl border border-border p-3">
+                                    <div className="flex items-center justify-between text-xs text-text-secondary">
+                                        <span>Projects this month</span>
+                                        <span>{planUsage.projectsUsed} / {planUsage.projectsLimit}</span>
+                                    </div>
+                                    <Progress
+                                        value={Math.min((planUsage.projectsUsed / planUsage.projectsLimit) * 100, 100)}
+                                        className="h-1.5"
+                                    />
+                                </div>
+                            )}
+                            {isProjectsExhausted ? (
+                                <Link href="/plans" className="block">
+                                    <Button className="w-full" size="lg" variant="secondary" disabled>
+                                        <SparklesIcon size={18} />
+                                        <span className="ml-2">Project limit reached — upgrade to create more</span>
+                                    </Button>
+                                </Link>
+                            ) : (
+                                <Link href="/projects/create" className="block">
+                                    <Button className="w-full" size="lg">
+                                        <SparklesIcon size={18} />
+                                        <span className="ml-2">Create new project</span>
+                                    </Button>
+                                </Link>
+                            )}
 
                             <div className="overflow-x-auto pb-2">
                                 <div className="flex min-w-max gap-4 pr-2">
