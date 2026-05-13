@@ -62,7 +62,8 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
     const [partSubmitting, setPartSubmitting] = useState<Record<string, boolean>>({});
     const [partResults, setPartResults] = useState<Record<string, StructuredPartEvaluation>>({});
 
-    const loadQuiz = useCallback(async (options?: { poll?: boolean }) => {
+        const waitingForNextQuestionRef = useRef(false);
+const loadQuiz = useCallback(async (options?: { poll?: boolean }) => {
         const isPoll = options?.poll ?? false;
         if (loadInFlightRef.current) {
             return;
@@ -160,7 +161,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                                 if (event.questionIndex === 0) {
                                     setLocalQuestionIndex(0);
                                     // Build a quiz-like object from the streamed question
-                                    setQuizMode("start");
+                                    
                                     setQuiz({
                                         quizId,
                                         topic: "",
@@ -172,7 +173,9 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
                                         currentQuestionIndex: 0,
                                         question: event.question,
                                     });
-                                } else if (waitingForNextQuestion) {
+                                } else if (waitingForNextQuestionRef.current) {
+                                    // The user was waiting for this question
+                                    waitingForNextQuestionRef.current = false;
                                     // The user was waiting for this question
                                     setWaitingForNextQuestion(false);
                                     setLocalQuestionIndex(event.questionIndex);
@@ -334,7 +337,7 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
 
     function onNext() {
         // If we were streaming questions via SSE, try to use the cached next question
-        if (quiz && quizMode === "start" && questionCache.size > 0) {
+        if (quiz && questionCache.size > 0) {
             const nextIndex = localQuestionIndex + 1;
             const cachedQuestion = questionCache.get(nextIndex);
             if (cachedQuestion) {
@@ -673,3 +676,4 @@ export function QuizScreenClient({ quizId }: QuizScreenClientProps) {
         </div>
     );
 }
+
