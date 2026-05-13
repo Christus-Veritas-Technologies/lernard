@@ -10,15 +10,15 @@ import type {
   ProjectDraft,
   ProjectGenerationStatus,
   ProjectLevel,
-  ProjectsContent,
   ProjectSection,
+  ProjectsContent,
   ProjectStatusResponse,
-  ProjectTemplateDefinition,
   ScopedPermission,
 } from '@lernard/shared-types';
 import type { User } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import { buildPagePayload } from '../../common/utils/build-page-payload';
+import { MastraService } from '../../mastra/mastra.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { R2Service } from '../../r2/r2.service';
 import {
@@ -27,9 +27,9 @@ import {
   GenerateProjectDto,
   UpdateProjectDraftDto,
 } from './dto/projects.dto';
+import { getProjectLayout } from './project-layouts';
 import { getProjectLevelLanguageProfile } from './project-level-language';
 import { ProjectPdfRendererService } from './project-pdf-renderer.service';
-import { findProjectTemplateById, listProjectTemplates } from './project-templates';
 
 @Injectable()
 export class ProjectsService {
@@ -39,6 +39,7 @@ export class ProjectsService {
     private readonly prisma: PrismaService,
     private readonly r2: R2Service,
     private readonly projectPdfRenderer: ProjectPdfRendererService,
+    private readonly mastra: MastraService,
   ) {}
 
   async getPayload(user: User): Promise<PagePayload<ProjectsContent>> {
@@ -101,28 +102,22 @@ export class ProjectsService {
     });
   }
 
-  listTemplates(level?: ProjectLevel): ProjectTemplateDefinition[] {
-    return listProjectTemplates(level);
+  listTemplates(_level?: ProjectLevel): never[] {
+    return [];
   }
 
   async createDraft(user: User, dto: CreateProjectDraftDto): Promise<ProjectDraft> {
-    const template = findProjectTemplateById(dto.templateId);
-    if (!template) {
-      throw new BadRequestException('Unknown project template.');
-    }
-    if (template.level !== dto.level) {
-      throw new BadRequestException('Template level does not match selected level.');
-    }
+    const layout = getProjectLayout(dto.level);
 
     const draft = await (this.prisma as any).projectDraft.create({
       data: {
         userId: user.id,
-        templateId: dto.templateId,
+        templateId: layout.id,
         subjectName: dto.subject,
         level: toDbLevel(dto.level),
-        topicHint: dto.topicHint ?? null,
+        topicHint: null,
         studentInfo: dto.studentInfo,
-        context: dto.context,
+        context: {},
       },
     });
 
@@ -145,25 +140,16 @@ export class ProjectsService {
       throw new NotFoundException('Project draft not found.');
     }
 
-    const nextTemplateId = dto.templateId ?? existing.templateId;
     const nextLevel = dto.level ?? toSharedLevel(existing.level);
-    const template = findProjectTemplateById(nextTemplateId);
-    if (!template) {
-      throw new BadRequestException('Unknown project template.');
-    }
-    if (template.level !== nextLevel) {
-      throw new BadRequestException('Template level does not match selected level.');
-    }
+    const nextLayout = getProjectLayout(nextLevel);
 
     const draft = await (this.prisma as any).projectDraft.update({
       where: { id: draftId },
       data: {
-        templateId: dto.templateId ?? existing.templateId,
+        templateId: nextLayout.id,
         subjectName: dto.subject ?? existing.subjectName,
         level: dto.level ? toDbLevel(dto.level) : existing.level,
-        topicHint: dto.topicHint !== undefined ? dto.topicHint : existing.topicHint,
         studentInfo: dto.studentInfo ?? existing.studentInfo,
-        context: dto.context ?? existing.context,
       },
     });
 
@@ -205,26 +191,20 @@ export class ProjectsService {
       throw new NotFoundException('Project draft not found.');
     }
 
-    const template = findProjectTemplateById(draft.templateId);
-    if (!template) {
-      throw new BadRequestException('Unknown project template.');
-    }
-
+    const sharedLevel = toSharedLevel(draft.level);
+    const layout = getProjectLayout(sharedLevel);
     const jobId = uuidv4();
-    const titlePrefix = draft.topicHint && String(draft.topicHint).trim().length > 0
-      ? draft.topicHint
-      : draft.subjectName;
 
     const queuedProject = await (this.prisma as any).project.create({
       data: {
         userId: user.id,
         draftId: draft.id,
-        templateId: template.id,
-        templateName: template.name,
-        title: `${template.name}: ${titlePrefix}`,
+        templateId: layout.id,
+        templateName: layout.name,
+        title: `${layout.name}: ${draft.subjectName}`,
         subjectName: draft.subjectName,
         level: draft.level,
-        totalMarks: template.totalMarks,
+        totalMarks: 0,
         status: 'QUEUED',
         jobId,
         idempotencyKey: dto.idempotencyKey,
@@ -237,7 +217,7 @@ export class ProjectsService {
       userId: user.id,
       jobId,
       draft,
-      template,
+      layout,
     });
 
     return { projectId: queuedProject.id, status: 'queued' };
@@ -248,7 +228,7 @@ export class ProjectsService {
     userId: string;
     jobId: string;
     draft: any;
-    template: ProjectTemplateDefinition;
+    layout: import('./project-layouts').ProjectLayoutDefinition;
   }): Promise<void> {
     try {
       const claimed = await (this.prisma as any).project.updateMany({
@@ -270,27 +250,39 @@ export class ProjectsService {
         return;
       }
 
-      const sections = this.buildTemplateSections(input.template, input.draft);
-      assertTemplateConformance(input.template, sections);
-
       const sharedLevel = toSharedLevel(input.draft.level);
-      const pdfBuffer = await this.projectPdfRenderer.render({
-        projectId: input.projectId,
-        title: `${input.template.name}: ${
-          input.draft.topicHint && String(input.draft.topicHint).trim().length > 0
-            ? String(input.draft.topicHint).trim()
-            : input.draft.subjectName
-        }`,
-        templateName: input.template.name,
+      const languageProfile = getProjectLevelLanguageProfile(sharedLevel);
+      const studentInfo = input.draft.studentInfo as {
+        fullName: string;
+        schoolName: string;
+        candidateNumber: string;
+        centreNumber: string;
+      };
+
+      const aiResult = await this.mastra.generateProjectContent({
+        studentInfo,
         subject: input.draft.subjectName,
         level: sharedLevel,
-        totalMarks: input.template.totalMarks,
+        layoutSections: input.layout.sections,
+        languageProfile,
+      });
+
+      const sections = aiResult.sections;
+      const title = aiResult.title;
+      const totalMarks = aiResult.totalMarks;
+
+      const pdfBuffer = await this.projectPdfRenderer.render({
+        projectId: input.projectId,
+        title,
+        templateName: input.layout.name,
+        subject: input.draft.subjectName,
+        level: sharedLevel,
+        totalMarks,
         sections,
       });
+
       const pdfObjectKey = buildProjectPdfObjectKey(input.userId, input.projectId);
       const pdfFileName = buildProjectPdfFileName({
-        templateName: input.template.name,
-        topicHint: input.draft.topicHint,
         subjectName: input.draft.subjectName,
         level: sharedLevel,
       });
@@ -306,6 +298,8 @@ export class ProjectsService {
         },
         data: {
           status: 'READY',
+          title,
+          totalMarks,
           sections,
           readyAt,
           pdfReadyAt: readyAt,
@@ -346,27 +340,6 @@ export class ProjectsService {
         },
       });
     }
-  }
-
-  private buildTemplateSections(
-    template: ProjectTemplateDefinition,
-    draft: any,
-  ): ProjectSection[] {
-    const level = toSharedLevel(draft.level);
-    return template.steps.map((step, index) => ({
-      key: step.key,
-      title: step.title,
-      body: buildSectionBody({
-        sectionTitle: step.title,
-        guidance: step.guidance,
-        level,
-        topicHint: draft.topicHint,
-        subjectName: draft.subjectName,
-        studentInfo: draft.studentInfo,
-        context: draft.context,
-        sectionIndex: index + 1,
-      }),
-    }));
   }
 
   async getProject(user: User, projectId: string): Promise<ProjectContent> {
@@ -539,12 +512,9 @@ function toSharedStatus(status: string): ProjectGenerationStatus {
 function toDraftResponse(draft: any): ProjectDraft {
   return {
     draftId: draft.id,
-    templateId: draft.templateId,
     subject: draft.subjectName,
     level: toSharedLevel(draft.level),
-    topicHint: draft.topicHint ?? undefined,
     studentInfo: draft.studentInfo,
-    context: draft.context,
     createdAt: draft.createdAt.toISOString(),
     updatedAt: draft.updatedAt.toISOString(),
   };
@@ -571,86 +541,15 @@ function toProjectContent(project: any): ProjectContent {
   };
 }
 
-function assertTemplateConformance(
-  template: ProjectTemplateDefinition,
-  sections: ProjectSection[],
-): void {
-  const expectedKeys = template.steps.map((step) => step.key);
-  const actualKeys = sections.map((section) => section.key);
-  if (expectedKeys.length !== actualKeys.length) {
-    throw new Error('Generated project does not match template section count.');
-  }
-
-  for (let index = 0; index < expectedKeys.length; index++) {
-    if (expectedKeys[index] !== actualKeys[index]) {
-      throw new Error('Generated project section order does not match template.');
-    }
-  }
-}
-
-function buildSectionBody(input: {
-  sectionTitle: string;
-  guidance: string;
-  level: ProjectLevel;
-  topicHint?: string | null;
-  subjectName: string;
-  studentInfo: {
-    fullName: string;
-    schoolName: string;
-    candidateNumber: string;
-    className: string;
-  };
-  context: {
-    community: string;
-    problemStatement: string;
-    availableResources: string;
-    preferredLanguage?: string;
-  };
-  sectionIndex: number;
-}): string {
-  const topic = input.topicHint && input.topicHint.trim().length > 0
-    ? input.topicHint.trim()
-    : input.subjectName;
-  const language = input.context.preferredLanguage?.trim() || 'English';
-  const levelProfile = getProjectLevelLanguageProfile(input.level);
-
-  return [
-    `Section ${input.sectionIndex}: ${input.sectionTitle}`,
-    `Target level: ${levelProfile.audienceLabel}`,
-    `Topic focus: ${topic}`,
-    `Learner: ${input.studentInfo.fullName} (${input.studentInfo.className}, candidate ${input.studentInfo.candidateNumber})`,
-    `School: ${input.studentInfo.schoolName}`,
-    `Community setting: ${input.context.community}`,
-    `Problem statement: ${input.context.problemStatement}`,
-    `Available resources: ${input.context.availableResources}`,
-    `Writing language: ${language}`,
-    '',
-    `Guidance: ${input.guidance}`,
-    `Vocabulary guidance: ${levelProfile.vocabularyGuidance}.`,
-    `Sentence guidance: ${levelProfile.sentenceGuidance}.`,
-    `Depth guidance: ${levelProfile.explanationDepth}.`,
-    `Examples guidance: ${levelProfile.examplesGuidance}.`,
-    'Write this section in exam-ready language aligned to the listed guidance only.',
-  ].join('\n');
-}
-
 function buildProjectPdfObjectKey(userId: string, projectId: string): string {
   return `projects/${userId}/${projectId}/project-v1.pdf`;
 }
 
 function buildProjectPdfFileName(input: {
-  templateName: string;
-  topicHint?: string | null;
   subjectName: string;
   level: ProjectLevel;
 }): string {
-  const coreTopic = input.topicHint && input.topicHint.trim().length > 0
-    ? input.topicHint
-    : input.subjectName;
-  const safeTemplate = slugify(input.templateName);
-  const safeTopic = slugify(coreTopic);
-  const safeLevel = input.level;
-  return `${safeTemplate}-${safeTopic}-${safeLevel}.pdf`;
+  return `${slugify(input.subjectName)}-${input.level}.pdf`;
 }
 
 function buildProjectPdfFileNameFromTitle(

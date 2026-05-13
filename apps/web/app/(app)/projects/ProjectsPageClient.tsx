@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -6,7 +6,7 @@ import { ArrowRight01Icon, BookOpen01Icon, CheckmarkCircle02Icon, Clock01Icon, F
 import Link from "next/link";
 
 import { ROUTES } from "@lernard/routes";
-import type { PagePayload, PlanUsage, ProgressContent, ProjectLevel, ProjectTemplateDefinition, ProjectsContent } from "@lernard/shared-types";
+import type { PagePayload, PlanUsage, ProgressContent, ProjectsContent } from "@lernard/shared-types";
 
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
@@ -16,33 +16,12 @@ import { browserApiFetch } from "@/lib/browser-api";
 import { usePagePayload } from "@/hooks/usePagePayload";
 
 export function ProjectsPageClient() {
-    const [templates, setTemplates] = useState<ProjectTemplateDefinition[]>([]);
-    const [templatesLoading, setTemplatesLoading] = useState(true);
-    const [templatesError, setTemplatesError] = useState<string | null>(null);
     const [planUsage, setPlanUsage] = useState<PlanUsage | null>(null);
 
-    async function loadTemplates() {
-        setTemplatesLoading(true);
-        setTemplatesError(null);
-
-        try {
-            const response = await browserApiFetch<ProjectTemplateDefinition[]>(ROUTES.PROJECTS.TEMPLATES);
-            setTemplates(response);
-        } catch {
-            setTemplatesError("Templates could not load right now. Try again in a moment.");
-        } finally {
-            setTemplatesLoading(false);
-        }
-    }
-
     useEffect(() => {
-        void Promise.allSettled([
-            loadTemplates(),
-            browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW)
-                .then((d) => setPlanUsage(d.content.planUsage))
-                .catch(() => undefined),
-        ]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        void browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW)
+            .then((d) => setPlanUsage(d.content.planUsage))
+            .catch(() => undefined);
     }, []);
 
     const { data, error, isAuthenticated, loading, refetch } = usePagePayload<ProjectsContent>(
@@ -141,131 +120,39 @@ export function ProjectsPageClient() {
 
             <Card>
                 <CardHeader>
-                    <div className="flex items-start justify-between gap-3">
-                        <div>
-                            <Badge tone="primary">Project templates</Badge>
-                            <CardTitle className="mt-2">Start a new project document</CardTitle>
-                            <CardDescription>
-                                Pick a template and continue with level-appropriate structure, marks, and section flow.
-                            </CardDescription>
-                        </div>
-                        <Button onClick={() => void loadTemplates()} variant="secondary">Refresh templates</Button>
-                    </div>
+                    <CardTitle>Start a new project</CardTitle>
+                    <CardDescription>
+                        Enter your details and let Lernard generate a complete ZIMSEC project document for your level.
+                    </CardDescription>
                 </CardHeader>
-                <CardContent>
-                    {templatesLoading ? (
-                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                            {Array.from({ length: 6 }).map((_, index) => (
-                                <div
-                                    className="h-72 animate-pulse rounded-2xl border border-border bg-background-subtle"
-                                    key={`template-loading-${index}`}
-                                />
-                            ))}
-                        </div>
-                    ) : null}
-
-                    {!templatesLoading && templatesError ? (
-                        <div className="rounded-2xl border border-dashed border-warning/40 bg-warning-bg p-5 text-sm text-text-primary">
-                            <p>{templatesError}</p>
-                            <Button className="mt-3" onClick={() => void loadTemplates()} variant="secondary">Try again</Button>
-                        </div>
-                    ) : null}
-
-                    {!templatesLoading && !templatesError && templates.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-border bg-background-subtle p-6 text-sm text-text-secondary">
-                            No templates are available yet.
-                        </div>
-                    ) : null}
-
-                    {!templatesLoading && !templatesError && templates.length > 0 ? (
-                        <div className="space-y-4">
-                            {planUsage && planUsage.projectsLimit > 0 && (
-                                <div className="flex flex-col gap-1.5 rounded-xl border border-border p-3">
-                                    <div className="flex items-center justify-between text-xs text-text-secondary">
-                                        <span>Projects this month</span>
-                                        <span>{planUsage.projectsUsed} / {planUsage.projectsLimit}</span>
-                                    </div>
-                                    <Progress
-                                        value={Math.min((planUsage.projectsUsed / planUsage.projectsLimit) * 100, 100)}
-                                        className="h-1.5"
-                                    />
-                                </div>
-                            )}
-                            {isProjectsExhausted ? (
-                                <Link href="/plans" className="block">
-                                    <Button className="w-full" size="lg" variant="secondary" disabled>
-                                        <SparklesIcon size={18} />
-                                        <span className="ml-2">Project limit reached — upgrade to create more</span>
-                                    </Button>
-                                </Link>
-                            ) : (
-                                <Link href="/projects/create" className="block">
-                                    <Button className="w-full" size="lg">
-                                        <SparklesIcon size={18} />
-                                        <span className="ml-2">Create new project</span>
-                                    </Button>
-                                </Link>
-                            )}
-
-                            <div className="overflow-x-auto pb-2">
-                                <div className="flex min-w-max gap-4 pr-2">
-                                {templates.map((template) => {
-                                    const stepPreview = template.steps.slice(0, 4);
-                                    const remainingCount = Math.max(template.steps.length - stepPreview.length, 0);
-
-                                    return (
-                                        <Link
-                                            href={`/projects/create?template=${template.id}`}
-                                            key={template.id}
-                                        >
-                                            <article
-                                                className="group h-full w-[252px] shrink-0 cursor-pointer rounded-3xl border-2 border-border bg-white p-3 shadow-[0_18px_40px_-34px_rgba(36,52,88,0.45)] transition duration-200 hover:border-primary-300 hover:shadow-[0_24px_48px_-36px_rgba(59,130,246,0.3)]"
-                                            >
-                                                <div className="rounded-2xl border border-border bg-background-subtle p-3">
-                                                    <div className="rounded-xl border border-border bg-white p-3">
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <div className={`h-8 w-8 rounded-xl ${levelAccent(template.level)} shadow-sm transition group-hover:scale-110`} />
-                                                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] ${levelBgTone(template.level)} text-white shadow-sm`}>
-                                                                {formatLevel(template.level)}
-                                                            </span>
-                                                        </div>
-                                                        <div className="mt-3 h-1.5 w-20 rounded-full bg-slate-200" />
-                                                        <div className="mt-2 h-1.5 w-24 rounded-full bg-slate-200" />
-                                                        <div className="mt-4 h-1.5 w-28 rounded-full bg-slate-200" />
-                                                        <div className="mt-2 h-1.5 w-16 rounded-full bg-slate-200" />
-                                                    </div>
-                                                </div>
-                                                <div className="mt-3 flex items-start justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                        <h3 className="line-clamp-2 text-[15px] font-semibold text-text-primary">{template.name}</h3>
-                                                        <p className="mt-1 text-sm text-text-secondary">{template.subject}</p>
-                                                    </div>
-                                                    <ArrowRight01Icon size={16} className="mt-0.5 shrink-0 text-text-tertiary transition group-hover:translate-x-1" />
-                                                </div>
-                                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                                    <Badge tone={levelTone(template.level)}>{formatLevel(template.level)}</Badge>
-                                                    <Badge tone="warm">{template.totalMarks} marks</Badge>
-                                                </div>
-
-                                                <div className="mt-3 rounded-xl border border-border bg-background-subtle p-2.5">
-                                                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-tertiary">Section flow</p>
-                                                    <ul className="mt-2 space-y-1">
-                                                        {stepPreview.map((step) => (
-                                                            <li className="line-clamp-1 text-xs text-text-primary" key={step.key}>• {step.title}</li>
-                                                        ))}
-                                                    </ul>
-                                                    {remainingCount > 0 ? (
-                                                        <p className="mt-2 text-[11px] font-medium text-text-secondary">+{remainingCount} more sections</p>
-                                                    ) : null}
-                                                </div>
-                                            </article>
-                                        </Link>
-                                    );
-                                })}
-                                </div>
+                <CardContent className="space-y-4">
+                    {planUsage && planUsage.projectsLimit > 0 && (
+                        <div className="flex flex-col gap-1.5 rounded-xl border border-border p-3">
+                            <div className="flex items-center justify-between text-xs text-text-secondary">
+                                <span>Projects this month</span>
+                                <span>{planUsage.projectsUsed} / {planUsage.projectsLimit}</span>
                             </div>
+                            <Progress
+                                value={Math.min((planUsage.projectsUsed / planUsage.projectsLimit) * 100, 100)}
+                                className="h-1.5"
+                            />
                         </div>
-                    ) : null}
+                    )}
+                    {isProjectsExhausted ? (
+                        <Link href="/plans">
+                            <Button size="lg" variant="secondary" disabled>
+                                <SparklesIcon size={18} />
+                                <span className="ml-2">Project limit reached â€” upgrade to create more</span>
+                            </Button>
+                        </Link>
+                    ) : (
+                        <Link href="/projects/create">
+                            <Button size="lg">
+                                <SparklesIcon size={18} />
+                                <span className="ml-2">New project</span>
+                            </Button>
+                        </Link>
+                    )}
                 </CardContent>
             </Card>
 
@@ -293,7 +180,7 @@ export function ProjectsPageClient() {
                                     <div className="min-w-0">
                                         <p className="truncate text-sm font-semibold text-text-primary">{project.title}</p>
                                         <p className="text-xs text-text-secondary">
-                                            {project.templateName} • {project.subject} • {project.level.toUpperCase()}
+                                            {project.templateName} â€¢ {project.subject} â€¢ {project.level.toUpperCase()}
                                         </p>
                                     </div>
                                 </div>
@@ -342,28 +229,13 @@ function Stat({ label, value, icon, tone }: { label: string; value: number; icon
     );
 }
 
-function formatLevel(level: ProjectLevel): string {
-    if (level === "grade7") return "Grade 7";
-    if (level === "olevel") return "O Level";
-    return "A Level";
-}
-
-function levelTone(level: ProjectLevel): "cool" | "warm" | "primary" {
-    if (level === "grade7") return "cool";
-    if (level === "olevel") return "warm";
-    return "primary";
-}
-
-function levelAccent(level: ProjectLevel): string {
-    if (level === "grade7") return "bg-sky-500";
-    if (level === "olevel") return "bg-amber-500";
-    return "bg-indigo-500";
-}
-
-function levelBgTone(level: ProjectLevel): string {
-    if (level === "grade7") return "bg-sky-500";
-    if (level === "olevel") return "bg-amber-500";
-    return "bg-indigo-500";
+function MetaPill({ icon, label }: { icon: ReactNode; label: string }) {
+    return (
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] text-text-primary shadow-sm ring-1 ring-border">
+            {icon}
+            {label}
+        </span>
+    );
 }
 
 function projectStatusTone(status: string): string {
@@ -376,15 +248,6 @@ function projectStatusTone(status: string): string {
     }
 
     return "inline-flex items-center rounded-full bg-warning-bg px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-warning";
-}
-
-function MetaPill({ icon, label }: { icon: ReactNode; label: string }) {
-    return (
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] text-text-primary shadow-sm ring-1 ring-border">
-            {icon}
-            {label}
-        </span>
-    );
 }
 
 const statIconTone = {

@@ -1,46 +1,24 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
     ArrowLeft01Icon,
-    CheckmarkCircle02Icon,
     SparklesIcon,
 } from "hugeicons-react";
 import Link from "next/link";
 
 import { ROUTES } from "@lernard/routes";
-import type { PagePayload, PlanUsage, ProgressContent, ProjectLevel, ProjectTemplateDefinition } from "@lernard/shared-types";
+import type { PagePayload, PlanUsage, ProgressContent, ProjectLevel } from "@lernard/shared-types";
 
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { browserApiFetch, tryParsePlanLimitError } from "@/lib/browser-api";
 import { HardPaywall } from "@/components/quota/HardPaywall";
 
-type CreateStep = "template" | "details" | "generating";
+type CreateStep = "details" | "generating";
 
-function levelLabel(level: ProjectLevel): string {
-    if (level === "grade7") return "Grade 7";
-    if (level === "olevel") return "O Level";
-    return "A Level";
-}
-
-function levelTone(level: ProjectLevel): "cool" | "warm" | "primary" {
-    if (level === "grade7") return "cool";
-    if (level === "olevel") return "warm";
-    return "primary";
-}
-
-function levelAccent(level: ProjectLevel): string {
-    if (level === "grade7") return "bg-sky-500";
-    if (level === "olevel") return "bg-amber-500";
-    return "bg-indigo-500";
-}
-
-/** Generates a v4 UUID using the Web Crypto API */
 function generateUUID(): string {
     const bytes = crypto.getRandomValues(new Uint8Array(16));
     bytes[6] = (bytes[6]! & 0x0f) | 0x40;
@@ -49,77 +27,45 @@ function generateUUID(): string {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function StepDot({ active, done, label }: { active: boolean; done: boolean; label: string }) {
-    return (
-        <span className={`flex items-center gap-1.5 text-xs font-semibold ${active ? "text-primary-600" : done ? "text-success" : "text-text-tertiary"}`}>
-            <span className={`h-2 w-2 rounded-full ${active ? "bg-primary-500" : done ? "bg-success" : "bg-border"}`} />
-            {label}
-        </span>
-    );
-}
+const LEVEL_OPTIONS: { value: ProjectLevel; label: string }[] = [
+    { value: "grade7", label: "Grade 7" },
+    { value: "olevel", label: "Form 4 (O Level)" },
+    { value: "alevel", label: "Form 6 (A Level)" },
+];
 
 export function ProjectCreateClient() {
     const router = useRouter();
-    const searchParams = useSearchParams();
-    const templateParam = searchParams?.get("template") ?? null;
 
-    // If a template was pre-selected via URL, go straight to the details step
-    const [step, setStep] = useState<CreateStep>(templateParam ? "details" : "template");
-    const [templates, setTemplates] = useState<ProjectTemplateDefinition[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [loadError, setLoadError] = useState<string | null>(null);
+    const [step, setStep] = useState<CreateStep>("details");
     const [submitting, setSubmitting] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
     const [planUsage, setPlanUsage] = useState<PlanUsage | null>(null);
 
-    const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(templateParam);
-
     const [fullName, setFullName] = useState("");
     const [schoolName, setSchoolName] = useState("");
     const [candidateNumber, setCandidateNumber] = useState("");
-    const [className, setClassName] = useState("");
-    const [community, setCommunity] = useState("");
-    const [problemStatement, setProblemStatement] = useState("");
-    const [availableResources, setAvailableResources] = useState("");
-    const [topicHint, setTopicHint] = useState("");
+    const [centreNumber, setCentreNumber] = useState("");
+    const [subject, setSubject] = useState("");
+    const [level, setLevel] = useState<ProjectLevel>("olevel");
 
     useEffect(() => {
-        void Promise.allSettled([
-            browserApiFetch<ProjectTemplateDefinition[]>(ROUTES.PROJECTS.TEMPLATES),
-            browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW),
-        ]).then(([templatesResult, planUsageResult]) => {
-            setLoading(false);
-            if (templatesResult.status === "fulfilled") {
-                setTemplates(templatesResult.value);
-                if (templateParam && !templatesResult.value.find((t) => t.id === templateParam)) {
-                    setSelectedTemplateId(null);
-                    setStep("template");
-                }
-            } else {
-                setLoadError("Could not load templates. Please try again.");
-            }
-            if (planUsageResult.status === "fulfilled") {
-                setPlanUsage(planUsageResult.value.content.planUsage);
-            }
-        });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        void browserApiFetch<PagePayload<ProgressContent>>(ROUTES.PROGRESS.OVERVIEW)
+            .then((d) => setPlanUsage(d.content.planUsage))
+            .catch(() => undefined);
     }, []);
 
-    const isProjectsExhausted = planUsage !== null && planUsage.projectsLimit > 0 && planUsage.projectsUsed >= planUsage.projectsLimit;
-
-    const selectedTemplate = templates.find((t) => t.id === selectedTemplateId) ?? null;
+    const isProjectsExhausted =
+        planUsage !== null && planUsage.projectsLimit > 0 && planUsage.projectsUsed >= planUsage.projectsLimit;
 
     const detailsValid =
         fullName.trim().length > 0 &&
         schoolName.trim().length > 0 &&
         candidateNumber.trim().length > 0 &&
-        className.trim().length > 0 &&
-        community.trim().length > 0 &&
-        problemStatement.trim().length > 0 &&
-        availableResources.trim().length > 0;
+        centreNumber.trim().length > 0 &&
+        subject.trim().length > 0;
 
     async function handleSubmit() {
-        if (!selectedTemplate || !detailsValid) return;
+        if (!detailsValid) return;
         setFormError(null);
         setSubmitting(true);
         setStep("generating");
@@ -128,12 +74,14 @@ export function ProjectCreateClient() {
             const draft = await browserApiFetch<{ draftId: string }>(ROUTES.PROJECTS.CREATE_DRAFT, {
                 method: "POST",
                 body: JSON.stringify({
-                    templateId: selectedTemplate.id,
-                    subject: selectedTemplate.subject,
-                    level: selectedTemplate.level,
-                    topicHint: topicHint.trim() || undefined,
-                    studentInfo: { fullName, schoolName, candidateNumber, className },
-                    context: { community, problemStatement, availableResources },
+                    subject: subject.trim(),
+                    level,
+                    studentInfo: {
+                        fullName: fullName.trim(),
+                        schoolName: schoolName.trim(),
+                        candidateNumber: candidateNumber.trim(),
+                        centreNumber: centreNumber.trim(),
+                    },
                 }),
             });
 
@@ -151,10 +99,10 @@ export function ProjectCreateClient() {
             if (resetAt !== null) {
                 if (planUsage) {
                     setPlanUsage({ ...planUsage, projectsUsed: planUsage.projectsLimit });
-                    setStep("template");
                 } else {
                     router.push("/plans");
                 }
+                setStep("details");
             } else {
                 setFormError(err instanceof Error ? err.message : "Could not create project. Please try again.");
                 setSubmitting(false);
@@ -163,8 +111,6 @@ export function ProjectCreateClient() {
         }
     }
 
-    // â”€â”€ Loading skeleton â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
     if (isProjectsExhausted && planUsage) {
         return (
             <div className="relative min-h-[400px]">
@@ -172,40 +118,6 @@ export function ProjectCreateClient() {
             </div>
         );
     }
-
-    if (loading) {
-        return (
-            <Card className="border-0 bg-gradient-to-br from-slate-50 to-white">
-                <CardHeader className="space-y-4">
-                    <div className="h-8 w-40 animate-pulse rounded-full bg-slate-200" />
-                    <div className="h-5 w-64 animate-pulse rounded-full bg-slate-100" />
-                </CardHeader>
-                <CardContent className="grid gap-4 sm:grid-cols-2">
-                    {Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} className="h-36 animate-pulse rounded-3xl border border-border bg-slate-100" />
-                    ))}
-                </CardContent>
-            </Card>
-        );
-    }
-
-    if (loadError || templates.length === 0) {
-        return (
-            <Card>
-                <CardHeader>
-                    <CardTitle>Could not load templates</CardTitle>
-                    <CardDescription>{loadError ?? "No templates are available yet."}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Link href="/projects">
-                        <Button variant="secondary">Back to projects</Button>
-                    </Link>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    // â”€â”€ Generating splash â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     if (step === "generating") {
         return (
@@ -217,8 +129,8 @@ export function ProjectCreateClient() {
                     <CardTitle className="text-2xl">Generating your project</CardTitle>
                     <CardDescription className="mt-2 max-w-md">
                         Lernard is building your{" "}
-                        <span className="font-semibold">{selectedTemplate?.name}</span> document. This
-                        takes about 30â€“60 seconds. You'll land on the project page automatically.
+                        <span className="font-semibold">{subject}</span> document. This
+                        takes about 30–60 seconds. You will land on the project page automatically.
                     </CardDescription>
                     <div className="mt-6 flex gap-1.5">
                         <span className="h-2 w-2 animate-bounce rounded-full bg-primary-400 [animation-delay:0ms]" />
@@ -230,125 +142,24 @@ export function ProjectCreateClient() {
         );
     }
 
-    // â”€â”€ Shared step header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-    const stepHeader = (
-        <div className="flex items-center gap-3">
-            {step === "details" ? (
-                <button
-                    type="button"
-                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-white shadow-sm transition hover:bg-background-subtle"
-                    onClick={() => { setSelectedTemplateId(null); setStep("template"); }}
-                >
-                    <ArrowLeft01Icon size={16} />
-                </button>
-            ) : (
+    return (
+        <div className="space-y-6">
+            <div className="flex items-center gap-3">
                 <Link
                     href="/projects"
                     className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-white shadow-sm transition hover:bg-background-subtle"
                 >
                     <ArrowLeft01Icon size={16} />
                 </Link>
-            )}
-            <div>
-                <h1 className="text-2xl font-semibold text-text-primary">Create new project</h1>
-                <div className="mt-1 flex items-center gap-2">
-                    <StepDot active={step === "template"} done={step === "details"} label="Template" />
-                    <div className="h-px w-6 bg-border" />
-                    <StepDot active={step === "details"} done={false} label="Details" />
-                </div>
+                <h1 className="text-2xl font-semibold text-text-primary">New project</h1>
             </div>
-        </div>
-    );
-
-    // â”€â”€ Step 1: Template picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-    if (step === "template") {
-        return (
-            <div className="space-y-6">
-                {stepHeader}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Choose a template</CardTitle>
-                        <CardDescription>
-                            Click a template to continue. Lernard will structure the document around your choice.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            {templates.map((template) => {
-                                const selected = selectedTemplateId === template.id;
-                                return (
-                                    <button
-                                        key={template.id}
-                                        type="button"
-                                        className={`group relative w-full rounded-3xl border-2 p-4 text-left transition duration-150 ${
-                                            selected
-                                                ? "border-primary-500 bg-primary-50 shadow-md shadow-primary-100"
-                                                : "border-border bg-white hover:border-primary-200 hover:bg-primary-50/40 hover:shadow-sm"
-                                        }`}
-                                        onClick={() => {
-                                            setSelectedTemplateId(template.id);
-                                            setStep("details");
-                                        }}
-                                    >
-                                        {selected && (
-                                            <div className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-primary-500 text-white">
-                                                <CheckmarkCircle02Icon size={12} />
-                                            </div>
-                                        )}
-                                        <div className="flex items-center gap-3">
-                                            <div className={`h-10 w-10 shrink-0 rounded-2xl ${levelAccent(template.level)} shadow-sm transition group-hover:scale-105`} />
-                                            <div className="min-w-0">
-                                                <p className="truncate font-semibold text-text-primary">{template.name}</p>
-                                                <p className="text-sm text-text-secondary">{template.subject}</p>
-                                            </div>
-                                        </div>
-                                        <p className="mt-3 line-clamp-2 text-xs leading-5 text-text-tertiary">{template.description}</p>
-                                        <div className="mt-3 flex flex-wrap gap-1.5">
-                                            <Badge tone={levelTone(template.level)}>{levelLabel(template.level)}</Badge>
-                                            <Badge tone="warm">{template.totalMarks} marks</Badge>
-                                            <Badge tone="cool">{template.steps.length} sections</Badge>
-                                        </div>
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
-    // â”€â”€ Step 2: Details form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-    return (
-        <div className="space-y-6">
-            {stepHeader}
-
-            {selectedTemplate && (
-                <div className="flex items-center gap-3 rounded-2xl border border-primary-200 bg-primary-50 px-4 py-3">
-                    <div className={`h-8 w-8 shrink-0 rounded-xl ${levelAccent(selectedTemplate.level)}`} />
-                    <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-primary-900">{selectedTemplate.name}</p>
-                        <p className="text-xs text-primary-700">
-                            {selectedTemplate.subject} â€¢ {levelLabel(selectedTemplate.level)} â€¢ {selectedTemplate.totalMarks} marks
-                        </p>
-                    </div>
-                    <button
-                        type="button"
-                        className="text-xs font-medium text-primary-600 hover:underline"
-                        onClick={() => { setSelectedTemplateId(null); setStep("template"); }}
-                    >
-                        Change
-                    </button>
-                </div>
-            )}
 
             <Card>
                 <CardHeader>
-                    <CardTitle>About you</CardTitle>
-                    <CardDescription>This information appears on the generated project document.</CardDescription>
+                    <CardTitle>Your details</CardTitle>
+                    <CardDescription>
+                        These appear on the generated project document. Lernard will generate all content and assign marks automatically.
+                    </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 sm:grid-cols-2">
                     <div className="space-y-1.5">
@@ -361,55 +172,34 @@ export function ProjectCreateClient() {
                     </div>
                     <div className="space-y-1.5">
                         <label className="text-sm font-semibold text-text-primary" htmlFor="candidateNumber">Candidate number *</label>
-                        <Input id="candidateNumber" value={candidateNumber} onChange={(e) => setCandidateNumber(e.target.value)} placeholder="e.g. 12345" maxLength={32} />
+                        <Input id="candidateNumber" value={candidateNumber} onChange={(e) => setCandidateNumber(e.target.value)} placeholder="e.g. 123456" maxLength={32} />
                     </div>
                     <div className="space-y-1.5">
-                        <label className="text-sm font-semibold text-text-primary" htmlFor="className">Class *</label>
-                        <Input id="className" value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. Form 4A" maxLength={40} />
+                        <label className="text-sm font-semibold text-text-primary" htmlFor="centreNumber">Centre number *</label>
+                        <Input id="centreNumber" value={centreNumber} onChange={(e) => setCentreNumber(e.target.value)} placeholder="e.g. 04321" maxLength={32} />
                     </div>
-                </CardContent>
-            </Card>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>Project context</CardTitle>
-                    <CardDescription>Help Lernard generate content grounded in your actual setting.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-semibold text-text-primary" htmlFor="community">Community / setting *</label>
-                        <Input id="community" value={community} onChange={(e) => setCommunity(e.target.value)} placeholder="e.g. A small-scale farming community in rural Mashonaland" maxLength={120} />
+                    <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-sm font-semibold text-text-primary" htmlFor="subject">Subject *</label>
+                        <Input id="subject" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="e.g. Biology, Geography, History" maxLength={300} />
                     </div>
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-semibold text-text-primary" htmlFor="problemStatement">Problem statement *</label>
-                        <Textarea
-                            id="problemStatement"
-                            value={problemStatement}
-                            onChange={(e) => setProblemStatement(e.target.value)}
-                            placeholder="Describe the problem or question you are investigatingâ€¦"
-                            maxLength={300}
-                            className="min-h-[96px]"
-                        />
-                        <p className="text-right text-xs text-text-tertiary">{problemStatement.length}/300</p>
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-semibold text-text-primary" htmlFor="availableResources">Available resources *</label>
-                        <Textarea
-                            id="availableResources"
-                            value={availableResources}
-                            onChange={(e) => setAvailableResources(e.target.value)}
-                            placeholder="List materials, people, data, or equipment you have access toâ€¦"
-                            maxLength={300}
-                            className="min-h-[80px]"
-                        />
-                        <p className="text-right text-xs text-text-tertiary">{availableResources.length}/300</p>
-                    </div>
-                    <div className="space-y-1.5">
-                        <label className="text-sm font-semibold text-text-primary" htmlFor="topicHint">
-                            Topic hint <span className="font-normal text-text-tertiary">(optional)</span>
-                        </label>
-                        <Input id="topicHint" value={topicHint} onChange={(e) => setTopicHint(e.target.value)} placeholder="e.g. Soil erosion from overgrazing" maxLength={200} />
-                        <p className="text-xs text-text-tertiary">A specific topic produces more focused section content.</p>
+                    <div className="space-y-1.5 sm:col-span-2">
+                        <p className="text-sm font-semibold text-text-primary">Level *</p>
+                        <div className="flex flex-wrap gap-2">
+                            {LEVEL_OPTIONS.map((opt) => (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => setLevel(opt.value)}
+                                    className={`rounded-full border-2 px-4 py-2 text-sm font-semibold transition ${
+                                        level === opt.value
+                                            ? "border-primary-500 bg-primary-50 text-primary-700"
+                                            : "border-border bg-white text-text-secondary hover:border-primary-200"
+                                    }`}
+                                >
+                                    {opt.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -420,24 +210,15 @@ export function ProjectCreateClient() {
                 </div>
             )}
 
-            <div className="flex gap-3">
-                <Button
-                    variant="secondary"
-                    className="flex-[0_0_auto] px-6"
-                    onClick={() => { setSelectedTemplateId(null); setStep("template"); }}
-                >
-                    <ArrowLeft01Icon size={15} className="mr-1.5" />
-                    Back
-                </Button>
-                <Button
-                    className="flex-1"
-                    onClick={() => void handleSubmit()}
-                    disabled={submitting || !detailsValid || !selectedTemplate}
-                >
-                    <SparklesIcon size={16} className="mr-2" />
-                    Generate project
-                </Button>
-            </div>
+            <Button
+                className="w-full"
+                size="lg"
+                onClick={() => void handleSubmit()}
+                disabled={submitting || !detailsValid}
+            >
+                <SparklesIcon size={16} className="mr-2" />
+                Generate project
+            </Button>
         </div>
     );
 }

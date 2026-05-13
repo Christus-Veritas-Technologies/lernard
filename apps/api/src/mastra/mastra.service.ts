@@ -1545,6 +1545,131 @@ Be specific. Name exact topics. Keep summaryParagraph to 2-3 sentences covering 
     };
   }
 
+  async generateProjectContent(input: {
+    studentInfo: {
+      fullName: string;
+      schoolName: string;
+      candidateNumber: string;
+      centreNumber: string;
+    };
+    subject: string;
+    level: 'grade7' | 'olevel' | 'alevel';
+    layoutSections: Array<{ key: string; title: string }>;
+    languageProfile: {
+      audienceLabel: string;
+      vocabularyGuidance: string;
+      sentenceGuidance: string;
+      explanationDepth: string;
+      examplesGuidance: string;
+    };
+  }): Promise<{ title: string; totalMarks: number; sections: Array<{ key: string; title: string; body: string }> }> {
+    const levelLabel =
+      input.level === 'grade7' ? 'Grade 7' :
+      input.level === 'olevel' ? 'O Level' : 'A Level';
+
+    const marksGuidance =
+      input.level === 'grade7' ? '25–40' :
+      input.level === 'olevel' ? '45–70' : '80–120';
+
+    const sectionsSpec = input.layoutSections
+      .map((s, i) => `${i + 1}. key: "${s.key}" | title: "${s.title}"`)
+      .join('\n');
+
+    const systemPrompt = `You are Lernard, an expert educational assistant generating ZIMSEC-aligned coursework projects for Zimbabwean students.
+You write content appropriate for the student's academic level and grounded in Zimbabwe's educational, cultural, and environmental context.
+Always return valid JSON only — no markdown, no extra text.`;
+
+    const userPrompt = `Generate a complete ZIMSEC ${levelLabel} project for the following student:
+
+Student name: ${input.studentInfo.fullName}
+School: ${input.studentInfo.schoolName}
+Candidate number: ${input.studentInfo.candidateNumber}
+Centre number: ${input.studentInfo.centreNumber}
+Subject: ${input.subject}
+Level: ${levelLabel}
+
+Language requirements:
+- Write for a ${input.languageProfile.audienceLabel}
+- Vocabulary: ${input.languageProfile.vocabularyGuidance}
+- Sentences: ${input.languageProfile.sentenceGuidance}
+- Depth: ${input.languageProfile.explanationDepth}
+- Examples: ${input.languageProfile.examplesGuidance}
+
+The project must use EXACTLY these sections in this order:
+${sectionsSpec}
+
+Return a JSON object with this exact structure:
+{
+  "title": "A descriptive project title that reflects the subject and level (max 120 characters)",
+  "totalMarks": <a whole number between ${marksGuidance}>,
+  "sections": [
+    { "key": "<section key>", "title": "<section title>", "body": "<full section content, well-developed and appropriate for ${levelLabel} ZIMSEC assessment>" },
+    ...
+  ]
+}
+
+Requirements:
+- The title must name the subject area and be academically appropriate
+- Each section body must be substantive, complete, and appropriate for ZIMSEC ${levelLabel} assessment
+- Ground all content in Zimbabwe's educational context — reference local communities, environments, and practices where relevant
+- Do not include any marks allocation, assessment criteria, or instructions inside section bodies
+- Return ONLY valid JSON — no markdown, no extra commentary`;
+
+    return completeWithRetry(async () => {
+      const text = await this.completeText({
+        model: SONNET_MODEL,
+        maxTokens: 4096,
+        systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+
+      const parsed = safeJsonParse<{
+        title?: string;
+        totalMarks?: number;
+        sections?: Array<{ key?: string; title?: string; body?: string }>;
+      }>(text);
+
+      if (!parsed || typeof parsed.title !== 'string' || !Array.isArray(parsed.sections)) {
+        this.logger.warn(
+          `[mastra.generateProjectContent] malformed JSON subject="${input.subject}" level="${input.level}" preview="${truncateForLog(text.replace(/\s+/g, ' '), 400)}"`,
+        );
+        throw new Error('Project generation returned malformed JSON');
+      }
+
+      const sections = parsed.sections
+        .filter((s) => typeof s.key === 'string' && typeof s.title === 'string' && typeof s.body === 'string')
+        .map((s) => ({ key: String(s.key), title: String(s.title), body: String(s.body) }));
+
+      if (sections.length !== input.layoutSections.length) {
+        throw new Error(
+          `Project section count mismatch: expected ${input.layoutSections.length}, got ${sections.length}`,
+        );
+      }
+
+      for (let i = 0; i < input.layoutSections.length; i++) {
+        if (sections[i]!.key !== input.layoutSections[i]!.key) {
+          throw new Error(
+            `Project section key mismatch at index ${i}: expected "${input.layoutSections[i]!.key}", got "${sections[i]!.key}"`,
+          );
+        }
+      }
+
+      const totalMarks =
+        typeof parsed.totalMarks === 'number' && Number.isFinite(parsed.totalMarks)
+          ? Math.round(parsed.totalMarks)
+          : input.level === 'grade7' ? 30 : input.level === 'olevel' ? 55 : 100;
+
+      return {
+        title: parsed.title.trim().slice(0, 200),
+        totalMarks,
+        sections,
+      };
+    }, {
+      maxAttempts: 3,
+      baseDelayMs: 500,
+    });
+  }
+
   private async runWithRetry<T>(
     operation: () => Promise<T>,
     fallback?: () => T,

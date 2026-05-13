@@ -3,7 +3,6 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsIn,
-  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -30,30 +29,8 @@ class ProjectStudentInfoDto {
 
   @IsString()
   @MinLength(1)
-  @MaxLength(40)
-  className!: string;
-}
-
-class ProjectContextDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(120)
-  community!: string;
-
-  @IsString()
-  @MinLength(1)
-  @MaxLength(300)
-  problemStatement!: string;
-
-  @IsString()
-  @MinLength(1)
-  @MaxLength(300)
-  availableResources!: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(40)
-  preferredLanguage?: string;
+  @MaxLength(32)
+  centreNumber!: string;
 }
 
 class EditProjectSectionDto {
@@ -76,42 +53,22 @@ class EditProjectSectionDto {
 export class CreateProjectDraftDto {
   @IsString()
   @MinLength(1)
-  @MaxLength(64)
-  templateId!: string;
-
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @MaxLength(300)
   subject!: string;
 
   @IsIn(['grade7', 'olevel', 'alevel'])
   level!: 'grade7' | 'olevel' | 'alevel';
 
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  topicHint?: string;
-
   @ValidateNested()
   @Type(() => ProjectStudentInfoDto)
   studentInfo!: ProjectStudentInfoDto;
-
-  @ValidateNested()
-  @Type(() => ProjectContextDto)
-  context!: ProjectContextDto;
 }
 
 export class UpdateProjectDraftDto {
   @IsOptional()
   @IsString()
   @MinLength(1)
-  @MaxLength(64)
-  templateId?: string;
-
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(100)
+  @MaxLength(300)
   subject?: string;
 
   @IsOptional()
@@ -119,26 +76,11 @@ export class UpdateProjectDraftDto {
   level?: 'grade7' | 'olevel' | 'alevel';
 
   @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  topicHint?: string;
-
-  @IsOptional()
-  @IsObject()
   studentInfo?: {
     fullName: string;
     schoolName: string;
     candidateNumber: string;
-    className: string;
-  };
-
-  @IsOptional()
-  @IsObject()
-  context?: {
-    community: string;
-    problemStatement: string;
-    availableResources: string;
-    preferredLanguage?: string;
+    centreNumber: string;
   };
 }
 
@@ -150,12 +92,6 @@ export class GenerateProjectDto {
 
   @IsUUID()
   idempotencyKey!: string;
-}
-
-export class ProjectTemplatesQueryDto {
-  @IsOptional()
-  @IsIn(['grade7', 'olevel', 'alevel'])
-  level?: 'grade7' | 'olevel' | 'alevel';
 }
 
 export class EditProjectPdfDto {
@@ -171,3 +107,5 @@ export class EditProjectPdfDto {
   @ArrayMaxSize(20)
   sections!: EditProjectSectionDto[];
 }
+
+

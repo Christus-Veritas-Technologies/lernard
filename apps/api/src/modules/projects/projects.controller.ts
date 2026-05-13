@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import type {
   PagePayload,
   ProjectDraft,
@@ -11,7 +11,6 @@ import {
   CreateProjectDraftDto,
   EditProjectPdfDto,
   GenerateProjectDto,
-  ProjectTemplatesQueryDto,
   UpdateProjectDraftDto,
 } from './dto/projects.dto';
 import { ProjectsService } from './projects.service';
@@ -24,12 +23,6 @@ export class ProjectsController {
   @Get('payload')
   async getPayload(@CurrentUser() user: User): Promise<PagePayload<ProjectsContent>> {
     return this.projectsService.getPayload(user);
-  }
-
-  @ProtectedRoute()
-  @Get('templates')
-  async listTemplates(@Query() query: ProjectTemplatesQueryDto) {
-    return this.projectsService.listTemplates(query.level);
   }
 
   @ProtectedRoute()
