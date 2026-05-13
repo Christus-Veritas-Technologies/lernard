@@ -118,7 +118,6 @@ export type {
   ProjectTemplateStep,
   ProjectTemplateDefinition,
   ProjectDraftStudentInfo,
-  ProjectDraftContext,
   ProjectDraft,
   ProjectSection,
   ProjectContent,
