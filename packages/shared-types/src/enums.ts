@@ -62,3 +62,10 @@ export enum PaymentStatus {
   FAILED = 'failed',
   CANCELLED = 'cancelled',
 }
+
+export enum PaymentSessionStatus {
+  PENDING = 'pending',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CLAIMED = 'claimed',
+}

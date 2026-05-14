@@ -1,19 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { CheckmarkCircle01Icon, Loading03Icon, Alert01Icon } from "hugeicons-react";
-import { PaymentStatus } from "@lernard/shared-types";
-import type { PaymentStatusResponse } from "@lernard/shared-types";
+import { Alert01Icon, CheckmarkCircle01Icon, Loading03Icon } from "hugeicons-react";
+import { PaymentSessionStatus } from "@lernard/shared-types";
+import type { PaymentSessionResponse } from "@lernard/shared-types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
-import { getPaymentStatus } from "@/lib/payments-client";
-
-const POLL_INTERVAL_MS = 3000;
-const TIMEOUT_MS = 90_000;
-
-type ViewState = "loading" | "success" | "failed" | "timeout" | "missing-ref";
+import { BrowserApiError } from "@/lib/browser-api";
+import { claimPaymentSession, getPaymentSession } from "@/lib/payments-client";
 
 function getPlanDisplayName(plan: string): string {
     const names: Record<string, string> = {
@@ -26,70 +22,82 @@ function getPlanDisplayName(plan: string): string {
     return names[plan] ?? plan;
 }
 
+type ViewState = "loading" | "pending" | "success" | "failed" | "missing-session";
+
+function readErrorMessage(error: unknown): string {
+    if (error instanceof BrowserApiError) {
+        try {
+            const body = JSON.parse(error.body) as { message?: string };
+            if (body.message) {
+                return body.message;
+            }
+        } catch {
+            return "Something went wrong while checking your payment.";
+        }
+    }
+
+    return "Something went wrong while checking your payment.";
+}
+
 export function PaymentReturnClient() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const queryClient = useQueryClient();
-    const reference = searchParams.get("ref");
+    const sessionId = searchParams.get("sessionId");
 
-    const [viewState, setViewState] = useState<ViewState>(reference ? "loading" : "missing-ref");
-    const [planName, setPlanName] = useState<string | null>(null);
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-    const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const resolvedRef = useRef(false);
+    const [viewState, setViewState] = useState<ViewState>(sessionId ? "loading" : "missing-session");
+    const [session, setSession] = useState<PaymentSessionResponse | null>(null);
+    const [message, setMessage] = useState<string | null>(null);
+    const [isConfirming, setIsConfirming] = useState(false);
 
-    function stopPolling() {
-        if (intervalRef.current) clearInterval(intervalRef.current);
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    }
-
-    async function poll() {
-        if (!reference || resolvedRef.current) return;
-
-        let result: PaymentStatusResponse;
-        try {
-            result = await getPaymentStatus(reference);
-        } catch {
-            return; // Network blip — keep polling
+    async function loadSession() {
+        if (!sessionId) {
+            setViewState("missing-session");
+            return;
         }
 
-        if (result.status === PaymentStatus.PAID) {
-            resolvedRef.current = true;
-            stopPolling();
-            setPlanName(getPlanDisplayName(result.plan));
-            await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-            setViewState("success");
-            setTimeout(() => router.push("/home"), 4000);
-        } else if (
-            result.status === PaymentStatus.FAILED ||
-            result.status === PaymentStatus.CANCELLED
-        ) {
-            resolvedRef.current = true;
-            stopPolling();
+        setViewState("loading");
+        setMessage(null);
+
+        try {
+            const result = await getPaymentSession(sessionId);
+            setSession(result);
+
+            if (result.status === PaymentSessionStatus.COMPLETED || result.status === PaymentSessionStatus.CLAIMED) {
+                setIsConfirming(true);
+                const claimed = await claimPaymentSession(sessionId);
+                setSession(claimed);
+                await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+                setViewState("success");
+                setTimeout(() => router.push("/home"), 2500);
+                return;
+            }
+
+            if (result.status === PaymentSessionStatus.FAILED) {
+                setMessage(
+                    result.validationErrors.length > 0
+                        ? result.validationErrors[0]
+                        : "Your payment could not be completed.",
+                );
+                setViewState("failed");
+                return;
+            }
+
+            setViewState("pending");
+        } catch (error) {
+            setMessage(readErrorMessage(error));
             setViewState("failed");
+        } finally {
+            setIsConfirming(false);
         }
     }
 
     useEffect(() => {
-        if (!reference) return;
-
-        // Initial poll immediately
-        void poll();
-
-        intervalRef.current = setInterval(() => void poll(), POLL_INTERVAL_MS);
-
-        timeoutRef.current = setTimeout(() => {
-            if (!resolvedRef.current) {
-                stopPolling();
-                setViewState("timeout");
-            }
-        }, TIMEOUT_MS);
-
-        return () => stopPolling();
+        void loadSession();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [reference]);
+    }, [sessionId]);
 
-    if (viewState === "missing-ref") {
+    if (viewState === "missing-session") {
         return (
             <div className="flex min-h-[60vh] items-center justify-center p-4">
                 <Card className="w-full max-w-md">
@@ -97,7 +105,7 @@ export function PaymentReturnClient() {
                         <Alert01Icon className="text-destructive" size={48} />
                         <h1 className="text-xl font-semibold text-text-primary">Invalid payment link</h1>
                         <p className="text-sm text-text-secondary">
-                            This page requires a valid payment reference. Please start a new payment.
+                            This page requires a payment session ID. Please start again from the plans page.
                         </p>
                         <Button variant="primary" onClick={() => router.push("/plans")}>
                             View plans
@@ -114,10 +122,39 @@ export function PaymentReturnClient() {
                 <Card className="w-full max-w-md">
                     <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
                         <Loading03Icon className="animate-spin text-primary-500" size={48} />
-                        <h1 className="text-xl font-semibold text-text-primary">Confirming your payment…</h1>
+                        <h1 className="text-xl font-semibold text-text-primary">Checking your payment…</h1>
                         <p className="text-sm text-text-secondary">
-                            This usually takes just a few seconds. Please stay on this page.
+                            We’re verifying the payment session and confirming your plan.
                         </p>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
+    if (viewState === "pending") {
+        return (
+            <div className="flex min-h-[60vh] items-center justify-center p-4">
+                <Card className="w-full max-w-md">
+                    <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
+                        <Loading03Icon className="animate-spin text-primary-500" size={48} />
+                        <h1 className="text-xl font-semibold text-text-primary">Payment is still processing</h1>
+                        <p className="text-sm text-text-secondary">
+                            We found your session, but Paynow has not confirmed the payment yet.
+                        </p>
+                        {session && (
+                            <p className="text-xs text-text-tertiary">
+                                {getPlanDisplayName(session.plan)} · ${session.amountUsd.toFixed(2)}
+                            </p>
+                        )}
+                        <div className="flex flex-wrap justify-center gap-3">
+                            <Button variant="secondary" onClick={() => void loadSession()}>
+                                Check again
+                            </Button>
+                            <Button variant="primary" onClick={() => router.push("/plans")}>
+                                Back to plans
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
@@ -131,12 +168,12 @@ export function PaymentReturnClient() {
                     <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
                         <CheckmarkCircle01Icon className="text-green-500" size={48} />
                         <h1 className="text-xl font-semibold text-text-primary">
-                            {planName ? `You're now on ${planName}` : "Payment confirmed!"}
+                            {session ? `You’re now on ${getPlanDisplayName(session.plan)}` : "Payment confirmed!"}
                         </h1>
                         <p className="text-sm text-text-secondary">
                             Your plan has been activated. Redirecting you to your dashboard…
                         </p>
-                        <Button variant="primary" onClick={() => router.push("/home")}>
+                        <Button variant="primary" disabled={isConfirming} onClick={() => router.push("/home")}>
                             Go to dashboard
                         </Button>
                     </CardContent>
@@ -145,49 +182,23 @@ export function PaymentReturnClient() {
         );
     }
 
-    if (viewState === "timeout") {
-        return (
-            <div className="flex min-h-[60vh] items-center justify-center p-4">
-                <Card className="w-full max-w-md">
-                    <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
-                        <Loading03Icon className="text-amber-500" size={48} />
-                        <h1 className="text-xl font-semibold text-text-primary">Still checking…</h1>
-                        <p className="text-sm text-text-secondary">
-                            Your payment is taking longer than expected to confirm. If you completed
-                            the payment, your plan will be activated automatically.
-                        </p>
-                        <div className="flex gap-3">
-                            <Button variant="secondary" onClick={() => window.location.reload()}>
-                                Check again
-                            </Button>
-                            <Button variant="primary" onClick={() => router.push("/home")}>
-                                Go to dashboard
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
-    // failed
     return (
         <div className="flex min-h-[60vh] items-center justify-center p-4">
             <Card className="w-full max-w-md">
                 <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
                     <Alert01Icon className="text-destructive" size={48} />
-                    <h1 className="text-xl font-semibold text-text-primary">Payment was not completed</h1>
-                    <p className="text-sm text-text-secondary">
-                        Your payment was cancelled or failed. No charge was made to your account.
-                    </p>
-                    <div className="flex gap-3">
+                    <h1 className="text-xl font-semibold text-text-primary">Payment could not be confirmed</h1>
+                    <p className="text-sm text-text-secondary">{message ?? "Please try the payment again."}</p>
+                    {session && (
+                        <p className="text-xs text-text-tertiary">
+                            {getPlanDisplayName(session.plan)} · ${session.amountUsd.toFixed(2)}
+                        </p>
+                    )}
+                    <div className="flex flex-wrap justify-center gap-3">
                         <Button variant="secondary" onClick={() => router.push("/plans")}>
                             Try again
                         </Button>
-                        <Button
-                            variant="ghost"
-                            onClick={() => window.open("mailto:support@lernard.app", "_blank")}
-                        >
+                        <Button variant="ghost" onClick={() => window.open("mailto:support@lernard.app", "_blank")}>
                             Contact support
                         </Button>
                     </div>

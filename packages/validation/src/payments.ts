@@ -15,4 +15,14 @@ export const initiatePaymentSchema = z.object({
   }),
 })
 
+export const paymentSessionParamsSchema = z.object({
+  sessionId: z.string().min(1, 'sessionId is required'),
+})
+
+export const paymentReferenceParamsSchema = z.object({
+  reference: z.string().min(1, 'reference is required'),
+})
+
 export type InitiatePaymentInput = z.infer<typeof initiatePaymentSchema>
+export type PaymentSessionParamsInput = z.infer<typeof paymentSessionParamsSchema>
+export type PaymentReferenceParamsInput = z.infer<typeof paymentReferenceParamsSchema>
