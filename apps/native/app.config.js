@@ -5,7 +5,7 @@
 module.exports = {
     name: 'Lernard AI',
     slug: 'lernard',
-    newArchEnabled: true,
+    newArchEnabled: false,
     version: '1.0.0',
     scheme: process.env.EXPO_PUBLIC_APP_SCHEME ?? 'lernard',
     platforms: ['ios', 'android'],
