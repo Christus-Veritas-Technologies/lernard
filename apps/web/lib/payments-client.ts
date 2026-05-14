@@ -1,7 +1,12 @@
 "use client";
 
 import { ROUTES } from "@lernard/routes";
-import type { Plan, PaymentInitResponse, PaymentStatusResponse } from "@lernard/shared-types";
+import type {
+    Plan,
+    PaymentInitResponse,
+    PaymentSessionResponse,
+    PaymentStatusResponse,
+} from "@lernard/shared-types";
 import { browserApiFetch } from "./browser-api";
 
 export function initiatePayment(plan: Plan): Promise<PaymentInitResponse> {
@@ -9,6 +14,16 @@ export function initiatePayment(plan: Plan): Promise<PaymentInitResponse> {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ plan }),
+    });
+}
+
+export function getPaymentSession(sessionId: string): Promise<PaymentSessionResponse> {
+    return browserApiFetch<PaymentSessionResponse>(ROUTES.PAYMENTS.SESSION(sessionId));
+}
+
+export function claimPaymentSession(sessionId: string): Promise<PaymentSessionResponse> {
+    return browserApiFetch<PaymentSessionResponse>(ROUTES.PAYMENTS.CLAIM(sessionId), {
+        method: "POST",
     });
 }
 

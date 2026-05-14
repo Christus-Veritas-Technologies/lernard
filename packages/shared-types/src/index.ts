@@ -9,6 +9,7 @@ export {
   SessionDepth,
   Appearance,
   PaymentStatus,
+  PaymentSessionStatus,
 } from './enums'
 
 // Entities
@@ -157,5 +158,6 @@ export type {
 } from './payloads/onboarding'
 export type {
   PaymentInitResponse,
+  PaymentSessionResponse,
   PaymentStatusResponse,
 } from './payloads/payments'
