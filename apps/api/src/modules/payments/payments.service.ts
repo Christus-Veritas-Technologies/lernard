@@ -65,6 +65,16 @@ const PAYMENT_TERMINAL_STATES = new Set<PrismaPaymentSessionStatus>([
   PrismaPaymentSessionStatus.CLAIMED,
 ]);
 
+function normalizeExternalBaseUrl(url: string | undefined): string {
+  if (!url) {
+    return '';
+  }
+
+  const trimmed = url.trim();
+  const unquoted = trimmed.replace(/^["']+|["']+$/g, '');
+  return unquoted.replace(/\/+$/, '');
+}
+
 function toSharedPaymentSessionStatus(
   status: PrismaPaymentSessionStatus,
 ): SharedPaymentSessionStatus {
@@ -153,14 +163,14 @@ export class PaymentsService {
       data: { paymentOrderId: order.id },
     });
 
-    const apiBaseUrl = this.config.get<string>('API_BASE_URL') ?? '';
-    const webAppUrl = this.config.get<string>('WEB_APP_URL') ?? '';
+    const apiBaseUrl = normalizeExternalBaseUrl(this.config.get<string>('API_BASE_URL'));
+    const webAppUrl = normalizeExternalBaseUrl(this.config.get<string>('WEB_APP_URL'));
     const integrationId = this.config.getOrThrow<string>('PAYNOW_INTEGRATION_ID');
     const integrationKey = this.config.getOrThrow<string>('PAYNOW_INTEGRATION_KEY');
 
     const paynow = new Paynow(integrationId, integrationKey);
     paynow.resultUrl = `${apiBaseUrl}${ROUTES.PAYMENTS.PAYNOW_CALLBACK}`;
-    paynow.returnUrl = `${webAppUrl}/payments/return?sessionId=${encodeURIComponent(session.id)}`;
+    paynow.returnUrl = `${webAppUrl}/payments/success?intermediatePayment=${encodeURIComponent(session.id)}`;
 
     const payment = paynow.createPayment(reference, user.email ?? '');
     payment.add(PLAN_DISPLAY_NAMES[plan] ?? 'Lernard Plan', amount);
@@ -194,6 +204,7 @@ export class PaymentsService {
 
     return {
       redirectUrl: response.redirectUrl as string,
+      intermediatePaymentId: session.id,
       sessionId: session.id,
       reference,
     };
