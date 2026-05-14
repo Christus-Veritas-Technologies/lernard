@@ -184,6 +184,7 @@ model User {
   conversations     Conversation[]
   pushSubscriptions PushSubscription[]
   paymentOrders     PaymentOrder[]
+  paymentSessions   PaymentSession[]
   whatsAppSession   WhatsAppSession?
   @@index([email])
   @@index([role])
@@ -584,6 +585,32 @@ model PaymentOrder {
 
   @@index([userId])
   @@index([reference])
+  @@index([userId, status])
+}
+
+enum PaymentSessionStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CLAIMED
+}
+
+model PaymentSession {
+  id                String                  @id @default(cuid())
+  userId            String
+  plan              Plan
+  amountUsd         Float
+  status            PaymentSessionStatus    @default(PENDING)
+  validationErrors  Json                    @default("[]")
+  claimedAt         DateTime?
+  paymentOrderId    String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
   @@index([userId, status])
 }
 
