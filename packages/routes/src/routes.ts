@@ -149,6 +149,8 @@ export const ROUTES = {
 
   PAYMENTS: {
     INITIATE: '/v1/payments/initiate',
+    SESSION: (sessionId: string) => `/v1/payments/sessions/${sessionId}` as const,
+    CLAIM: (sessionId: string) => `/v1/payments/sessions/${sessionId}/claim` as const,
     STATUS: (reference: string) => `/v1/payments/status/${reference}` as const,
     PAYNOW_CALLBACK: '/v1/payments/paynow/callback',
   },
