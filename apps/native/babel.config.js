@@ -1,20 +1,9 @@
 module.exports = function (api) {
   api.cache(true);
-  const tailwindConfig = require('./tailwind.config');
-  let plugins = [];
-
-  plugins.push('react-native-worklets/plugin');
-  plugins.push([
-    'nativewind/babel',
-    {
-      mode: 'transformOnly',
-      tailwindConfig,
-    },
-  ]);
+  const plugins = ['nativewind/babel', 'react-native-worklets/plugin'];
 
   return {
     presets: ['babel-preset-expo'],
-
     plugins,
   };
 };

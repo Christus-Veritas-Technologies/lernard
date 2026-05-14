@@ -2,6 +2,7 @@ import type { Plan, PaymentSessionStatus } from '../enums'
 
 export interface PaymentInitResponse {
   redirectUrl: string
+  intermediatePaymentId: string
   sessionId: string
   reference: string
 }
