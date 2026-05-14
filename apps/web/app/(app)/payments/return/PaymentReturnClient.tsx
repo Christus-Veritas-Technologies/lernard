@@ -43,7 +43,9 @@ export function PaymentReturnClient() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const queryClient = useQueryClient();
-    const sessionId = searchParams.get("sessionId");
+    const intermediatePaymentId = searchParams.get("intermediatePayment");
+    const legacySessionId = searchParams.get("sessionId");
+    const sessionId = intermediatePaymentId ?? legacySessionId;
 
     const [viewState, setViewState] = useState<ViewState>(sessionId ? "loading" : "missing-session");
     const [session, setSession] = useState<PaymentSessionResponse | null>(null);
@@ -100,12 +102,12 @@ export function PaymentReturnClient() {
     if (viewState === "missing-session") {
         return (
             <div className="flex min-h-[60vh] items-center justify-center p-4">
-                <Card className="w-full max-w-md">
+                <Card className="w-full max-w-md border-destructive/20 bg-gradient-to-b from-destructive/5 to-background shadow-sm transition-all duration-300">
                     <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
                         <Alert01Icon className="text-destructive" size={48} />
                         <h1 className="text-xl font-semibold text-text-primary">Invalid payment link</h1>
                         <p className="text-sm text-text-secondary">
-                            This page requires a payment session ID. Please start again from the plans page.
+                            This page requires an intermediate payment ID. Please start again from the plans page.
                         </p>
                         <Button variant="primary" onClick={() => router.push("/plans")}>
                             View plans
@@ -119,9 +121,10 @@ export function PaymentReturnClient() {
     if (viewState === "loading") {
         return (
             <div className="flex min-h-[60vh] items-center justify-center p-4">
-                <Card className="w-full max-w-md">
+                <Card className="w-full max-w-md border-primary-200 bg-gradient-to-b from-primary-50/80 to-background shadow-sm transition-all duration-300">
                     <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
                         <Loading03Icon className="animate-spin text-primary-500" size={48} />
+                        <div className="h-1.5 w-24 animate-pulse rounded-full bg-primary-200" />
                         <h1 className="text-xl font-semibold text-text-primary">Checking your payment…</h1>
                         <p className="text-sm text-text-secondary">
                             We’re verifying the payment session and confirming your plan.
@@ -135,9 +138,10 @@ export function PaymentReturnClient() {
     if (viewState === "pending") {
         return (
             <div className="flex min-h-[60vh] items-center justify-center p-4">
-                <Card className="w-full max-w-md">
+                <Card className="w-full max-w-md border-amber-200 bg-gradient-to-b from-amber-50/80 to-background shadow-sm transition-all duration-300">
                     <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
-                        <Loading03Icon className="animate-spin text-primary-500" size={48} />
+                        <Loading03Icon className="animate-spin text-amber-500" size={48} />
+                        <div className="h-1.5 w-24 animate-pulse rounded-full bg-amber-200" />
                         <h1 className="text-xl font-semibold text-text-primary">Payment is still processing</h1>
                         <p className="text-sm text-text-secondary">
                             We found your session, but Paynow has not confirmed the payment yet.
@@ -164,9 +168,10 @@ export function PaymentReturnClient() {
     if (viewState === "success") {
         return (
             <div className="flex min-h-[60vh] items-center justify-center p-4">
-                <Card className="w-full max-w-md">
+                <Card className="w-full max-w-md border-emerald-200 bg-gradient-to-b from-emerald-50/90 to-background shadow-md transition-all duration-300">
                     <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
-                        <CheckmarkCircle01Icon className="text-green-500" size={48} />
+                        <CheckmarkCircle01Icon className="animate-pulse text-emerald-500" size={48} />
+                        <div className="h-1.5 w-24 rounded-full bg-emerald-200" />
                         <h1 className="text-xl font-semibold text-text-primary">
                             {session ? `You’re now on ${getPlanDisplayName(session.plan)}` : "Payment confirmed!"}
                         </h1>
@@ -184,9 +189,10 @@ export function PaymentReturnClient() {
 
     return (
         <div className="flex min-h-[60vh] items-center justify-center p-4">
-            <Card className="w-full max-w-md">
+            <Card className="w-full max-w-md border-destructive/20 bg-gradient-to-b from-destructive/5 to-background shadow-sm transition-all duration-300">
                 <CardContent className="flex flex-col items-center gap-4 py-10 text-center">
                     <Alert01Icon className="text-destructive" size={48} />
+                    <div className="h-1.5 w-24 animate-pulse rounded-full bg-destructive/20" />
                     <h1 className="text-xl font-semibold text-text-primary">Payment could not be confirmed</h1>
                     <p className="text-sm text-text-secondary">{message ?? "Please try the payment again."}</p>
                     {session && (
