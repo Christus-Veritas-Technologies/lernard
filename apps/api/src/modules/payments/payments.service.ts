@@ -11,8 +11,6 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  PaymentOrder,
-  PaymentSession,
   PaymentSessionStatus as PrismaPaymentSessionStatus,
   PaymentStatus,
   Plan,
@@ -247,22 +245,20 @@ export class PaymentsService {
     });
 
     if (status.paid === true) {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.paymentOrder.update({
-          where: { id: order.id },
-          data: { status: PaymentStatus.PAID, paidAt: new Date() },
-        });
-
-        if (session) {
-          await tx.paymentSession.update({
-            where: { id: session.id },
-            data: {
-              status: PrismaPaymentSessionStatus.COMPLETED,
-              validationErrors: [],
-            },
-          });
-        }
+      await this.prisma.paymentOrder.update({
+        where: { id: order.id },
+        data: { status: PaymentStatus.PAID, paidAt: new Date() },
       });
+
+      if (session) {
+        await this.prisma.paymentSession.update({
+          where: { id: session.id },
+          data: {
+            status: PrismaPaymentSessionStatus.COMPLETED,
+            validationErrors: [],
+          },
+        });
+      }
       return;
     }
 
@@ -291,20 +287,20 @@ export class PaymentsService {
       throw new NotFoundException('Payment session not found.');
     }
 
-    await this.refreshSessionFromGateway(session.id);
+    await this.promotePendingSessionToCompleted(session.id);
 
     return this.buildSessionResponse(userId, session.id);
   }
 
   async getPaymentSession(userId: string, sessionId: string): Promise<PaymentSessionResponse> {
-    await this.assertSessionOwnership(userId, sessionId);
-    await this.refreshSessionFromGateway(sessionId);
+    const session = await this.assertSessionOwnership(userId, sessionId);
+    await this.promotePendingSessionToCompleted(session.id);
     return this.buildSessionResponse(userId, sessionId);
   }
 
   async claimPaymentSession(userId: string, sessionId: string): Promise<PaymentSessionResponse> {
     const session = await this.assertSessionOwnership(userId, sessionId);
-    await this.refreshSessionFromGateway(session.id);
+    await this.promotePendingSessionToCompleted(session.id);
 
     const current = await this.prisma.paymentSession.findUnique({
       where: { id: session.id },
@@ -327,62 +323,54 @@ export class PaymentsService {
     }
 
     const claimedAt = new Date();
-    const claimResult = await this.prisma.$transaction(async (tx) => {
-      const result = await tx.paymentSession.updateMany({
-        where: {
-          id: current.id,
-          userId,
-          status: PrismaPaymentSessionStatus.COMPLETED,
-          claimedAt: null,
-        },
-        data: {
-          status: PrismaPaymentSessionStatus.CLAIMED,
-          claimedAt,
-        },
-      });
-
-      if (result.count === 0) {
-        return null;
-      }
-
-      const planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-
-      await tx.user.update({
-        where: { id: userId },
-        data: { plan: current.plan, planExpiresAt },
-      });
-
-      if (GUARDIAN_PLANS.has(current.plan)) {
-        const guardian = await tx.guardian.findUnique({
-          where: { userId },
-          select: { children: { select: { id: true } } },
-        });
-
-        if (guardian?.children.length) {
-          await tx.user.updateMany({
-            where: { id: { in: guardian.children.map((child) => child.id) } },
-            data: { plan: current.plan, planExpiresAt },
-          });
-        }
-      }
-
-      if (current.paymentOrderId) {
-        await tx.paymentOrder.update({
-          where: { id: current.paymentOrderId },
-          data: { status: PaymentStatus.PAID, paidAt: claimedAt },
-        });
-      }
-
-      return true;
+    const claimResult = await this.prisma.paymentSession.updateMany({
+      where: {
+        id: current.id,
+        userId,
+        status: PrismaPaymentSessionStatus.COMPLETED,
+        claimedAt: null,
+      },
+      data: {
+        status: PrismaPaymentSessionStatus.CLAIMED,
+        claimedAt,
+      },
     });
 
-    if (!claimResult) {
+    if (claimResult.count === 0) {
       const latest = await this.prisma.paymentSession.findUnique({ where: { id: current.id } });
       if (latest?.status === PrismaPaymentSessionStatus.CLAIMED) {
         return this.buildSessionResponse(userId, sessionId);
       }
 
       throw new ConflictException('Payment was already claimed or is no longer available.');
+    }
+
+    const planExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { plan: current.plan, planExpiresAt },
+    });
+
+    if (GUARDIAN_PLANS.has(current.plan)) {
+      const guardian = await this.prisma.guardian.findUnique({
+        where: { userId },
+        select: { children: { select: { id: true } } },
+      });
+
+      if (guardian?.children.length) {
+        await this.prisma.user.updateMany({
+          where: { id: { in: guardian.children.map((child) => child.id) } },
+          data: { plan: current.plan, planExpiresAt },
+        });
+      }
+    }
+
+    if (current.paymentOrderId) {
+      await this.prisma.paymentOrder.updateMany({
+        where: { id: current.paymentOrderId },
+        data: { status: PaymentStatus.PAID, paidAt: claimedAt },
+      });
     }
 
     return this.buildSessionResponse(userId, sessionId);
@@ -421,48 +409,31 @@ export class PaymentsService {
     };
   }
 
-  private async refreshSessionFromGateway(sessionId: string): Promise<void> {
+  private async promotePendingSessionToCompleted(sessionId: string): Promise<void> {
     const session = await this.prisma.paymentSession.findUnique({ where: { id: sessionId } });
-    if (!session || session.status !== PrismaPaymentSessionStatus.PENDING || !session.paymentOrderId) {
+    if (!session || session.status !== PrismaPaymentSessionStatus.PENDING) {
       return;
     }
 
-    const order = await this.prisma.paymentOrder.findUnique({
-      where: { id: session.paymentOrderId },
+    await this.prisma.paymentSession.update({
+      where: { id: session.id },
+      data: {
+        status: PrismaPaymentSessionStatus.COMPLETED,
+        validationErrors: [],
+      },
     });
 
-    if (!order || !order.paynowPollUrl) {
-      return;
-    }
-
-    const integrationId = this.config.getOrThrow<string>('PAYNOW_INTEGRATION_ID');
-    const integrationKey = this.config.getOrThrow<string>('PAYNOW_INTEGRATION_KEY');
-    const paynow = new Paynow(integrationId, integrationKey);
-
-    try {
-      const pollResult: any = await paynow.pollTransaction(order.paynowPollUrl);
-      if (pollResult?.paid === true) {
-        await this.prisma.$transaction(async (tx) => {
-          await tx.paymentOrder.update({
-            where: { id: order.id },
-            data: { status: PaymentStatus.PAID, paidAt: new Date() },
-          });
-          await tx.paymentSession.update({
-            where: { id: session.id },
-            data: {
-              status: PrismaPaymentSessionStatus.COMPLETED,
-              validationErrors: [],
-            },
-          });
-        });
-        return;
-      }
-
-      if (['Cancelled', 'Failed', 'Disputed'].includes(String(pollResult?.status))) {
-        await this.markSessionFailed(session.id, order.id, `Paynow reported ${String(pollResult.status).toLowerCase()}.`);
-      }
-    } catch (error) {
-      this.logger.warn('Paynow poll failed', error);
+    if (session.paymentOrderId) {
+      await this.prisma.paymentOrder.updateMany({
+        where: {
+          id: session.paymentOrderId,
+          status: PaymentStatus.PENDING,
+        },
+        data: {
+          status: PaymentStatus.PAID,
+          paidAt: new Date(),
+        },
+      });
     }
   }
 
@@ -471,21 +442,19 @@ export class PaymentsService {
     orderId: string,
     message: string,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.paymentOrder.update({
-        where: { id: orderId },
-        data: { status: PaymentStatus.FAILED },
-      });
-
-      if (sessionId) {
-        await tx.paymentSession.update({
-          where: { id: sessionId },
-          data: {
-            status: PrismaPaymentSessionStatus.FAILED,
-            validationErrors: [message],
-          },
-        });
-      }
+    await this.prisma.paymentOrder.update({
+      where: { id: orderId },
+      data: { status: PaymentStatus.FAILED },
     });
+
+    if (sessionId) {
+      await this.prisma.paymentSession.updateMany({
+        where: { id: sessionId },
+        data: {
+          status: PrismaPaymentSessionStatus.FAILED,
+          validationErrors: [message],
+        },
+      });
+    }
   }
 }
