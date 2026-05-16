@@ -19,11 +19,11 @@ import {
   Role,
 } from '@prisma/client';
 import {
-  PaymentSessionStatus as SharedPaymentSessionStatus,
   Plan as SharedPlan,
 } from '@lernard/shared-types';
 import type {
   PaymentInitResponse,
+  PaymentSessionStatus as SharedPaymentSessionStatus,
   PaymentSessionResponse,
   PaymentStatusResponse,
 } from '@lernard/shared-types';
@@ -80,14 +80,14 @@ function toSharedPaymentSessionStatus(
 ): SharedPaymentSessionStatus {
   switch (status) {
     case PrismaPaymentSessionStatus.COMPLETED:
-      return SharedPaymentSessionStatus.COMPLETED;
+      return 'completed' as SharedPaymentSessionStatus;
     case PrismaPaymentSessionStatus.CLAIMED:
-      return SharedPaymentSessionStatus.CLAIMED;
+      return 'claimed' as SharedPaymentSessionStatus;
     case PrismaPaymentSessionStatus.FAILED:
-      return SharedPaymentSessionStatus.FAILED;
+      return 'failed' as SharedPaymentSessionStatus;
     case PrismaPaymentSessionStatus.PENDING:
     default:
-      return SharedPaymentSessionStatus.PENDING;
+      return 'pending' as SharedPaymentSessionStatus;
   }
 }
 
