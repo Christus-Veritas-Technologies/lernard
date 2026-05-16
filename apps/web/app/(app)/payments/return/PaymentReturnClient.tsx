@@ -8,7 +8,7 @@ import { PaymentSessionStatus } from "@lernard/shared-types";
 import type { PaymentSessionResponse } from "@lernard/shared-types";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
-import { BrowserApiError } from "@/lib/browser-api";
+import { BrowserApiError, BrowserAuthError } from "@/lib/browser-api";
 import { claimPaymentSession, getPaymentSession } from "@/lib/payments-client";
 
 function getPlanDisplayName(plan: string): string {
@@ -23,6 +23,10 @@ function getPlanDisplayName(plan: string): string {
 }
 
 type ViewState = "loading" | "pending" | "success" | "failed" | "missing-session";
+
+interface PaymentReturnClientProps {
+    initialSessionId?: string | null;
+}
 
 function readErrorMessage(error: unknown): string {
     if (error instanceof BrowserApiError) {
@@ -39,45 +43,31 @@ function readErrorMessage(error: unknown): string {
     return "Something went wrong while checking your payment.";
 }
 
-export function PaymentReturnClient() {
+export function PaymentReturnClient({ initialSessionId }: PaymentReturnClientProps) {
     const searchParams = useSearchParams();
     const router = useRouter();
     const queryClient = useQueryClient();
-    const intermediatePaymentId = searchParams.get("intermediatePayment");
-    const legacySessionId = searchParams.get("sessionId");
-    const sessionId = intermediatePaymentId ?? legacySessionId;
-
-    console.log("[PaymentReturnClient] Parsed from URL:", {
-        intermediatePaymentId,
-        legacySessionId,
-        sessionId,
-        hasSessionId: !!sessionId,
-    });
+    const sessionIdFromSearch = searchParams.get("intermediatePayment") ?? searchParams.get("sessionId");
+    const sessionId = initialSessionId ?? sessionIdFromSearch;
 
     const [viewState, setViewState] = useState<ViewState>(sessionId ? "loading" : "missing-session");
     const [session, setSession] = useState<PaymentSessionResponse | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [isConfirming, setIsConfirming] = useState(false);
-
-    console.log("[PaymentReturnClient] Initial viewState:", sessionId ? "loading" : "missing-session");
+    const [authIssue, setAuthIssue] = useState(false);
 
     async function loadSession() {
-        console.log("[PaymentReturnClient.loadSession] Starting with sessionId:", sessionId);
-
         if (!sessionId) {
-            console.log("[PaymentReturnClient.loadSession] No sessionId found, showing missing-session state");
             setViewState("missing-session");
             return;
         }
 
-        console.log("[PaymentReturnClient.loadSession] Setting viewState to 'loading'");
         setViewState("loading");
         setMessage(null);
+        setAuthIssue(false);
 
         try {
-            console.log("[PaymentReturnClient.loadSession] Calling getPaymentSession for:", sessionId);
             const result = await getPaymentSession(sessionId);
-            console.log("[PaymentReturnClient.loadSession] Got session result:", result);
             setSession(result);
 
             if (result.status === PaymentSessionStatus.COMPLETED || result.status === PaymentSessionStatus.CLAIMED) {
@@ -102,13 +92,14 @@ export function PaymentReturnClient() {
 
             setViewState("pending");
         } catch (error) {
-            console.error("[PaymentReturnClient.loadSession] Error caught:", {
-                errorType: error instanceof BrowserApiError ? "BrowserApiError" : error instanceof Error ? error.name : "unknown",
-                errorMessage: error instanceof Error ? error.message : String(error),
-                fullError: error,
-            });
+            if (error instanceof BrowserAuthError) {
+                setAuthIssue(true);
+                setMessage("Your session expired while we were confirming your payment. Sign in to continue.");
+                setViewState("failed");
+                return;
+            }
+
             const errorMsg = readErrorMessage(error);
-            console.log("[PaymentReturnClient.loadSession] Parsed error message:", errorMsg);
             setMessage(errorMsg);
             setViewState("failed");
         } finally {
@@ -117,7 +108,6 @@ export function PaymentReturnClient() {
     }
 
     useEffect(() => {
-        console.log("[PaymentReturnClient.useEffect] Triggered with sessionId:", sessionId);
         void loadSession();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId]);
@@ -224,6 +214,17 @@ export function PaymentReturnClient() {
                         </p>
                     )}
                     <div className="flex flex-wrap justify-center gap-3">
+                        {authIssue && (
+                            <Button
+                                variant="primary"
+                                onClick={() => {
+                                    const next = encodeURIComponent(window.location.pathname + window.location.search);
+                                    router.push(`/login?next=${next}`);
+                                }}
+                            >
+                                Sign in
+                            </Button>
+                        )}
                         <Button variant="secondary" onClick={() => router.push("/plans")}>
                             Try again
                         </Button>
