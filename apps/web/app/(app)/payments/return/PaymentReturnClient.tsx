@@ -47,22 +47,37 @@ export function PaymentReturnClient() {
     const legacySessionId = searchParams.get("sessionId");
     const sessionId = intermediatePaymentId ?? legacySessionId;
 
+    console.log("[PaymentReturnClient] Parsed from URL:", {
+        intermediatePaymentId,
+        legacySessionId,
+        sessionId,
+        hasSessionId: !!sessionId,
+    });
+
     const [viewState, setViewState] = useState<ViewState>(sessionId ? "loading" : "missing-session");
     const [session, setSession] = useState<PaymentSessionResponse | null>(null);
     const [message, setMessage] = useState<string | null>(null);
     const [isConfirming, setIsConfirming] = useState(false);
 
+    console.log("[PaymentReturnClient] Initial viewState:", sessionId ? "loading" : "missing-session");
+
     async function loadSession() {
+        console.log("[PaymentReturnClient.loadSession] Starting with sessionId:", sessionId);
+
         if (!sessionId) {
+            console.log("[PaymentReturnClient.loadSession] No sessionId found, showing missing-session state");
             setViewState("missing-session");
             return;
         }
 
+        console.log("[PaymentReturnClient.loadSession] Setting viewState to 'loading'");
         setViewState("loading");
         setMessage(null);
 
         try {
+            console.log("[PaymentReturnClient.loadSession] Calling getPaymentSession for:", sessionId);
             const result = await getPaymentSession(sessionId);
+            console.log("[PaymentReturnClient.loadSession] Got session result:", result);
             setSession(result);
 
             if (result.status === PaymentSessionStatus.COMPLETED || result.status === PaymentSessionStatus.CLAIMED) {
@@ -87,7 +102,14 @@ export function PaymentReturnClient() {
 
             setViewState("pending");
         } catch (error) {
-            setMessage(readErrorMessage(error));
+            console.error("[PaymentReturnClient.loadSession] Error caught:", {
+                errorType: error instanceof BrowserApiError ? "BrowserApiError" : error instanceof Error ? error.name : "unknown",
+                errorMessage: error instanceof Error ? error.message : String(error),
+                fullError: error,
+            });
+            const errorMsg = readErrorMessage(error);
+            console.log("[PaymentReturnClient.loadSession] Parsed error message:", errorMsg);
+            setMessage(errorMsg);
             setViewState("failed");
         } finally {
             setIsConfirming(false);
@@ -95,6 +117,7 @@ export function PaymentReturnClient() {
     }
 
     useEffect(() => {
+        console.log("[PaymentReturnClient.useEffect] Triggered with sessionId:", sessionId);
         void loadSession();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sessionId]);

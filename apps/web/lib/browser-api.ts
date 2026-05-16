@@ -56,31 +56,51 @@ export async function browserApiFetch<T>(
     route: string,
     options: BrowserApiOptions = {},
 ): Promise<T> {
+    console.log("[browserApiFetch] Starting fetch to:", route);
     const refreshToken = getRefreshToken();
     let accessToken = getAccessToken();
 
+    console.log("[browserApiFetch] Auth state:", {
+        hasRefreshToken: !!refreshToken,
+        hasAccessToken: !!accessToken,
+        skipAuth: options.skipAuth,
+    });
+
     if (!options.skipAuth && !accessToken && refreshToken) {
+        console.log("[browserApiFetch] No accessToken but refreshToken exists; attempting refresh...");
         accessToken = await refreshSession(refreshToken);
     }
 
     if (!options.skipAuth && !accessToken) {
+        console.error("[browserApiFetch] No accessToken and no refreshToken; throwing BrowserAuthError");
         throw new BrowserAuthError();
     }
 
+    console.log("[browserApiFetch] Auth check passed; proceeding with fetch");
+
     try {
+        console.log("[browserApiFetch] Making request to:", route);
         return await requestJson<T>(route, options, accessToken);
     } catch (error) {
+        console.error("[browserApiFetch] Fetch error:", {
+            isApiError: error instanceof BrowserApiError,
+            status: error instanceof BrowserApiError ? error.status : null,
+            message: error instanceof Error ? error.message : String(error),
+        });
+
         if (
             !options.skipAuth
             && error instanceof BrowserApiError
             && error.status === 401
             && refreshToken
         ) {
+            console.log("[browserApiFetch] Got 401 with refreshToken; attempting token refresh...");
             const refreshedAccessToken = await refreshSession(refreshToken);
             return requestJson<T>(route, options, refreshedAccessToken);
         }
 
         if (!options.skipAuth && error instanceof BrowserApiError && error.status === 401) {
+            console.log("[browserApiFetch] Got 401 with no refreshToken; clearing tokens and throwing BrowserAuthError");
             clearTokens();
             throw new BrowserAuthError("Your session has expired. Sign in again to continue.");
         }
