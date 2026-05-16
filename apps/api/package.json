@@ -6,6 +6,8 @@
     "schema": "./prisma/schema.prisma"
   },
   "scripts": {
+    "predev": "bun run --cwd ../../packages/routes build && bun run --cwd ../../packages/shared-types build",
+    "prestart:dev": "bun run --cwd ../../packages/routes build && bun run --cwd ../../packages/shared-types build",
     "build": "nest build",
     "db:generate": "prisma generate --schema ./prisma/schema.prisma",
     "dev": "nest start --watch",
