@@ -1,5 +1,6 @@
 ﻿import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, View } from 'react-native';
+import { useState } from 'react';
+import { Linking, Pressable, ScrollView, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -17,6 +18,7 @@ import { ROUTES } from '@lernard/routes';
 import type {
     GuardianManagedChildSettings,
     GuardianSettingsContent,
+    Plan,
     SettingsContent,
     StudentSettingsContent,
 } from '@lernard/shared-types';
@@ -28,6 +30,7 @@ import { RoleFullScreenLoadingOverlay } from '@/components/RoleFullScreenLoading
 import { StateNotice } from '@/components/StateNotice';
 import { usePagePayload } from '@/hooks/usePagePayload';
 import { capitalize } from '@/lib/formatters';
+import { nativeApiFetch } from '@/lib/native-api';
 
 // ─── Main screen ────────────────────────────────────────────────────────────
 
@@ -100,6 +103,44 @@ export default function SettingsScreen() {
 
 function GuardianSettingsView({ content }: { content: GuardianSettingsContent }) {
     const router = useRouter();
+    const [subscribingPlan, setSubscribingPlan] = useState<Plan | null>(null);
+
+    const guardianPlans: Array<{ key: Plan; name: string; price: string; limit: string; featured?: boolean }> = [
+        {
+            key: 'guardian_family_starter' as Plan,
+            name: 'Family Starter',
+            price: '$7.99/mo',
+            limit: '50 lessons per child/month',
+        },
+        {
+            key: 'guardian_family_standard' as Plan,
+            name: 'Family Standard',
+            price: '$14.99/mo',
+            limit: '80 lessons per child/month',
+            featured: true,
+        },
+        {
+            key: 'guardian_family_premium' as Plan,
+            name: 'Family Premium',
+            price: '$24.99/mo',
+            limit: '150 lessons per child/month',
+        },
+    ];
+
+    async function handleSubscribe(plan: Plan) {
+        setSubscribingPlan(plan);
+        try {
+            const response = await nativeApiFetch<{ redirectUrl: string }>(ROUTES.PAYMENTS.INITIATE, {
+                method: 'POST',
+                body: JSON.stringify({ plan }),
+            });
+            await Linking.openURL(response.redirectUrl);
+        } catch {
+            // Keep user on page if payment initiation fails.
+        } finally {
+            setSubscribingPlan(null);
+        }
+    }
 
     return (
         <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -151,6 +192,51 @@ function GuardianSettingsView({ content }: { content: GuardianSettingsContent })
                                 />
                             ))
                         )}
+                    </View>
+                </View>
+
+                {/* Plans and billing */}
+                <View className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm">
+                    <View className="flex-row items-center gap-2">
+                        <Bookmark01Icon color="#0F172A" size={20} />
+                        <Text className="text-2xl font-semibold text-slate-900">Plans and billing</Text>
+                    </View>
+                    <Text className="mt-2 text-sm leading-6 text-slate-600">
+                        Current plan: {capitalize(content.viewer.plan)}
+                    </Text>
+
+                    <View className="mt-5 gap-3">
+                        {guardianPlans.map((plan) => {
+                            const isCurrent = content.viewer.plan === plan.key;
+                            const isSubscribing = subscribingPlan === plan.key;
+                            const isDisabled = isCurrent || (!!subscribingPlan && !isSubscribing);
+
+                            return (
+                                <View
+                                    className={plan.featured
+                                        ? 'rounded-[24px] border-2 border-indigo-300 bg-indigo-50 p-4'
+                                        : 'rounded-[24px] border border-slate-200 bg-slate-50 p-4'}
+                                    key={plan.key}
+                                >
+                                    <View className="flex-row items-center justify-between gap-3">
+                                        <View className="flex-1">
+                                            <Text className="text-base font-semibold text-slate-900">{plan.name}</Text>
+                                            <Text className="mt-1 text-sm text-slate-600">{plan.price} · {plan.limit}</Text>
+                                        </View>
+                                        <Button
+                                            disabled={isDisabled}
+                                            onPress={isCurrent ? undefined : () => void handleSubscribe(plan.key)}
+                                            title={isCurrent ? 'Current' : isSubscribing ? 'Loading…' : 'Upgrade'}
+                                            variant={plan.featured ? 'primary' : 'secondary'}
+                                        />
+                                    </View>
+                                </View>
+                            );
+                        })}
+                    </View>
+
+                    <View className="mt-4">
+                        <Button onPress={() => router.push('/settings/plans')} title="Compare full plans" variant="secondary" />
                     </View>
                 </View>
 

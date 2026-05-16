@@ -73,6 +73,16 @@ function normalizeExternalBaseUrl(url: string | undefined): string {
   return unquoted.replace(/\/+$/, '');
 }
 
+function resolvePaynowCustomerIdentity(userId: string, email: string | null): string {
+  const normalized = email?.trim().toLowerCase() ?? '';
+  if (normalized.length > 0 && normalized.includes('@')) {
+    return normalized;
+  }
+
+  // Paynow expects a customer identity value; fallback avoids empty-string failures.
+  return `${userId}@lernard.app`;
+}
+
 function toSharedPaymentSessionStatus(
   status: PrismaPaymentSessionStatus,
 ): SharedPaymentSessionStatus {
@@ -170,14 +180,38 @@ export class PaymentsService {
     paynow.resultUrl = `${apiBaseUrl}${ROUTES.PAYMENTS.PAYNOW_CALLBACK}`;
     paynow.returnUrl = `${webAppUrl}/payments/success?intermediatePayment=${encodeURIComponent(session.id)}`;
 
-    const payment = paynow.createPayment(reference, user.email ?? '');
+    const customerIdentity = resolvePaynowCustomerIdentity(user.id, user.email);
+    const payment = paynow.createPayment(reference, customerIdentity);
     payment.add(PLAN_DISPLAY_NAMES[plan] ?? 'Lernard Plan', amount);
 
-    let response: any;
-    try {
-      response = await paynow.send(payment);
-    } catch (error) {
-      this.logger.error('Paynow send failed', error);
+    let response: any = null;
+    let lastSendError: unknown = null;
+
+    // Retry once to align behavior across roles and reduce transient gateway failures.
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        response = await paynow.send(payment);
+      } catch (error) {
+        lastSendError = error;
+        this.logger.warn(`Paynow send attempt ${attempt} failed`, error);
+        continue;
+      }
+
+      if (response?.success) {
+        break;
+      }
+
+      this.logger.warn(`Paynow returned unsuccessful response on attempt ${attempt}`, {
+        reference,
+        sessionId: session.id,
+        plan,
+        userId,
+        customerIdentity,
+      });
+    }
+
+    if (!response) {
+      this.logger.error('Paynow send failed after retries', lastSendError);
       await this.markSessionFailed(session.id, order.id, 'Payment gateway is unavailable.');
       throw new ServiceUnavailableException(
         'Payment gateway is unavailable. Please try again shortly.',
@@ -185,7 +219,15 @@ export class PaymentsService {
     }
 
     if (!response.success) {
-      this.logger.warn('Paynow returned unsuccessful response', { reference, sessionId: session.id });
+      this.logger.warn('Paynow returned unsuccessful response', {
+        reference,
+        sessionId: session.id,
+        plan,
+        userId,
+        customerIdentity,
+        gatewayStatus: response?.status,
+        gatewayMessage: response?.error ?? response?.message,
+      });
       await this.markSessionFailed(session.id, order.id, 'Payment gateway returned an unsuccessful response.');
       throw new ServiceUnavailableException(
         'Payment gateway error. Please try again shortly.',
