@@ -6,12 +6,14 @@ import type {
     GuardianManagedChildSettings,
     GuardianSettingsContent,
     GuardianViewerSummary,
+    Plan,
     ScopedPermission,
 } from "@lernard/shared-types";
 import {
     ArrowRight02Icon,
     CheckmarkCircle01Icon,
     Delete02Icon,
+    Loading03Icon,
     SchoolBell01Icon,
     Settings02Icon,
     UserGroupIcon,
@@ -43,8 +45,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BrowserApiError } from "@/lib/browser-api";
 import { browserApiFetch } from "@/lib/browser-api";
 import { formatRelativeDate } from "@/lib/formatters";
+import { initiatePayment } from "@/lib/payments-client";
 
 import {
     ensureCompanionControls,
@@ -58,11 +62,78 @@ interface GuardianSettingsPageClientProps {
     permissions: ScopedPermission[];
 }
 
+interface GuardianPlanConfig {
+    key: Plan;
+    name: string;
+    tagline: string;
+    price: string;
+    limits: string[];
+    features: string[];
+    featured?: boolean;
+}
+
+const guardianPlans: GuardianPlanConfig[] = [
+    {
+        key: "guardian_family_starter" as Plan,
+        name: "Family Starter",
+        tagline: "For households beginning with Lernard",
+        price: "$7.99/mo",
+        limits: [
+            "50 lessons per child/month",
+            "50 quizzes per child/month",
+            "5 projects per child/month",
+            "600 chat messages per child/month",
+        ],
+        features: [
+            "Guardian dashboard",
+            "Companion controls per child",
+            "Cross-account progress view",
+        ],
+    },
+    {
+        key: "guardian_family_standard" as Plan,
+        name: "Family Standard",
+        tagline: "For active families",
+        price: "$14.99/mo",
+        limits: [
+            "80 lessons per child/month",
+            "80 quizzes per child/month",
+            "10 projects per child/month",
+            "800 chat messages per child/month",
+        ],
+        features: [
+            "Everything in Family Starter",
+            "Priority support",
+            "Detailed learning insights per child",
+        ],
+        featured: true,
+    },
+    {
+        key: "guardian_family_premium" as Plan,
+        name: "Family Premium",
+        tagline: "For families who want it all",
+        price: "$24.99/mo",
+        limits: [
+            "150 lessons per child/month",
+            "150 quizzes per child/month",
+            "15 projects per child/month",
+            "1,200 chat messages per child/month",
+        ],
+        features: [
+            "Everything in Family Standard",
+            "Dedicated onboarding call",
+            "Custom study plans per child",
+        ],
+    },
+];
+
 export function GuardianSettingsPageClient({ content, permissions }: GuardianSettingsPageClientProps) {
     const [children, setChildren] = useState(content.children);
     const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
     const [renameDraft, setRenameDraft] = useState("");
     const [savingField, setSavingField] = useState<string | null>(null);
+    const [initiatingPlan, setInitiatingPlan] = useState<Plan | null>(null);
+    const [billingError, setBillingError] = useState<string | null>(null);
 
     useEffect(() => {
         setChildren(content.children);
@@ -117,6 +188,33 @@ export function GuardianSettingsPageClient({ content, permissions }: GuardianSet
         }
     };
 
+    const currentPlan = content.viewer.plan as Plan;
+
+    const handleSubscribe = async (plan: Plan) => {
+        setInitiatingPlan(plan);
+        setBillingError(null);
+
+        try {
+            const response = await initiatePayment(plan);
+            window.location.href = response.redirectUrl;
+        } catch (error) {
+            let message = "Unable to start upgrade right now. Please try again.";
+            if (error instanceof BrowserApiError) {
+                try {
+                    const parsed = JSON.parse(error.body) as { message?: string };
+                    if (parsed.message) {
+                        message = parsed.message;
+                    }
+                } catch {
+                    // ignore malformed body
+                }
+            }
+
+            setBillingError(message);
+            setInitiatingPlan(null);
+        }
+    };
+
     return (
         <>
             <div className="flex flex-col gap-6">
@@ -159,6 +257,7 @@ export function GuardianSettingsPageClient({ content, permissions }: GuardianSet
                         <TabsTrigger value="household">Household</TabsTrigger>
                         <TabsTrigger value="children">Children</TabsTrigger>
                         <TabsTrigger value="controls">Companion controls</TabsTrigger>
+                        <TabsTrigger value="billing">Plans &amp; billing</TabsTrigger>
                     </TabsList>
 
                     <TabsContent className="grid gap-6 lg:grid-cols-3" value="household">
@@ -309,6 +408,90 @@ export function GuardianSettingsPageClient({ content, permissions }: GuardianSet
                                 );
                             })
                         )}
+                    </TabsContent>
+
+                    <TabsContent className="grid gap-6" value="billing">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Household plan</CardTitle>
+                                <CardDescription>
+                                    Upgrade your Guardian plan from settings and continue directly through the secure payment flow.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="flex flex-wrap items-center gap-3">
+                                <Badge tone="primary">Current plan: {formatTokenLabel(currentPlan)}</Badge>
+                                <Link href="/plans">
+                                    <Button variant="secondary">Compare all plans</Button>
+                                </Link>
+                            </CardContent>
+                        </Card>
+
+                        {billingError && (
+                            <Alert variant="warning">
+                                <AlertTitle>Upgrade failed</AlertTitle>
+                                <AlertDescription>{billingError}</AlertDescription>
+                            </Alert>
+                        )}
+
+                        <div className="grid gap-4 lg:grid-cols-3">
+                            {guardianPlans.map((plan) => {
+                                const isCurrent = plan.key === currentPlan;
+                                const isLoading = initiatingPlan === plan.key;
+                                const disabled = isCurrent || (!!initiatingPlan && !isLoading);
+
+                                return (
+                                    <Card
+                                        className={plan.featured
+                                            ? "border-primary-300 shadow-[0_14px_40px_-28px_rgba(67,56,202,0.65)]"
+                                            : undefined}
+                                        key={plan.key}
+                                    >
+                                        <CardHeader>
+                                            <CardTitle className="flex items-center gap-2">
+                                                {plan.name}
+                                                {plan.featured && (
+                                                    <Badge tone="cool">Popular</Badge>
+                                                )}
+                                            </CardTitle>
+                                            <CardDescription>{plan.tagline}</CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <p className="text-2xl font-semibold text-text-primary">{plan.price}</p>
+                                            <Button
+                                                className="w-full"
+                                                disabled={disabled}
+                                                onClick={isCurrent ? undefined : () => void handleSubscribe(plan.key)}
+                                                variant={plan.featured ? "primary" : "secondary"}
+                                            >
+                                                {isLoading ? (
+                                                    <Loading03Icon className="animate-spin" size={16} />
+                                                ) : isCurrent ? (
+                                                    "Current plan"
+                                                ) : (
+                                                    "Upgrade"
+                                                )}
+                                            </Button>
+
+                                            <div className="space-y-1.5">
+                                                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-text-tertiary">Limits</p>
+                                                {plan.limits.map((limit) => (
+                                                    <p className="text-sm text-text-secondary" key={limit}>{limit}</p>
+                                                ))}
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                {plan.features.map((feature) => (
+                                                    <div className="flex items-start gap-2" key={feature}>
+                                                        <CheckmarkCircle01Icon className="mt-0.5 text-primary-500" size={14} />
+                                                        <p className="text-sm text-text-secondary">{feature}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+                        </div>
                     </TabsContent>
                 </Tabs>
             </div>
