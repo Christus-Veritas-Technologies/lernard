@@ -46,11 +46,11 @@ export function AppShellNav() {
     const { data: me } = useAuthMeQuery();
     const isGuardian = me?.role === "guardian";
     const navItems = isGuardian ? guardianNavItems : studentNavItems;
-    const mobileNavItems = isGuardian ? guardianNavItems : studentNavItems.slice(0, 5);
+    const mobileNavItems = isGuardian ? guardianNavItems : studentNavItems;
     const sidebarDescription = isGuardian
         ? "Manage your children's learning and configure your household."
         : "Move between home, lessons, practice exams, chat, and settings.";
-    const mobileGridCols = isGuardian ? "grid-cols-3" : "grid-cols-5";
+    const mobileGridCols = isGuardian ? "grid-cols-3" : "grid-cols-6";
 
     return (
         <>

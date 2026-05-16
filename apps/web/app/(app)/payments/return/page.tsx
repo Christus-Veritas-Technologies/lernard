@@ -5,6 +5,15 @@ export const metadata: Metadata = {
     title: "Payment — Lernard",
 };
 
-export default function PaymentReturnPage() {
-    return <PaymentReturnClient />;
+type PageProps = {
+    searchParams?: {
+        intermediatePayment?: string;
+        sessionId?: string;
+    };
+};
+
+export default function PaymentReturnPage({ searchParams }: PageProps) {
+    const sessionId = searchParams?.intermediatePayment ?? searchParams?.sessionId ?? null;
+
+    return <PaymentReturnClient initialSessionId={sessionId} />;
 }
